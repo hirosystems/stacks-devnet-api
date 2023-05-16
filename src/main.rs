@@ -6,7 +6,7 @@ use std::{collections::BTreeMap, time::Duration};
 use k8s_openapi::{
     api::core::v1::{
         ConfigMap, ConfigMapEnvSource, ConfigMapVolumeSource, Container, ContainerPort,
-        EnvFromSource, EnvVar, HostPathVolumeSource, PersistentVolumeClaim,
+        EnvFromSource, EnvVar, HostPathVolumeSource, Namespace, PersistentVolumeClaim,
         PersistentVolumeClaimSpec, PersistentVolumeClaimVolumeSource, Pod, ResourceRequirements,
         Service, ServicePort, Volume, VolumeMount,
     },
@@ -21,86 +21,71 @@ use kube::{
 };
 use std::thread::sleep;
 
+const BITCOIND_CHAIN_COORDINATOR_SERVICE_NAME: &str = "bitcoind-service";
+const STACKS_NODE_SERVICE_NAME: &str = "stacks-node-service";
+// const CHAIN_COORDINATOR_SERVICE_NAME: &str = "orchestrator-service";
+
+const BITCOIND_P2P_PORT: &str = "18444";
+const BITCOIND_RPC_PORT: &str = "18443";
+const STACKS_NODE_P2P_PORT: &str = "20444";
+const STACKS_NODE_RPC_PORT: &str = "20443";
+const CHAIN_COORDINATOR_INGESTION_PORT: &str = "20445";
+const CHAIN_COORDINATOR_CONTROL_PORT: &str = "20446";
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    const BITCOIN_NODE_SERVICE_NAME: &str = "bitcoin-node-service";
-    const ORCHESTRATOR_SERVICE_NAME: &str = "orchestrator-service";
-
     // values from user config
     // let user_id = "user-id";
     // let user_project_name = "my-project";
     let namespace = "px-devnet"; //format!("{user_id}-{user_project_name}-devnet");
-    let bitcoin_node_image = "quay.io/hirosystems/bitcoind:devnet-v3";
-    let bitcoin_node_p2p_port = "18444";
-    let bitcoin_node_rpc_port = "18443";
-    let stacks_node_image = "quay.io/hirosystems/stacks-node:devnet-v3";
-    let stacks_node_p2p_port = "20444";
-    let stacks_node_rpc_port = "20443";
     let stacks_miner_secret_key_hex =
         "7287ba251d44a4d3fd9276c88ce34c5c52a038955511cccaf77e61068649c17801";
     let miner_stx_address = "ST1SJ3DTE5DN7X54YDH5D64R3BCB6A2AG2ZQ8YPD5";
     let stacks_node_wait_time_for_microblocks: u32 = 50;
     let stacks_node_first_attempt_time_ms: u32 = 500;
     let stacks_node_subsequent_attempt_time_ms: u32 = 1_000;
-    let orchestrator_ingestion_port = "20445";
+    let pox_2_activation = 112;
+    let epoch_2_0 = 100;
+    let epoch_2_05 = 102;
+    let epoch_2_1 = 106;
 
-    let stacks_api_image = "hirosystems/stacks-blockchain-api";
-    let chain_coordinator_image = "stacks-network";
+    create_namespace(&namespace).await?;
+    deploy_bitcoin_node_pod(&namespace).await?;
 
-    deploy_bitcoin_node_pod(
-        &namespace,
-        &bitcoin_node_image,
-        &bitcoin_node_p2p_port,
-        &bitcoin_node_rpc_port,
-        BITCOIN_NODE_SERVICE_NAME,
-    )
-    .await?;
-
-    deploy_chain_coordinator(
-        &namespace,
-        &chain_coordinator_image,
-        ORCHESTRATOR_SERVICE_NAME,
-    )
-    .await?;
+    // deploy_chain_coordinator(&namespace).await?;
 
     sleep(Duration::from_secs(10));
 
     deploy_stacks_node_pod(
         &namespace,
-        &stacks_node_image,
-        &stacks_node_p2p_port,
-        &stacks_node_rpc_port,
         &stacks_miner_secret_key_hex,
         &stacks_node_wait_time_for_microblocks,
         &stacks_node_first_attempt_time_ms,
         &stacks_node_subsequent_attempt_time_ms,
         &miner_stx_address,
-        // &bitcoin_node_p2p_port,
-        // &bitcoin_node_rpc_port,
-        // &orchestrator_ingestion_port,
-        // BITCOIN_NODE_SERVICE_NAME,
-        // ORCHESTRATOR_SERVICE_NAME,
+        pox_2_activation,
+        epoch_2_0,
+        epoch_2_05,
+        epoch_2_1,
     )
     .await?;
 
-    deploy_stacks_api_pod(&namespace, &stacks_api_image).await?;
+    deploy_stacks_api_pod(&namespace).await?;
+
     let client = Client::try_default().await?;
     let pods_api: Api<Pod> = Api::namespaced(client, &namespace);
     // Watch it phase for a few seconds
-    let establish = await_condition(pods_api.clone(), "bitcoin-node", is_pod_running());
+    let establish = await_condition(pods_api.clone(), "bitcoind", is_pod_running());
     let _ = tokio::time::timeout(std::time::Duration::from_secs(15), establish).await?;
 
     // Verify we can get it
-    println!("Get Pod bitcoin-node");
-    let p1cpy = pods_api.get("bitcoin-node").await?;
+    println!("Get Pod bitcoind");
+    let p1cpy = pods_api.get("bitcoind").await?;
     if let Some(spec) = &p1cpy.spec {
-        println!(
-            "Got bitcoin-node pod with containers: {:?}",
-            spec.containers
-        );
+        println!("Got bitcoind pod with containers: {:?}", spec.containers);
     }
 
-    let lp = ListParams::default().fields(&format!("metadata.name={}", "bitcoin-node")); // only want results for our pod
+    let lp = ListParams::default().fields(&format!("metadata.name={}", "bitcoind")); // only want results for our pod
     for p in pods_api.list(&lp).await? {
         println!("Found Pod: {}", p.name_any());
     }
@@ -115,24 +100,48 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-async fn deploy_bitcoin_node_pod(
-    namespace: &str,
-    image: &str,
-    p2p_port: &str,
-    rpc_port: &str,
-    service_name: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
-    // constants for bitcoin pod, services, and config
-    const POD_NAME: &str = "bitcoin-node";
-    const CONTAINER_NAME: &str = "bitcoin-node-container";
-    const CONFIGMAP_NAME: &str = "bitcoin-conf";
-    const CONFIGMAP_VOLUME_NAME: &str = "bitcoin-conf-volume";
+async fn create_namespace(namespace: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let client = Client::try_default().await?;
+    let namespace_api: Api<Namespace> = kube::Api::all(client);
 
-    // massage user data
-    let p2p_port = p2p_port.parse::<i32>()?;
-    let rpc_port = rpc_port.parse::<i32>()?;
+    let namespace: Namespace = serde_json::from_value(json!({
+        "apiVersion": "v1",
+        "kind": "Namespace",
+        "metadata": {
+            "name": namespace,
+            "labels": {
+                "name": namespace
+            }
+        }
+    }))?;
+    let post_params = PostParams::default();
+    let created_namespace = namespace_api.create(&post_params, &namespace).await?;
+    let name = created_namespace.name_any();
+    assert_eq!(namespace.name_any(), name);
+    println!("Created {}", name);
+    Ok(())
+}
 
-    // deploy config map for bitcoin node
+async fn deploy_bitcoin_node_pod(namespace: &str) -> Result<(), Box<dyn std::error::Error>> {
+    const POD_NAME: &str = "bitcoind-chain-coordinator";
+    const BITCOIND_CONTAINER_NAME: &str = "bitcoind-container";
+    const BITCOIND_CONFIGMAP_NAME: &str = "bitcoind-conf";
+    const BITCOIND_CONFIGMAP_VOLUME_NAME: &str = "bitcoind-conf-volume";
+    const BITCOIND_IMAGE: &str = "quay.io/hirosystems/bitcoind:devnet-v3";
+
+    const CHAIN_COORDINATOR_CONTAINER_NAME: &str = "chain-coordinator-container";
+    const CHAIN_COORDINATOR_CONFIGMAP_NAME: &str = "chain-coordinator-conf";
+    const CHAIN_COORDINATOR_CONFIGMAP_VOLUME_NAME: &str = "chain-coordinator-conf-volume";
+    const CHAIN_COORDINATOR_IMAGE: &str = "stacks-network";
+
+    let bitcoind_p2p_port = BITCOIND_P2P_PORT.parse::<i32>()?;
+    let bitcoind_rpc_port = BITCOIND_RPC_PORT.parse::<i32>()?;
+    let coordinator_ingestion_port = CHAIN_COORDINATOR_INGESTION_PORT.parse::<i32>()?;
+    let coordinator_control_port = CHAIN_COORDINATOR_CONTROL_PORT.parse::<i32>()?;
+
+    let project_path = String::from("/foo2");
+
+    // deploy configmap for bitcoin node
     {
         let client = Client::try_default().await?;
         let config_map_api: Api<ConfigMap> = kube::Api::<ConfigMap>::namespaced(client, &namespace);
@@ -157,16 +166,16 @@ async fn deploy_bitcoin_node_pod(
                 fallbackfee=0.00001
                 
                 [regtest]
-                bind=0.0.0.0:{p2p_port}
-                rpcbind=0.0.0.0:{rpc_port}
-                rpcport={rpc_port}
+                bind=0.0.0.0:{bitcoind_p2p_port}
+                rpcbind=0.0.0.0:{bitcoind_rpc_port}
+                rpcport={bitcoind_rpc_port}
                 "#
         );
         let config_map: ConfigMap = serde_json::from_value(json!({
             "apiVersion": "v1",
             "kind": "ConfigMap",
             "metadata": {
-                "name": CONFIGMAP_NAME,
+                "name": BITCOIND_CONFIGMAP_NAME,
                 "namespace": namespace
             },
             "data": {
@@ -182,7 +191,7 @@ async fn deploy_bitcoin_node_pod(
         println!("Created {}", name);
     }
 
-    // deploy bitcoin node pod
+    // deploy  pod
     {
         let client = Client::try_default().await?;
         let pods_api: Api<Pod> = Api::namespaced(client, &namespace);
@@ -196,52 +205,94 @@ async fn deploy_bitcoin_node_pod(
             "labels": {"name": POD_NAME}
         },
         "spec": {
-            "containers": Some(vec![ Container {
-                name: CONTAINER_NAME.into(),
-                image: Some(image.into()),
-                command: Some(vec![
-                    "/usr/local/bin/bitcoind".into(),
-                    "-conf=/etc/bitcoin/bitcoin.conf".into(),
-                    "-nodebuglogfile".into(),
-                    "-pid=/run/bitcoind.pid".into(),
-                ]),
-                ports: Some(vec![
-                    ContainerPort {
-                        container_port: p2p_port,
-                        protocol: Some("TCP".into()),
-                        name: Some("p2p".into()),
+            "containers": Some(vec![
+                Container {
+                    name: BITCOIND_CONTAINER_NAME.into(),
+                    image: Some(BITCOIND_IMAGE.into()),
+                    command: Some(vec![
+                        "/usr/local/bin/bitcoind".into(),
+                        "-conf=/etc/bitcoin/bitcoin.conf".into(),
+                        "-nodebuglogfile".into(),
+                        "-pid=/run/bitcoind.pid".into(),
+                    ]),
+                    ports: Some(vec![
+                        ContainerPort {
+                            container_port: bitcoind_p2p_port,
+                            protocol: Some("TCP".into()),
+                            name: Some("p2p".into()),
+                            ..Default::default()
+                        },
+                        ContainerPort {
+                            container_port: bitcoind_rpc_port,
+                            protocol: Some("TCP".into()),
+                            name: Some("rpc".into()),
+                            ..Default::default()
+                        },
+                        ContainerPort {
+                            container_port: coordinator_ingestion_port,
+                            protocol: Some("TCP".into()),
+                            name: Some("orchestrator".into()),
+                            ..Default::default()
+                        },
+                    ]),
+                    volume_mounts: Some(vec![ VolumeMount {
+                        name: BITCOIND_CONFIGMAP_VOLUME_NAME.into(),
+                        mount_path: "/etc/bitcoin".into(),
+                        read_only: Some(true),
                         ..Default::default()
-                    },
-                    ContainerPort {
-                        container_port: rpc_port,
-                        protocol: Some("TCP".into()),
-                        name: Some("rpc".into()),
-                        ..Default::default()
-                    },
-                    ContainerPort {
-                        container_port: 20445,
-                        protocol: Some("TCP".into()),
-                        name: Some("orchestrator".into()),
-                        ..Default::default()
-                    },
-                ]),
-                volume_mounts: Some(vec![ VolumeMount {
-                    name: CONFIGMAP_VOLUME_NAME.into(),
-                    mount_path: "/etc/bitcoin".into(),
-                    read_only: Some(true),
+                    }]),
                     ..Default::default()
-                }]),
-                ..Default::default()
-            }]),
+                },
+                Container {
+                    name: CHAIN_COORDINATOR_CONTAINER_NAME.into(),
+                    image: Some(CHAIN_COORDINATOR_IMAGE.into()),
+                    image_pull_policy: Some("Never".into()),
+                    command: Some(vec![
+                        "./stacks-network".into(),
+                        "--manifest-path=/etc/stacks-network/project/Clarinet.toml".into(),
+                        "--deployment-plan-path=/etc/stacks-network/project/deployments/default.devnet-plan.yaml".into(),
+                        "--project-root-path=/etc/stacks-network/project/".into(),
+                    ]),
+                    ports: Some(vec![
+                        ContainerPort {
+                            container_port: coordinator_ingestion_port,
+                            protocol: Some("TCP".into()),
+                            name: Some("coordinator-in".into()),
+                            ..Default::default()
+                        },
+                        ContainerPort {
+                            container_port: coordinator_control_port,
+                            protocol: Some("TCP".into()),
+                            name: Some("coordinator-con".into()),
+                            ..Default::default()
+                        },
+                    ]),
+                    volume_mounts: Some(vec![
+                        VolumeMount {
+                            name: "project".into(),
+                            mount_path: "/etc/stacks-network/project".into(),
+                            read_only: Some(false),
+                            ..Default::default()
+                        }
+                    ]),
+                    ..Default::default()
+                }
+            ]),
             "volumes": Some(vec![
                 Volume {
-                name: CONFIGMAP_VOLUME_NAME.into(),
-                config_map: Some(ConfigMapVolumeSource {
-                    name: Some(CONFIGMAP_NAME.into())
-                    , ..Default::default()
-                }),
-                ..Default::default()
-            }])
+                    name: BITCOIND_CONFIGMAP_VOLUME_NAME.into(),
+                    config_map: Some(ConfigMapVolumeSource {
+                        name: Some(BITCOIND_CONFIGMAP_NAME.into())
+                        , ..Default::default()
+                    }),
+                    ..Default::default()
+                },
+                Volume {
+                    name: "project".into(),
+                    host_path: Some(HostPathVolumeSource { path: project_path, type_: Some("Directory".into())}),
+                    ..Default::default()
+                }
+            ])
         }}))?;
 
         let pp = PostParams::default();
@@ -250,36 +301,48 @@ async fn deploy_bitcoin_node_pod(
         println!("created pod {}", name);
     }
 
-    // deploy service to communicate with container
+    // deploy service
     {
         let client = Client::try_default().await?;
         let service_api: Api<Service> = Api::namespaced(client, &namespace);
 
         let mut selector = BTreeMap::<String, String>::new();
-        selector.insert("name".into(), CONTAINER_NAME.into());
+        selector.insert("name".into(), BITCOIND_CONTAINER_NAME.into());
 
         let service: Service = serde_json::from_value(json!({
             "apiVersion": "v1",
             "kind": "Service",
             "metadata": {
-                "name": service_name,
+                "name": BITCOIND_CHAIN_COORDINATOR_SERVICE_NAME,
                 "namespace": namespace
             },
             "spec":  {
-                "type": "NodePort",
-                "ports": Some(vec![ServicePort {
-                    port: p2p_port,
-                    protocol: Some("TCP".into()),
-                    name: Some("p2p".into()),
-                    node_port: Some(30000),
-                    ..Default::default()
-                },ServicePort {
-                    port: rpc_port,
-                    protocol: Some("TCP".into()),
-                    name: Some("rpc".into()),
-                    node_port: Some(30001),
-                    ..Default::default()
-                }]),
+                "ports": Some(vec![
+                    ServicePort {
+                        port: bitcoind_p2p_port,
+                        protocol: Some("TCP".into()),
+                        name: Some("p2p".into()),
+                        ..Default::default()
+                    },
+                    ServicePort {
+                        port: bitcoind_rpc_port,
+                        protocol: Some("TCP".into()),
+                        name: Some("rpc".into()),
+                        ..Default::default()
+                    },
+                    ServicePort {
+                        port: coordinator_ingestion_port,
+                        protocol: Some("TCP".into()),
+                        name: Some("coordinator-in".into()),
+                        ..Default::default()
+                    },
+                    ServicePort {
+                        port: coordinator_control_port,
+                        protocol: Some("TCP".into()),
+                        name: Some("coordinator-con".into()),
+                        ..Default::default()
+                    }
+                ]),
                 "selector":  {"name": POD_NAME},
             }
         }))?;
@@ -292,145 +355,260 @@ async fn deploy_bitcoin_node_pod(
     Ok(())
 }
 
+// async fn deploy_chain_coordinator(namespace: &str) -> Result<(), Box<dyn std::error::Error>> {
+//     const POD_NAME: &str = "chain-coordinator";
+//     const CONTAINER_NAME: &str = "chain-coordinator-container";
+
+//     let ingestion_port = CHAIN_COORDINATOR_INGESTION_PORT.parse::<i32>()?;
+//     let control_port = CHAIN_COORDINATOR_CONTROL_PORT.parse::<i32>()?;
+
+//     // deploy pod
+//     {
+//         let client = Client::try_default().await?;
+//         let pods_api: Api<Pod> = Api::namespaced(client, &namespace);
+
+//         let project_path = String::from("/foo2");
+
+//         let pod: Pod = serde_json::from_value(json!({
+//         "apiVersion": "v1",
+//         "kind": "Pod",
+//         "metadata": {
+//             "name": POD_NAME,
+//             "namespace": namespace,
+//             "labels": {"name": POD_NAME}
+//         },
+//         "spec": {
+//             "containers": Some(vec![ Container {
+//                 name: CONTAINER_NAME.into(),
+//                 image: Some(CHAIN_COORDINATOR_IMAGE.into()),
+//                 image_pull_policy: Some("Never".into()),
+//                 command: Some(vec![
+//                     "./stacks-network".into(),
+//                     "--manifest-path=/etc/stacks-network/project/Clarinet.toml".into(),
+//                     "--deployment-plan-path=/etc/stacks-network/project/deployments/default.devnet-plan.yaml".into(),
+//                     "--project-root-path=/etc/stacks-network/project/".into(),
+//                 ]),
+//                 ports: Some(vec![
+//                     ContainerPort {
+//                         container_port: ingestion_port,
+//                         protocol: Some("TCP".into()),
+//                         name: Some("coordinator-in".into()),
+//                         ..Default::default()
+//                     },
+//                     ContainerPort {
+//                         container_port: control_port,
+//                         protocol: Some("TCP".into()),
+//                         name: Some("coordinator-con".into()),
+//                         ..Default::default()
+//                     },
+//                 ]),
+//                 volume_mounts: Some(vec![
+//                     VolumeMount {
+//                         name: "project".into(),
+//                         mount_path: "/etc/stacks-network/project".into(),
+//                         read_only: Some(false),
+//                         ..Default::default()
+//                     }
+//                 ]),
+//                 ..Default::default()
+//             }]),
+//             "volumes": Some(vec![
+//                 Volume {
+//                     name: "project".into(),
+//                     host_path: Some(HostPathVolumeSource { path: project_path, type_: Some("Directory".into())}),
+//                     ..Default::default()
+//                 }
+//             ])
+//         }}))?;
+
+//         let pp = PostParams::default();
+//         let response = pods_api.create(&pp, &pod).await?;
+//         let name = response.name_any();
+//         println!("created pod {}", name);
+//     }
+
+//     // deploy service
+//     {
+//         let client = Client::try_default().await?;
+//         let service_api: Api<Service> = Api::namespaced(client, &namespace);
+
+//         let mut selector = BTreeMap::<String, String>::new();
+//         selector.insert("name".into(), CONTAINER_NAME.into());
+
+//         let service: Service = serde_json::from_value(json!({
+//             "apiVersion": "v1",
+//             "kind": "Service",
+//             "metadata": {
+//                 "name": CHAIN_COORDINATOR_SERVICE_NAME,
+//                 "namespace": namespace
+//             },
+//             "spec":  {
+//                 "ports": Some(vec![ServicePort {
+//                     port: 20445,
+//                     protocol: Some("TCP".into()),
+//                     name: Some("coordinator-in".into()),
+//                     ..Default::default()
+//                 },ServicePort {
+//                     port: 20446,
+//                     protocol: Some("TCP".into()),
+//                     name: Some("coordinator-con".into()),
+//                     ..Default::default()
+//                 }]),
+//                 "selector":  {"name": POD_NAME},
+//             }
+//         }))?;
+
+//         let pp = PostParams::default();
+//         let response = service_api.create(&pp, &service).await?;
+//         let name = response.name_any();
+//         println!("created service {}", name);
+//     }
+//     Ok(())
+// }
+
 async fn deploy_stacks_node_pod(
     namespace: &str,
-    image: &str,
-    p2p_port: &str,
-    rpc_port: &str,
     miner_secret_key_hex: &str,
     wait_time_for_microblocks: &u32,
     first_attempt_time_ms: &u32,
     subsequent_attempt_time_ms: &u32,
     miner_coinbase_recipient: &str,
-    // bitcoin_node_p2p_port: &str,
-    // bitcoin_node_rpc_port: &str,
-    // orchestrator_ingestion_port: &str,
-    // bitcoin_node_service_name: &str,
-    // orchestrator_service_name: &str,
+    pox_2_activation: i32,
+    epoch_2_0: i32,
+    epoch_2_05: i32,
+    epoch_2_1: i32,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // constants for stacks pod, services, and config
     const POD_NAME: &str = "stacks-node";
     const CONTAINER_NAME: &str = "stacks-node-container";
-    const CONFIGMAP_NAME: &str = "stacks-conf";
-    const CONFIGMAP_VOLUME_NAME: &str = "stacks-conf-volume";
-    const SERVICE_NAME: &str = "stacks-node-service";
+    const CONFIGMAP_NAME: &str = "stacks-node-conf";
+    const CONFIGMAP_VOLUME_NAME: &str = "stacks-node-conf-volume";
+    const STACKS_NODE_IMAGE: &str = "quay.io/hirosystems/stacks-node:devnet-v3";
 
-    // massage user data
-    let p2p_port = p2p_port.parse::<i32>()?;
-    let rpc_port = rpc_port.parse::<i32>()?;
+    let p2p_port = STACKS_NODE_P2P_PORT.parse::<i32>()?;
+    let rpc_port = STACKS_NODE_RPC_PORT.parse::<i32>()?;
 
-    // deploy config map for stacks node
+    // deploy configmap
     {
         let client = Client::try_default().await?;
         let config_map_api: Api<ConfigMap> = kube::Api::<ConfigMap>::namespaced(client, &namespace);
+        let stacks_conf = {
+            let mut stacks_conf = format!(
+                r#"
+                    [node]
+                    working_dir = "/devnet"
+                    rpc_bind = "0.0.0.0:{rpc_port}"
+                    p2p_bind = "0.0.0.0:{p2p_port}"
+                    miner = true
+                    seed = "{miner_secret_key_hex}"
+                    local_peer_seed = "{miner_secret_key_hex}"
+                    pox_sync_sample_secs = 0
+                    wait_time_for_blocks = 0
+                    wait_time_for_microblocks = {wait_time_for_microblocks}
+                    microblock_frequency = 1000
 
-        let mut stacks_conf = format!(
-            r#"
-                [node]
-                working_dir = "/devnet"
-                rpc_bind = "0.0.0.0:{rpc_port}"
-                p2p_bind = "0.0.0.0:{p2p_port}"
-                miner = true
-                seed = "{miner_secret_key_hex}"
-                local_peer_seed = "{miner_secret_key_hex}"
-                pox_sync_sample_secs = 0
-                wait_time_for_blocks = 0
-                wait_time_for_microblocks = {wait_time_for_microblocks}
-                microblock_frequency = 1000
+                    [connection_options]
+                    # inv_sync_interval = 10
+                    # download_interval = 10
+                    # walk_interval = 10
+                    disable_block_download = true
+                    disable_inbound_handshakes = true
+                    disable_inbound_walks = true
+                    public_ip_address = "1.1.1.1:1234"
 
-                [connection_options]
-                # inv_sync_interval = 10
-                # download_interval = 10
-                # walk_interval = 10
-                disable_block_download = true
-                disable_inbound_handshakes = true
-                disable_inbound_walks = true
-                public_ip_address = "1.1.1.1:1234"
-
-                [miner]
-                first_attempt_time_ms = {first_attempt_time_ms}
-                subsequent_attempt_time_ms = {subsequent_attempt_time_ms}
-                block_reward_recipient = "{miner_coinbase_recipient}"
-                # microblock_attempt_time_ms = 15000
-                "#
-        );
-
-        let balance: u64 = 100_000_000_000_000;
-        stacks_conf.push_str(&format!(
-            r#"
-        [[ustx_balance]]
-        address = "{miner_coinbase_recipient}"
-        amount = {balance}
-        "#
-        ));
-
-        let cluster_domain = "cluster.local";
-
-        stacks_conf.push_str(&format!(
-            r#"
-# Add orchestrator (docker-host) as an event observer
-[[events_observer]]
-endpoint = "host.docker.internal:30008"
-retry_count = 255
-include_data_events = true
-events_keys = ["*"]
-"#
-        ));
-
-        //         stacks_conf.push_str(&format!(
-        //             r#"
-        // # Add stacks-api as an event observer
-        // [[events_observer]]
-        // endpoint = "host.docker.internal:{}"
-        // retry_count = 255
-        // include_data_events = false
-        // events_keys = ["*"]
-        // "#,
-        //             30007,
-        //         ));
-
-        stacks_conf.push_str(&format!(
-            r#"
-[burnchain]
-chain = "bitcoin"
-mode = "krypton"
-poll_time_secs = 1
-timeout = 30
-peer_host = "host.docker.internal" 
-rpc_ssl = false
-wallet_name = "devnet"
-username = "{namespace}"
-password = "{namespace}"
-rpc_port = {}
-peer_port = {}
-"#,
-            30008, 30000
-        ));
-
-        let pox_2_activation = 112;
-        let epoch_2_0 = 100;
-        let epoch_2_05 = 102;
-        let epoch_2_1 = 106;
-        stacks_conf.push_str(&format!(
-            r#"pox_2_activation = {pox_2_activation}
-
-[[burnchain.epochs]]
-epoch_name = "1.0"
-start_height = 0
-
-[[burnchain.epochs]]
-epoch_name = "2.0"
-start_height = {epoch_2_0}
-
-[[burnchain.epochs]]
-epoch_name = "2.05"
-start_height = {epoch_2_05}
-
-[[burnchain.epochs]]
-epoch_name = "2.1"
-start_height = {epoch_2_1}
+                    [miner]
+                    first_attempt_time_ms = {first_attempt_time_ms}
+                    subsequent_attempt_time_ms = {subsequent_attempt_time_ms}
+                    block_reward_recipient = "{miner_coinbase_recipient}"
+                    # microblock_attempt_time_ms = 15000
                     "#
-        ));
+            );
+
+            let balance: u64 = 100_000_000_000_000;
+            stacks_conf.push_str(&format!(
+                r#"
+                [[ustx_balance]]
+                address = "{miner_coinbase_recipient}"
+                amount = {balance}
+                "#
+            ));
+
+            let namespaced_host = format!("{}.svc.cluster.local", &namespace);
+            let bitcoind_chain_coordinator_host = format!(
+                "{}.{}",
+                &BITCOIND_CHAIN_COORDINATOR_SERVICE_NAME, namespaced_host
+            );
+
+            stacks_conf.push_str(&format!(
+                r#"
+                # Add orchestrator (docker-host) as an event observer
+                [[events_observer]]
+                endpoint = "{}:{}"
+                retry_count = 255
+                include_data_events = true
+                events_keys = ["*"]
+                "#,
+                bitcoind_chain_coordinator_host, CHAIN_COORDINATOR_INGESTION_PORT
+            ));
+
+            //         stacks_conf.push_str(&format!(
+            //             r#"
+            // # Add stacks-api as an event observer
+            // [[events_observer]]
+            // endpoint = "host.docker.internal:{}"
+            // retry_count = 255
+            // include_data_events = false
+            // events_keys = ["*"]
+            // "#,
+            //             30007,
+            //         ));
+
+            stacks_conf.push_str(&format!(
+                r#"
+                [burnchain]
+                chain = "bitcoin"
+                mode = "krypton"
+                poll_time_secs = 1
+                timeout = 30
+                peer_host = "{}" 
+                rpc_ssl = false
+                wallet_name = "devnet"
+                username = "{}"
+                password = "{}"
+                rpc_port = {}
+                peer_port = {}
+                "#,
+                bitcoind_chain_coordinator_host,
+                namespace,
+                namespace,
+                CHAIN_COORDINATOR_INGESTION_PORT, /* TODO: this is supposed to be the coordinator ingestion port (consider making coorinator/bitcoind same pod) */
+                BITCOIND_P2P_PORT
+            ));
+
+            stacks_conf.push_str(&format!(
+                r#"
+                pox_2_activation = {}
+
+                [[burnchain.epochs]]
+                epoch_name = "1.0"
+                start_height = 0
+
+                [[burnchain.epochs]]
+                epoch_name = "2.0"
+                start_height = {}
+
+                [[burnchain.epochs]]
+                epoch_name = "2.05"
+                start_height = {}
+
+                [[burnchain.epochs]]
+                epoch_name = "2.1"
+                start_height = {}
+                "#,
+                pox_2_activation, epoch_2_0, epoch_2_05, epoch_2_1
+            ));
+            stacks_conf
+        };
+
         let config_map: ConfigMap = serde_json::from_value(json!({
             "apiVersion": "v1",
             "kind": "ConfigMap",
@@ -451,7 +629,7 @@ start_height = {epoch_2_1}
         println!("Created {}", name);
     }
 
-    // deploy stacks node pod
+    // deploy pod
     {
         let client = Client::try_default().await?;
         let pods_api: Api<Pod> = Api::namespaced(client, &namespace);
@@ -467,7 +645,7 @@ start_height = {epoch_2_1}
         "spec": {
             "containers": Some(vec![ Container {
                 name: CONTAINER_NAME.into(),
-                image: Some(image.into()),
+                image: Some(STACKS_NODE_IMAGE.into()),
                 command: Some(vec![
                     "stacks-node".into(),
                     "start".into(),
@@ -529,7 +707,7 @@ start_height = {epoch_2_1}
         println!("created pod {}", name);
     }
 
-    // deploy service to communicate with container
+    // deploy service
     {
         let client = Client::try_default().await?;
         let service_api: Api<Service> = Api::namespaced(client, &namespace);
@@ -541,22 +719,19 @@ start_height = {epoch_2_1}
             "apiVersion": "v1",
             "kind": "Service",
             "metadata": {
-                "name": SERVICE_NAME,
+                "name": STACKS_NODE_SERVICE_NAME,
                 "namespace": namespace
             },
             "spec":  {
-                "type": "NodePort",
                 "ports": Some(vec![ServicePort {
                     port: p2p_port,
                     protocol: Some("TCP".into()),
                     name: Some("p2p".into()),
-                    node_port: Some(30002),
                     ..Default::default()
                 },ServicePort {
                     port: rpc_port,
                     protocol: Some("TCP".into()),
                     name: Some("rpc".into()),
-                    node_port: Some(30003),
                     ..Default::default()
                 }]),
                 "selector":  {"name": POD_NAME},
@@ -571,21 +746,20 @@ start_height = {epoch_2_1}
     Ok(())
 }
 
-async fn deploy_stacks_api_pod(
-    namespace: &str,
-    image: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+async fn deploy_stacks_api_pod(namespace: &str) -> Result<(), Box<dyn std::error::Error>> {
     // constants for stacks pod, services, and config
     const POD_NAME: &str = "stacks-api";
-    const POSTGRES_POD_NAME: &str = "stacks-api-postgres";
-    const CONTAINER_NAME: &str = "stacks-api-container";
-    const POSTGRES_CONFIGMAP_NAME: &str = "stacks-api-postgres-conf";
+    const POSTGRES_CONTAINER_NAME: &str = "stacks-api-postgres";
+    const API_CONTAINER_NAME: &str = "stacks-api-container";
+    const CONFIGMAP_NAME: &str = "stacks-api-conf";
+    const CONFIGMAP_VOLUME_NAME: &str = "stacks-api-conf-volume";
     const PVC_NAME: &str = "stacks-api-pvc";
     const STORAGE_CLASS_NAME: &str = "stacks-api-storage-class";
-    const POSTGRES_CONFIGMAP_VOLUME_NAME: &str = "stacks-api-postgres-conf-volume";
     const SERVICE_NAME: &str = "stacks-api-service";
+    const STACKS_API_IMAGE: &str = "hirosystems/stacks-blockchain-api";
+    const POSTGRES_IMAGE: &str = "postgres:14";
 
-    // deploy config map for stacks api
+    // deploy configmap
     {
         let client = Client::try_default().await?;
         let config_map_api: Api<ConfigMap> = kube::Api::<ConfigMap>::namespaced(client, &namespace);
@@ -594,7 +768,7 @@ async fn deploy_stacks_api_pod(
             "apiVersion": "v1",
             "kind": "ConfigMap",
             "metadata": {
-                "name": POSTGRES_CONFIGMAP_NAME,
+                "name": CONFIGMAP_NAME,
                 "namespace": namespace
             },
             "data": {
@@ -683,15 +857,18 @@ async fn deploy_stacks_api_pod(
         println!("Created {}", name);
     }
 
-    // deploy pod with stacks api and postgres containers
+    // deploy pod
     {
         let client = Client::try_default().await?;
         let pods_api: Api<Pod> = Api::namespaced(client, &namespace);
 
+        let namespaced_host = format!("{}.svc.cluster.local", &namespace);
+        let stacks_node_host = format!("{}.{}", &STACKS_NODE_SERVICE_NAME, namespaced_host);
+
         let env: Vec<EnvVar> = vec![
             EnvVar {
                 name: String::from("STACKS_CORE_RPC_HOST"),
-                value: Some(format!("host.docker.internal",)),
+                value: Some(format!("{}", stacks_node_host)),
                 ..Default::default()
             },
             EnvVar {
@@ -701,7 +878,7 @@ async fn deploy_stacks_api_pod(
             },
             EnvVar {
                 name: String::from("STACKS_CORE_RPC_PORT"),
-                value: Some("30003".to_string()),
+                value: Some(STACKS_NODE_RPC_PORT.to_string()),
                 ..Default::default()
             },
             EnvVar {
@@ -731,12 +908,12 @@ async fn deploy_stacks_api_pod(
             },
             EnvVar {
                 name: String::from("PG_HOST"),
-                value: Some(format!("host.docker.internal",)),
+                value: Some(format!("0.0.0.0",)),
                 ..Default::default()
             },
             EnvVar {
                 name: String::from("PG_PORT"),
-                value: Some(String::from("30006")),
+                value: Some(String::from("5432")),
                 ..Default::default()
             },
             EnvVar {
@@ -789,8 +966,8 @@ async fn deploy_stacks_api_pod(
         "spec": {
             "containers": Some(vec![
                 Container {
-                    name: CONTAINER_NAME.into(),
-                    image: Some(image.into()),
+                    name: API_CONTAINER_NAME.into(),
+                    image: Some(STACKS_API_IMAGE.into()),
                     image_pull_policy: Some("Never".into()),
                     ports: Some(vec![
                         ContainerPort {
@@ -810,8 +987,8 @@ async fn deploy_stacks_api_pod(
                     ..Default::default()
                 },
                 Container {
-                    name: POSTGRES_POD_NAME.into(),
-                    image: Some("postgres:14".to_string()),
+                    name: POSTGRES_CONTAINER_NAME.into(),
+                    image: Some(POSTGRES_IMAGE.to_string()),
                     ports: Some(vec![
                         ContainerPort {
                             container_port: 5432,
@@ -822,12 +999,12 @@ async fn deploy_stacks_api_pod(
                     ]),
                     env_from: Some(vec![
                         EnvFromSource {
-                            config_map_ref: Some( ConfigMapEnvSource{name: Some(POSTGRES_CONFIGMAP_NAME.to_string()), optional: Some(false)}),
+                            config_map_ref: Some( ConfigMapEnvSource{name: Some(CONFIGMAP_NAME.to_string()), optional: Some(false)}),
                             ..Default::default()
                         }
                     ]),
                     volume_mounts: Some(vec![ VolumeMount {
-                        name: POSTGRES_CONFIGMAP_VOLUME_NAME.into(),
+                        name: CONFIGMAP_VOLUME_NAME.into(),
                         mount_path: "/var/lib/postgresql/data".into(),
                         ..Default::default()
                     }]),
@@ -835,7 +1012,7 @@ async fn deploy_stacks_api_pod(
                 }]),
                 "volumes": Some(vec![
                     Volume {
-                    name: POSTGRES_CONFIGMAP_VOLUME_NAME.into(),
+                    name: CONFIGMAP_VOLUME_NAME.into(),
                     persistent_volume_claim: Some(PersistentVolumeClaimVolumeSource {
                         claim_name: PVC_NAME.into()
                         , ..Default::default()
@@ -850,13 +1027,13 @@ async fn deploy_stacks_api_pod(
         println!("created pod {}", name);
     }
 
-    // deploy service to communicate with container
+    // deploy service
     {
         let client = Client::try_default().await?;
         let service_api: Api<Service> = Api::namespaced(client, &namespace);
 
         let mut selector = BTreeMap::<String, String>::new();
-        selector.insert("name".into(), CONTAINER_NAME.into());
+        selector.insert("name".into(), API_CONTAINER_NAME.into());
 
         let service: Service = serde_json::from_value(json!({
             "apiVersion": "v1",
@@ -866,194 +1043,27 @@ async fn deploy_stacks_api_pod(
                 "namespace": namespace,
             },
             "spec":  {
-                "type": "NodePort",
                 "ports": Some(vec![ServicePort {
                     port: 3999,
                     protocol: Some("TCP".into()),
                     name: Some("api".into()),
-                    node_port: Some(30005),
                     ..Default::default()
                 },
                 ServicePort {
                     port: 5432,
                     protocol: Some("TCP".into()),
                     name: Some("postgres".into()),
-                    node_port: Some(30006),
                     ..Default::default()
                 },
                 ServicePort {
                     port: 3700,
                     protocol: Some("TCP".into()),
                     name: Some("eventport".into()),
-                    node_port: Some(30007),
                     ..Default::default()
                 }]),
                 "selector":  {
                     "name": POD_NAME
                 },
-            }
-        }))?;
-
-        let pp = PostParams::default();
-        let response = service_api.create(&pp, &service).await?;
-        let name = response.name_any();
-        println!("created service {}", name);
-    }
-    Ok(())
-}
-
-async fn deploy_chain_coordinator(
-    namespace: &str,
-    image: &str,
-    orchestrator_service_name: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
-    const POD_NAME: &str = "chain-coordinator";
-    const CONTAINER_NAME: &str = "chain-coordinator-container";
-    const CONFIGMAP_NAME: &str = "chain-coordinator-conf";
-    const CONFIGMAP_VOLUME_NAME: &str = "chain-coordinator-conf-volume";
-
-    // // deploy config map for chain coordinator
-    // {
-    //     let client = Client::try_default().await?;
-    //     let config_map_api: Api<ConfigMap> = kube::Api::<ConfigMap>::namespaced(client, &namespace);
-
-    //     let manifest_path = PathBuf::from("../stx-px/Clarinet.toml");
-    //     let manifest = fs::read_to_string(manifest_path)?;
-
-    //     let deployment_plan_path = PathBuf::from("../stx-px/deployments/default.devnet-plan.yaml");
-    //     let deployment_plan = fs::read_to_string(deployment_plan_path)?;
-
-    //     let config_map: ConfigMap = serde_json::from_value(json!({
-    //         "apiVersion": "v1",
-    //         "kind": "ConfigMap",
-    //         "metadata": {
-    //             "name": CONFIGMAP_NAME,
-    //             "namespace": namespace
-    //         },
-    //         "data": {
-    //             "Clarinet.toml": manifest,
-    //             "deployment-plan.yaml": deployment_plan,
-    //         },
-    //     }))?;
-
-    //     let post_params = PostParams::default();
-    //     let created_config = config_map_api.create(&post_params, &config_map).await?;
-    //     let name = created_config.name_any();
-    //     assert_eq!(config_map.name_any(), name);
-    //     println!("Created {}", name);
-    // }
-
-    // deploy pod
-    {
-        let client = Client::try_default().await?;
-        let pods_api: Api<Pod> = Api::namespaced(client, &namespace);
-
-        let project_path = String::from("/foo2");
-
-        let pod: Pod = serde_json::from_value(json!({
-        "apiVersion": "v1",
-        "kind": "Pod",
-        "metadata": {
-            "name": POD_NAME,
-            "namespace": namespace,
-            "labels": {"name": POD_NAME}
-        },
-        "spec": {
-            "containers": Some(vec![ Container {
-                name: CONTAINER_NAME.into(),
-                image: Some(image.into()),
-                image_pull_policy: Some("Never".into()),
-                command: Some(vec![
-                    "./stacks-network".into(),
-                    // "--help".into(),
-                    "--manifest-path=/etc/stacks-network/project/Clarinet.toml".into(),
-                    "--deployment-plan-path=/etc/stacks-network/project/deployments/default.devnet-plan.yaml".into(),
-                    "--project-root-path=/etc/stacks-network/project/".into(),
-                ]),
-                ports: Some(vec![
-                    ContainerPort {
-                        container_port: 20445,
-                        protocol: Some("TCP".into()),
-                        name: Some("orchestrator".into()),
-                        ..Default::default()
-                    },
-                    ContainerPort {
-                        container_port: 20446,
-                        protocol: Some("TCP".into()),
-                        name: Some("orch-control".into()),
-                        ..Default::default()
-                    },
-                ]),
-                volume_mounts: Some(vec![
-                    // VolumeMount {
-                    //     name: CONFIGMAP_VOLUME_NAME.into(),
-                    //     mount_path: "/etc/stacks-network".into(),
-                    //     read_only: Some(true),
-                    //     ..Default::default()
-                    // },
-                    VolumeMount {
-                        name: "project".into(),
-                        mount_path: "/etc/stacks-network/project".into(),
-                        read_only: Some(false),
-                        ..Default::default()
-                    }
-                ]),
-                ..Default::default()
-            }]),
-            "volumes": Some(vec![
-                // Volume {
-                //     name: CONFIGMAP_VOLUME_NAME.into(),
-                //     config_map: Some(ConfigMapVolumeSource {
-                //         name: Some(CONFIGMAP_NAME.into())
-                //         , ..Default::default()
-                //     }),
-                //     ..Default::default()
-                // },
-                Volume {
-                    name: "project".into(),
-                    host_path: Some(HostPathVolumeSource { path: project_path, type_: Some("Directory".into())}),
-                    ..Default::default()
-                }
-            ])
-        }}))?;
-
-        let pp = PostParams::default();
-        let response = pods_api.create(&pp, &pod).await?;
-        let name = response.name_any();
-        println!("created pod {}", name);
-    }
-
-    // deploy service to communicate with container
-    {
-        let client = Client::try_default().await?;
-        let service_api: Api<Service> = Api::namespaced(client, &namespace);
-
-        let mut selector = BTreeMap::<String, String>::new();
-        selector.insert("name".into(), CONTAINER_NAME.into());
-
-        let service: Service = serde_json::from_value(json!({
-            "apiVersion": "v1",
-            "kind": "Service",
-            "metadata": {
-                "name": orchestrator_service_name,
-                "namespace": namespace
-            },
-            "spec":  {
-                "type": "NodePort",
-                "ports": Some(vec![ServicePort {
-                    port: 20445,
-                    protocol: Some("TCP".into()),
-                    name: Some("orchestrator".into()),
-                    node_port: Some(30008),
-                    ..Default::default()
-                },ServicePort {
-                    port: 20446,
-                    protocol: Some("TCP".into()),
-                    name: Some("orch-control".into()),
-                    node_port: Some(30009),
-                    ..Default::default()
-                }]),
-                "selector":  {"name": POD_NAME},
             }
         }))?;
 
