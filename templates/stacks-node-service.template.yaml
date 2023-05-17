@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: stacks-node-service
+  namespace: "{namespace}"
+spec:
+  ports:
+  - name: p2p
+    port: 20444
+    protocol: TCP
+  - name: rpc
+    port: 20443
+    protocol: TCP
+  selector:
+    name: stacks-node

@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    name: bitcoind-chain-coordinator
+  name: bitcoind-chain-coordinator
+  namespace: "{namespace}"
+spec:
+  containers:
+  - command:
+    - /usr/local/bin/bitcoind
+    - -conf=/etc/bitcoin/bitcoin.conf
+    - -nodebuglogfile
+    - -pid=/run/bitcoind.pid
+    image: quay.io/hirosystems/bitcoind:devnet-v3
+    imagePullPolicy: IfNotPresent
+    name: bitcoind-container
+    ports:
+    - containerPort: 18444
+      name: p2p
+      protocol: TCP
+    - containerPort: 18443
+      name: rpc
+      protocol: TCP
+    - containerPort: 20445
+      name: orchestrator
+      protocol: TCP
+    volumeMounts:
+    - mountPath: /etc/bitcoin
+      name: bitcoind-conf-volume
+      readOnly: true
+  - command:
+    - ./stacks-network
+    - --manifest-path=/etc/stacks-network/project/Clarinet.toml
+    - --deployment-plan-path=/etc/stacks-network/project/deployments/default.devnet-plan.yaml
+    - --project-root-path=/etc/stacks-network/project/
+    image: stacks-network
+    imagePullPolicy: Never
+    name: chain-coordinator-container
+    ports:
+    - containerPort: 20445
+      name: coordinator-in
+      protocol: TCP
+    - containerPort: 20446
+      name: coordinator-con
+      protocol: TCP
+    volumeMounts:
+    - mountPath: /etc/stacks-network/project
+      name: project
+  volumes:
+  - configMap:
+      name: bitcoind-conf
+    name: bitcoind-conf-volume
+  - hostPath:
+      path: /foo2
+      type: Directory
+    name: project

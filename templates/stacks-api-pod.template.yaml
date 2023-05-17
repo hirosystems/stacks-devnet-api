@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    name: stacks-api
+  name: stacks-api
+  namespace: "{namespace}"
+spec:
+  containers:
+  - name: stacks-api-container
+    envFrom:
+      - configMapRef:
+          name: stacks-api-conf
+          optional: false
+    image: hirosystems/stacks-blockchain-api
+    imagePullPolicy: Never
+    ports:
+    - containerPort: 3999
+      name: api
+      protocol: TCP
+    - containerPort: 3700
+      name: eventport
+      protocol: TCP
+  - name: stacks-api-postgres
+    envFrom:
+      - configMapRef:
+          name: stacks-api-postgres-conf
+          optional: false
+    image: postgres:14
+    imagePullPolicy: IfNotPresent
+    ports:
+    - containerPort: 5432
+      name: postgres
+      protocol: TCP
+    volumeMounts:
+    - mountPath: /var/lib/postgresql/data
+      name: stacks-api-conf-volume
+  volumes:
+  - name: stacks-api-conf-volume
+    persistentVolumeClaim:
+      claimName: stacks-api-pvc
