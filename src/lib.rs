@@ -1,9 +1,13 @@
-use k8s_openapi::api::core::v1::{ConfigMap, Namespace, PersistentVolumeClaim, Pod, Service};
-use serde::{Deserialize, Serialize};
+use futures::try_join;
+use k8s_openapi::{
+    api::core::v1::{ConfigMap, Namespace, PersistentVolumeClaim, Pod, Service},
+    NamespaceResourceScope,
+};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{collections::BTreeMap, fs, time::Duration};
 
 use kube::{
-    api::{Api, PostParams, ResourceExt},
+    api::{Api, DeleteParams, PostParams, ResourceExt},
     Client,
 };
 use std::thread::sleep;
@@ -62,6 +66,24 @@ pub async fn deploy_devnet(config: StacksDevnetConfig) -> Result<(), Box<dyn std
     if !config.disable_stacks_api {
         deploy_stacks_api_pod(&namespace).await?;
     }
+    Ok(())
+}
+
+pub async fn delete_devnet(namespace: &str) -> Result<(), Box<dyn std::error::Error>> {
+    try_join!(
+        delete_namespace(namespace),
+        delete_resource::<Pod>(namespace, "bitcoind-chain-coordinator"),
+        delete_resource::<Pod>(namespace, "stacks-node"),
+        delete_resource::<Pod>(namespace, "stacks-api"),
+        delete_resource::<ConfigMap>(namespace, "bitcoind-conf"),
+        delete_resource::<ConfigMap>(namespace, "stacks-node-conf"),
+        delete_resource::<ConfigMap>(namespace, "stacks-api-conf"),
+        delete_resource::<ConfigMap>(namespace, "stacks-api-postgres-conf"),
+        delete_resource::<Service>(namespace, "bitcoind-chain-coordinator-service"),
+        delete_resource::<Service>(namespace, "stacks-node-service"),
+        delete_resource::<Service>(namespace, "stacks-api-service"),
+        delete_resource::<PersistentVolumeClaim>(namespace, "stacks-api-pvc"),
+    )?;
     Ok(())
 }
 
@@ -418,5 +440,37 @@ async fn deploy_stacks_api_pod(namespace: &str) -> Result<(), Box<dyn std::error
 
     deploy_service("stacks-api-service.template.yaml", &namespace).await?;
 
+    Ok(())
+}
+
+async fn delete_resource<K: kube::Resource<Scope = NamespaceResourceScope>>(
+    namespace: &str,
+    resource_name: &str,
+) -> Result<(), Box<dyn std::error::Error>>
+where
+    <K as kube::Resource>::DynamicType: Default,
+    K: Clone,
+    K: DeserializeOwned,
+    K: std::fmt::Debug,
+{
+    let client = Client::try_default().await?;
+    let api: Api<K> = Api::namespaced(client, &namespace);
+    let dp = DeleteParams::default();
+    api.delete(resource_name, &dp).await?.map_left(|del| {
+        assert_eq!(del.name_any(), resource_name);
+        println!("Deleting resource started: {:?}", del);
+    });
+    Ok(())
+}
+
+async fn delete_namespace(namespace_str: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let client = Client::try_default().await?;
+    let api: Api<Namespace> = kube::Api::all(client);
+
+    let dp = DeleteParams::default();
+    api.delete(namespace_str, &dp).await?.map_left(|del| {
+        assert_eq!(del.name_any(), namespace_str);
+        println!("Deleting resource started: {:?}", del);
+    });
     Ok(())
 }
