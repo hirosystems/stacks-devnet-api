@@ -1,0 +1,30 @@
+apiVersion: kind.x-k8s.io/v1alpha4
+kind: Cluster
+nodes:
+- role: control-plane
+  extraMounts:
+    - hostPath: /Users/micaiahreid/work/stx-px
+      containerPath: /foo2
+  extraPortMappings:
+  - containerPort: 30000
+    hostPort: 18444
+  - containerPort: 30001
+    hostPort: 18443
+  - containerPort: 30002
+    hostPort: 20444
+  - containerPort: 30003
+    hostPort: 20443
+  - containerPort: 30005
+    hostPort: 20445
+  - containerPort: 30006
+    hostPort: 20446
+  - containerPort: 30007
+    hostPort: 3999
+  - containerPort: 30008
+    hostPort: 5432
+  - containerPort: 30009
+    hostPort: 3700
+- role: worker
+  extraMounts:
+    - hostPath: /Users/micaiahreid/work/stx-px
+      containerPath: /foo2
