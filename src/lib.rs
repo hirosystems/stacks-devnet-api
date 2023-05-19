@@ -1,4 +1,3 @@
-use futures::try_join;
 use k8s_openapi::{
     api::core::v1::{ConfigMap, Namespace, PersistentVolumeClaim, Pod, Service},
     NamespaceResourceScope,
@@ -39,6 +38,11 @@ pub struct StacksDevnetConfig {
     pox_2_activation: u32,
     pox_2_unlock_height: u32,
     accounts: Vec<(String, u64)>,
+    // needed for chain coordinator
+    project_manifest: String,
+    devnet_config: String,
+    deployment_plan: String,
+    contracts: Vec<(String, String)>,
     // to remove and compute
     stacks_miner_secret_key_hex: String,
     miner_stx_address: String,
@@ -209,6 +213,45 @@ async fn deploy_bitcoin_node_pod(
         "bitcoind-configmap.template.yaml",
         &namespace,
         Some(vec![("bitcoin.conf", &bitcoind_conf)]),
+    )
+    .await?;
+
+    deploy_configmap(
+        "chain-coord-namespace-configmap.template.yaml",
+        &namespace,
+        Some(vec![("NAMESPACE", &namespace)]),
+    )
+    .await?;
+
+    deploy_configmap(
+        "chain-coord-project-manifest-configmap.template.yaml",
+        &namespace,
+        Some(vec![("Clarinet.toml", &config.project_manifest)]),
+    )
+    .await?;
+
+    deploy_configmap(
+        "chain-coord-devnet-configmap.template.yaml",
+        &namespace,
+        Some(vec![("Devnet.toml", &config.devnet_config)]),
+    )
+    .await?;
+
+    deploy_configmap(
+        "chain-coord-deployment-plan-configmap.template.yaml",
+        &namespace,
+        Some(vec![("default.devnet-plan.yaml", &config.deployment_plan)]),
+    )
+    .await?;
+
+    let mut contracts: Vec<(&str, &str)> = vec![];
+    for (contract_name, contract_source) in &config.contracts {
+        contracts.push((contract_name, contract_source));
+    }
+    deploy_configmap(
+        "chain-coord-project-dir-configmap.template.yaml",
+        &namespace,
+        Some(contracts),
     )
     .await?;
 

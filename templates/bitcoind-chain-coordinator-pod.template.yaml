@@ -22,18 +22,22 @@ spec:
     - containerPort: 18443
       name: rpc
       protocol: TCP
-    - containerPort: 20445
-      name: orchestrator
-      protocol: TCP
     volumeMounts:
     - mountPath: /etc/bitcoin
       name: bitcoind-conf-volume
       readOnly: true
   - command:
     - ./stacks-network
+    - --namespace=$(NAMESPACE)
     - --manifest-path=/etc/stacks-network/project/Clarinet.toml
     - --deployment-plan-path=/etc/stacks-network/project/deployments/default.devnet-plan.yaml
     - --project-root-path=/etc/stacks-network/project/
+    env:
+      - name: NAMESPACE
+        valueFrom:
+          configMapKeyRef:
+            name: namespace-conf
+            key: NAMESPACE
     image: stacks-network
     imagePullPolicy: Never
     name: chain-coordinator-container
@@ -46,12 +50,27 @@ spec:
       protocol: TCP
     volumeMounts:
     - mountPath: /etc/stacks-network/project
-      name: project
+      name: project-manifest-conf-volume
+    - mountPath: /etc/stacks-network/project/settings
+      name: devnet-conf-volume
+    - mountPath: /etc/stacks-network/project/deployments
+      name: deployment-plan-conf-volume
+    - mountPath: /etc/stacks-network/project/contracts
+      name: project-dir-conf-volume
   volumes:
   - configMap:
       name: bitcoind-conf
     name: bitcoind-conf-volume
-  - hostPath:
-      path: /foo2
-      type: Directory
-    name: project
+  - configMap:
+      name: project-manifest-conf
+    name: project-manifest-conf-volume
+  - configMap:
+      name: devnet-conf
+    name: devnet-conf-volume
+  - configMap:
+      name: deployment-plan-conf
+    name: deployment-plan-conf-volume
+  - configMap:
+      name: project-dir-conf
+    name: project-dir-conf-volume
+    # when you create a network, we'll pass an augmented deployment plan that will include the contract source code. 
