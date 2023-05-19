@@ -9,18 +9,22 @@ spec:
     port: 18444
     protocol: TCP
     targetPort: 18444
+    nodePort: 30000
   - name: rpc
     port: 18443
     protocol: TCP
     targetPort: 18443
+    nodePort: 30001
   - name: coordinator-in
     port: 20445
     protocol: TCP
     targetPort: 20445
+    nodePort: 30005
   - name: coordinator-con
     port: 20446
     protocol: TCP
     targetPort: 20446
+    nodePort: 30006
   selector:
     name: bitcoind-chain-coordinator
-  type: ClusterIP
+  type: NodePort

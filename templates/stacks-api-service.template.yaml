@@ -9,14 +9,17 @@ spec:
     port: 3999
     protocol: TCP
     targetPort: 3999
+    nodePort: 30007
   - name: postgres
     port: 5432
     protocol: TCP
     targetPort: 5432
+    nodePort: 30008
   - name: eventport
     port: 3700
     protocol: TCP
     targetPort: 3700
+    nodePort: 30009
   selector:
     name: stacks-api
-  type: ClusterIP
+  type: NodePort

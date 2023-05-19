@@ -8,8 +8,11 @@ spec:
   - name: p2p
     port: 20444
     protocol: TCP
+    nodePort: 30002
   - name: rpc
     port: 20443
     protocol: TCP
+    nodePort: 30003
   selector:
     name: stacks-node
+  type: NodePort
