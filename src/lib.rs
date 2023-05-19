@@ -70,20 +70,23 @@ pub async fn deploy_devnet(config: StacksDevnetConfig) -> Result<(), Box<dyn std
 }
 
 pub async fn delete_devnet(namespace: &str) -> Result<(), Box<dyn std::error::Error>> {
-    try_join!(
-        delete_namespace(namespace),
-        delete_resource::<Pod>(namespace, "bitcoind-chain-coordinator"),
-        delete_resource::<Pod>(namespace, "stacks-node"),
-        delete_resource::<Pod>(namespace, "stacks-api"),
-        delete_resource::<ConfigMap>(namespace, "bitcoind-conf"),
-        delete_resource::<ConfigMap>(namespace, "stacks-node-conf"),
-        delete_resource::<ConfigMap>(namespace, "stacks-api-conf"),
-        delete_resource::<ConfigMap>(namespace, "stacks-api-postgres-conf"),
-        delete_resource::<Service>(namespace, "bitcoind-chain-coordinator-service"),
-        delete_resource::<Service>(namespace, "stacks-node-service"),
-        delete_resource::<Service>(namespace, "stacks-api-service"),
-        delete_resource::<PersistentVolumeClaim>(namespace, "stacks-api-pvc"),
-    )?;
+    let _ = delete_namespace(namespace).await;
+    let _ = delete_resource::<Pod>(namespace, "bitcoind-chain-coordinator").await;
+    let _ = delete_resource::<Pod>(namespace, "stacks-node").await;
+    let _ = delete_resource::<Pod>(namespace, "stacks-api").await;
+    let _ = delete_resource::<ConfigMap>(namespace, "bitcoind-conf").await;
+    let _ = delete_resource::<ConfigMap>(namespace, "stacks-node-conf").await;
+    let _ = delete_resource::<ConfigMap>(namespace, "stacks-api-conf").await;
+    let _ = delete_resource::<ConfigMap>(namespace, "stacks-api-postgres-conf").await;
+    let _ = delete_resource::<ConfigMap>(namespace, "deployment-plan-conf").await;
+    let _ = delete_resource::<ConfigMap>(namespace, "devnet-conf").await;
+    let _ = delete_resource::<ConfigMap>(namespace, "project-dir-conf").await;
+    let _ = delete_resource::<ConfigMap>(namespace, "namespace-conf").await;
+    let _ = delete_resource::<ConfigMap>(namespace, "project-manifest-conf").await;
+    let _ = delete_resource::<Service>(namespace, "bitcoind-chain-coordinator-service").await;
+    let _ = delete_resource::<Service>(namespace, "stacks-node-service").await;
+    let _ = delete_resource::<Service>(namespace, "stacks-api-service").await;
+    let _ = delete_resource::<PersistentVolumeClaim>(namespace, "stacks-api-pvc").await;
     Ok(())
 }
 
