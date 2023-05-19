@@ -11,5 +11,5 @@ spec:
       storage: 750Mi
     requests:
       storage: 500Mi
-  storageClassName: stacks-api-storage-class
+  storageClassName: devnet-storage-class
   volumeMode: Filesystem
