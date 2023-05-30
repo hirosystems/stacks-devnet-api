@@ -1,7 +1,13 @@
 [package]
-name = "k8s-experimentation"
+name = "stacks-devnet-api"
 version = "0.1.0"
 edition = "2021"
+authors = ["Micaiah Reid <micaiah@hiro.so>"]
+description = "The Stacks Devnet API runs a server that can be used to deploy, delete, manage, and make requests to Stacks Devnets run on Kubernetes."
+readme = "README.md"
+exclude = ["examples/**", "scripts/**"]
+homepage = "https://github.com/hirosystems/stacks-devnet-api"
+repository = "https://github.com/hirosystems/stacks-devnet-api"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
