@@ -230,10 +230,21 @@ async fn deploy_bitcoin_node_pod(
     )
     .await?;
 
+    let mut devnet_config = config.devnet_config.clone();
+    //devnet_config.push_str("\n[devnet]");
+    devnet_config.push_str(&format!(
+        "\nbitcoin_node_username = \"{}\"",
+        &config.bitcoin_node_username
+    ));
+    devnet_config.push_str(&format!(
+        "\nbitcoin_node_password = \"{}\"",
+        &config.bitcoin_node_password
+    ));
+    println!("{}", devnet_config);
     deploy_configmap(
         "chain-coord-devnet-configmap.template.yaml",
         &namespace,
-        Some(vec![("Devnet.toml", &config.devnet_config)]),
+        Some(vec![("Devnet.toml", &devnet_config)]),
     )
     .await?;
 
