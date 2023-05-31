@@ -1,6 +1,6 @@
 use std::str::FromStr;
 
-use k8s_experimentation::{delete_devnet, deploy_devnet, StacksDevnetConfig};
+use stacks_devnet_api::{delete_devnet, deploy_devnet, StacksDevnetConfig};
 use serde::Deserialize;
 use tiny_http::{Method, Response, Server};
 use url::Url;
