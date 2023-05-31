@@ -53,7 +53,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 _ => request.respond(Response::empty(404))?,
             },
-            //let not_implemented = Response::new( StatusCode::from(501), request.headers(), "not implemented", None, None );
+            // TODO: respond with unimplemented
             _ => request.respond(Response::empty(501))?,
         }
     }
