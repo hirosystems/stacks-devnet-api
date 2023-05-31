@@ -5,11 +5,12 @@ Spins up a server that provides an API to deploy, delete, control, and make requ
 Running this tool requires having Kubernetes installed. Some [kind](https://kind.sigs.k8s.io/) configuration scripts are included in this repo. Using kind is not a requirement for using this tool, but you will need to use some tool for running local Kubernetes clusters. This is the recommended set of installation instructions for using this tool.
 1. [Install Kubernetes.](https://kubernetes.io/releases/download/)
 2. [Install `kubectl`.](https://kubernetes.io/releases/download/#kubectl)
-3. Install kind.
+3. [Install Docker Desktop.](https://docs.docker.com/desktop/install/mac-install/)
+4. Install kind.
 ```
 brew install kind
 ```
-4. Create kind cluster
+5. With Docker Desktop running, create kind cluster
 ```
 ./scripts/kind-deploy.sh
 ```
