@@ -1,8 +1,8 @@
 use std::str::FromStr;
 
-use stacks_devnet_api::{delete_devnet, deploy_devnet, StacksDevnetConfig};
 use serde::Deserialize;
-use tiny_http::{Method, Response, Server};
+use stacks_devnet_api::{delete_devnet, deploy_devnet, StacksDevnetConfig};
+use tiny_http::{Method, Response, Server, StatusCode};
 use url::Url;
 
 #[derive(Deserialize, Debug)]
@@ -36,8 +36,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let mut content = String::new();
                     request.as_reader().read_to_string(&mut content).unwrap();
                     let config: StacksDevnetConfig = serde_json::from_str(&content)?;
-                    deploy_devnet(config).await?;
-                    request.respond(Response::empty(200))?
+                    match deploy_devnet(config).await {
+                        Ok(_) => request.respond(Response::empty(200))?,
+                        Err(e) => {
+                            let status_code = match e.code {
+                                _ => StatusCode::from(e.code),
+                            };
+                            // todo: there's got to be a better way to make a response
+                            let response = Response::from_string(e.message);
+                            request.respond(Response::with_status_code(response, status_code))?
+                        }
+                    }
                 }
                 _ => request.respond(Response::empty(404))?,
             },

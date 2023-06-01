@@ -51,6 +51,11 @@ pub struct StacksDevnetConfig {
     miner_stx_address: String,
 }
 
+pub struct DevNetError {
+    pub message: String,
+    pub code: u16,
+}
+
 const BITCOIND_CHAIN_COORDINATOR_SERVICE_NAME: &str = "bitcoind-chain-coordinator-service";
 const STACKS_NODE_SERVICE_NAME: &str = "stacks-node-service";
 
@@ -60,7 +65,7 @@ const STACKS_NODE_P2P_PORT: i32 = 20444;
 const STACKS_NODE_RPC_PORT: i32 = 20443;
 const CHAIN_COORDINATOR_INGESTION_PORT: i32 = 20445;
 
-pub async fn deploy_devnet(config: StacksDevnetConfig) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn deploy_devnet(config: StacksDevnetConfig) -> Result<(), DevNetError> {
     let namespace = &config.namespace;
 
     deploy_namespace(&namespace).await?;
@@ -97,67 +102,105 @@ pub async fn delete_devnet(namespace: &str) -> Result<(), Box<dyn std::error::Er
     Ok(())
 }
 
-async fn deploy_namespace(namespace_str: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let client = Client::try_default().await?;
-    let namespace_api: Api<Namespace> = kube::Api::all(client);
-
-    let template_str = get_yaml_from_filename(Template::Namespace);
-    let mut namespace: Namespace = serde_yaml::from_str(template_str)?;
+async fn deploy_namespace(namespace_str: &str) -> Result<(), DevNetError> {
+    let mut namespace: Namespace = get_resource_from_file(Template::Namespace)?;
 
     namespace.metadata.name = Some(namespace_str.to_owned());
     namespace.metadata.labels = Some(BTreeMap::from([("name".into(), namespace_str.to_owned())]));
 
-    let post_params = PostParams::default();
-    let created_namespace = namespace_api.create(&post_params, &namespace).await?;
-    let name = created_namespace.name_any();
-    assert_eq!(namespace.name_any(), name);
-    println!("Created {}", name);
-    Ok(())
-}
-
-async fn deploy_pod(template: Template, namespace: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let client = Client::try_default().await?;
-    let pods_api: Api<Pod> = Api::namespaced(client, &namespace);
-
-    let template_str = get_yaml_from_filename(template);
-    let mut pod: Pod = serde_yaml::from_str(template_str)?;
-    pod.metadata.namespace = Some(namespace.to_owned());
+    let client = Client::try_default().await.map_err(|e| DevNetError {
+        message: format!("unable to get kube client: {}", e.to_string()),
+        code: 500,
+    })?;
+    let namespace_api: Api<Namespace> = kube::Api::all(client);
 
     let pp = PostParams::default();
-    let response = pods_api.create(&pp, &pod).await?;
-    let name = response.name_any();
-    println!("created pod {}", name);
-    Ok(())
+    match namespace_api.create(&pp, &namespace).await {
+        Ok(namespace) => {
+            let name = namespace.name_any();
+            println!("created namespace {}", name);
+            Ok(())
+        }
+        Err(kube::Error::Api(api_error)) => Err(DevNetError {
+            message: format!("unable to create namespace: {}", api_error.message),
+            code: api_error.code,
+        }),
+        Err(e) => Err(DevNetError {
+            message: format!("unable to create namespace: {}", e.to_string()),
+            code: 500,
+        }),
+    }
 }
 
-async fn deploy_service(
-    template: Template,
+fn get_resource_from_file<K>(template: Template) -> Result<K, DevNetError>
+where
+    K: DeserializeOwned,
+{
+    let template_str = get_yaml_from_filename(template);
+
+    let resource: K = serde_yaml::from_str(template_str).map_err(|e| DevNetError {
+        message: format!("unable to parse template file: {}", e.to_string()),
+        code: 500,
+    })?;
+    Ok(resource)
+}
+
+async fn deploy_resource<K: kube::Resource<Scope = NamespaceResourceScope>>(
     namespace: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let client = Client::try_default().await?;
-    let service_api: Api<Service> = Api::namespaced(client, &namespace);
-
-    let template_str = get_yaml_from_filename(template);
-    let mut service: Service = serde_yaml::from_str(template_str)?;
-    service.metadata.namespace = Some(namespace.to_owned());
+    resource: K,
+    resource_name: &str,
+) -> Result<(), DevNetError>
+where
+    <K as kube::Resource>::DynamicType: Default,
+    K: Clone,
+    K: DeserializeOwned,
+    K: std::fmt::Debug,
+    K: Serialize,
+{
+    let client = Client::try_default().await.map_err(|e| DevNetError {
+        message: format!("unable to get kube client: {}", e.to_string()),
+        code: 500,
+    })?;
+    let resource_api: Api<K> = Api::namespaced(client, &namespace);
 
     let pp = PostParams::default();
-    let response = service_api.create(&pp, &service).await?;
-    let name = response.name_any();
-    println!("created service {}", name);
-    Ok(())
+    match resource_api.create(&pp, &resource).await {
+        Ok(resource) => {
+            let name = resource.name_any();
+            println!("created {} {}", resource_name, name);
+            Ok(())
+        }
+        Err(kube::Error::Api(api_error)) => Err(DevNetError {
+            message: format!("unable to create {}: {}", resource_name, api_error.message),
+            code: api_error.code,
+        }),
+        Err(e) => Err(DevNetError {
+            message: format!("unable to create {}: {}", resource_name, e.to_string()),
+            code: 500,
+        }),
+    }
+}
+
+async fn deploy_pod(template: Template, namespace: &str) -> Result<(), DevNetError> {
+    let mut pod: Pod = get_resource_from_file(template)?;
+
+    pod.metadata.namespace = Some(namespace.to_owned());
+    deploy_resource(namespace, pod, "pod").await
+}
+
+async fn deploy_service(template: Template, namespace: &str) -> Result<(), DevNetError> {
+    let mut service: Service = get_resource_from_file(template)?;
+
+    service.metadata.namespace = Some(namespace.to_owned());
+    deploy_resource(namespace, service, "service").await
 }
 
 async fn deploy_configmap(
     template: Template,
     namespace: &str,
     configmap_data: Option<Vec<(&str, &str)>>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let client = Client::try_default().await?;
-    let config_map_api: Api<ConfigMap> = kube::Api::<ConfigMap>::namespaced(client, &namespace);
-
-    let template_str = get_yaml_from_filename(template);
-    let mut configmap: ConfigMap = serde_yaml::from_str(template_str)?;
+) -> Result<(), DevNetError> {
+    let mut configmap: ConfigMap = get_resource_from_file(template)?;
 
     configmap.metadata.namespace = Some(namespace.to_owned());
     if let Some(configmap_data) = configmap_data {
@@ -168,20 +211,18 @@ async fn deploy_configmap(
         configmap.data = Some(map);
     }
 
-    let post_params = PostParams::default();
-    let created_config = config_map_api.create(&post_params, &configmap).await?;
-    let name = created_config.name_any();
-    assert_eq!(configmap.name_any(), name);
-    println!("Created {}", name);
-    Ok(())
+    deploy_resource(namespace, configmap, "configmap").await
 }
 
-async fn deploy_bitcoin_node_pod(
-    config: &StacksDevnetConfig,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let bitcoind_p2p_port = BITCOIND_P2P_PORT.parse::<i32>()?;
-    let bitcoind_rpc_port = BITCOIND_RPC_PORT.parse::<i32>()?;
+async fn deploy_pvc(template: Template, namespace: &str) -> Result<(), DevNetError> {
+    let mut pvc: PersistentVolumeClaim = get_resource_from_file(template)?;
 
+    pvc.metadata.namespace = Some(namespace.to_owned());
+
+    deploy_resource(namespace, pvc, "pvc").await
+}
+
+async fn deploy_bitcoin_node_pod(config: &StacksDevnetConfig) -> Result<(), DevNetError> {
     let namespace = &config.namespace;
 
     let bitcoind_conf = format!(
@@ -246,7 +287,7 @@ async fn deploy_bitcoin_node_pod(
         "\nbitcoin_node_password = \"{}\"",
         &config.bitcoin_node_password
     ));
-    println!("{}", devnet_config);
+
     deploy_configmap(
         Template::ChainCoordinatorDevnetConfigmap,
         &namespace,
@@ -279,11 +320,7 @@ async fn deploy_bitcoin_node_pod(
     Ok(())
 }
 
-async fn deploy_stacks_node_pod(
-    config: &StacksDevnetConfig,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let p2p_port = STACKS_NODE_P2P_PORT.parse::<i32>()?;
-    let rpc_port = STACKS_NODE_RPC_PORT.parse::<i32>()?;
+async fn deploy_stacks_node_pod(config: &StacksDevnetConfig) -> Result<(), DevNetError> {
     let namespace = &config.namespace;
 
     let stacks_conf = {
@@ -438,7 +475,7 @@ async fn deploy_stacks_node_pod(
     Ok(())
 }
 
-async fn deploy_stacks_api_pod(namespace: &str) -> Result<(), Box<dyn std::error::Error>> {
+async fn deploy_stacks_api_pod(namespace: &str) -> Result<(), DevNetError> {
     // configmap env vars for pg conatainer
     let stacks_api_pg_env = Vec::from([
         ("POSTGRES_PASSWORD", "postgres"),
@@ -481,20 +518,7 @@ async fn deploy_stacks_api_pod(namespace: &str) -> Result<(), Box<dyn std::error
     )
     .await?;
 
-    // deploy persistent volume claim
-    {
-        let client = Client::try_default().await?;
-        let pvc_api: Api<PersistentVolumeClaim> = Api::namespaced(client, &namespace);
-
-        let template_str = get_yaml_from_filename(Template::StacksApiPvc);
-        let mut pvc: PersistentVolumeClaim = serde_yaml::from_str(template_str)?;
-        pvc.metadata.namespace = Some(namespace.to_owned());
-
-        let pp = PostParams::default();
-        let response = pvc_api.create(&pp, &pvc).await?;
-        let name = response.name_any();
-        println!("created pod {}", name);
-    }
+    deploy_pvc(Template::StacksApiPvc, &namespace).await?;
 
     deploy_pod(Template::StacksApiPod, &namespace).await?;
 
@@ -506,31 +530,61 @@ async fn deploy_stacks_api_pod(namespace: &str) -> Result<(), Box<dyn std::error
 async fn delete_resource<K: kube::Resource<Scope = NamespaceResourceScope>>(
     namespace: &str,
     resource_name: &str,
-) -> Result<(), Box<dyn std::error::Error>>
+) -> Result<(), DevNetError>
 where
     <K as kube::Resource>::DynamicType: Default,
     K: Clone,
     K: DeserializeOwned,
     K: std::fmt::Debug,
 {
-    let client = Client::try_default().await?;
+    let client = Client::try_default().await.map_err(|e| DevNetError {
+        message: format!("unable to get kube client: {}", e.to_string()),
+        code: 500,
+    })?;
     let api: Api<K> = Api::namespaced(client, &namespace);
     let dp = DeleteParams::default();
-    api.delete(resource_name, &dp).await?.map_left(|del| {
-        assert_eq!(del.name_any(), resource_name);
-        println!("Deleting resource started: {:?}", del);
-    });
-    Ok(())
+    match api.delete(resource_name, &dp).await {
+        Ok(resource) => {
+            resource.map_left(|del| {
+                assert_eq!(del.name_any(), resource_name);
+                println!("Deleting {resource_name} started");
+            });
+            Ok(())
+        }
+        Err(kube::Error::Api(api_error)) => Err(DevNetError {
+            message: format!("unable to delete {}: {}", resource_name, api_error.message),
+            code: api_error.code,
+        }),
+        Err(e) => Err(DevNetError {
+            message: format!("unable to delete {}: {}", resource_name, e.to_string()),
+            code: 500,
+        }),
+    }
 }
 
-async fn delete_namespace(namespace_str: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let client = Client::try_default().await?;
+async fn delete_namespace(namespace_str: &str) -> Result<(), DevNetError> {
+    let client = Client::try_default().await.map_err(|e| DevNetError {
+        message: format!("unable to get kube client: {}", e.to_string()),
+        code: 500,
+    })?;
     let api: Api<Namespace> = kube::Api::all(client);
 
     let dp = DeleteParams::default();
-    api.delete(namespace_str, &dp).await?.map_left(|del| {
-        assert_eq!(del.name_any(), namespace_str);
-        println!("Deleting resource started: {:?}", del);
-    });
-    Ok(())
+    match api.delete(namespace_str, &dp).await {
+        Ok(namespace) => {
+            namespace.map_left(|del| {
+                assert_eq!(del.name_any(), namespace_str);
+                println!("Deleting namespace started");
+            });
+            Ok(())
+        }
+        Err(kube::Error::Api(api_error)) => Err(DevNetError {
+            message: format!("unable to delete namespace: {}", api_error.message),
+            code: api_error.code,
+        }),
+        Err(e) => Err(DevNetError {
+            message: format!("unable to delete namespace: {}", e.to_string()),
+            code: 500,
+        }),
+    }
 }
