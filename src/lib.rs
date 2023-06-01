@@ -3,13 +3,16 @@ use k8s_openapi::{
     NamespaceResourceScope,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{collections::BTreeMap, fs, time::Duration};
+use std::{collections::BTreeMap, time::Duration};
 
 use kube::{
     api::{Api, DeleteParams, PostParams, ResourceExt},
     Client,
 };
 use std::thread::sleep;
+
+mod template_parser;
+use template_parser::{get_yaml_from_filename, Template};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct StacksDevnetConfig {
@@ -98,8 +101,8 @@ async fn deploy_namespace(namespace_str: &str) -> Result<(), Box<dyn std::error:
     let client = Client::try_default().await?;
     let namespace_api: Api<Namespace> = kube::Api::all(client);
 
-    let file = fs::File::open("./templates/namespace.template.yaml")?;
-    let mut namespace: Namespace = serde_yaml::from_reader(file)?;
+    let template_str = get_yaml_from_filename(Template::Namespace);
+    let mut namespace: Namespace = serde_yaml::from_str(template_str)?;
 
     namespace.metadata.name = Some(namespace_str.to_owned());
     namespace.metadata.labels = Some(BTreeMap::from([("name".into(), namespace_str.to_owned())]));
@@ -112,12 +115,12 @@ async fn deploy_namespace(namespace_str: &str) -> Result<(), Box<dyn std::error:
     Ok(())
 }
 
-async fn deploy_pod(template: &str, namespace: &str) -> Result<(), Box<dyn std::error::Error>> {
+async fn deploy_pod(template: Template, namespace: &str) -> Result<(), Box<dyn std::error::Error>> {
     let client = Client::try_default().await?;
     let pods_api: Api<Pod> = Api::namespaced(client, &namespace);
 
-    let file = fs::File::open(format!("./templates/{}", template))?;
-    let mut pod: Pod = serde_yaml::from_reader(file)?;
+    let template_str = get_yaml_from_filename(template);
+    let mut pod: Pod = serde_yaml::from_str(template_str)?;
     pod.metadata.namespace = Some(namespace.to_owned());
 
     let pp = PostParams::default();
@@ -127,12 +130,15 @@ async fn deploy_pod(template: &str, namespace: &str) -> Result<(), Box<dyn std::
     Ok(())
 }
 
-async fn deploy_service(template: &str, namespace: &str) -> Result<(), Box<dyn std::error::Error>> {
+async fn deploy_service(
+    template: Template,
+    namespace: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     let client = Client::try_default().await?;
     let service_api: Api<Service> = Api::namespaced(client, &namespace);
 
-    let file = fs::File::open(format!("./templates/{}", template))?;
-    let mut service: Service = serde_yaml::from_reader(file)?;
+    let template_str = get_yaml_from_filename(template);
+    let mut service: Service = serde_yaml::from_str(template_str)?;
     service.metadata.namespace = Some(namespace.to_owned());
 
     let pp = PostParams::default();
@@ -143,15 +149,15 @@ async fn deploy_service(template: &str, namespace: &str) -> Result<(), Box<dyn s
 }
 
 async fn deploy_configmap(
-    template: &str,
+    template: Template,
     namespace: &str,
     configmap_data: Option<Vec<(&str, &str)>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let client = Client::try_default().await?;
     let config_map_api: Api<ConfigMap> = kube::Api::<ConfigMap>::namespaced(client, &namespace);
 
-    let file = fs::File::open(format!("./templates/{}", template))?;
-    let mut configmap: ConfigMap = serde_yaml::from_reader(file)?;
+    let template_str = get_yaml_from_filename(template);
+    let mut configmap: ConfigMap = serde_yaml::from_str(template_str)?;
 
     configmap.metadata.namespace = Some(namespace.to_owned());
     if let Some(configmap_data) = configmap_data {
@@ -210,21 +216,21 @@ async fn deploy_bitcoin_node_pod(
     );
 
     deploy_configmap(
-        "bitcoind-configmap.template.yaml",
+        Template::BitcoindConfigmap,
         &namespace,
         Some(vec![("bitcoin.conf", &bitcoind_conf)]),
     )
     .await?;
 
     deploy_configmap(
-        "chain-coord-namespace-configmap.template.yaml",
+        Template::ChainCoordinatorNamespaceConfigmap,
         &namespace,
         Some(vec![("NAMESPACE", &namespace)]),
     )
     .await?;
 
     deploy_configmap(
-        "chain-coord-project-manifest-configmap.template.yaml",
+        Template::ChainCoordinatorProjectManifestConfigmap,
         &namespace,
         Some(vec![("Clarinet.toml", &config.project_manifest)]),
     )
@@ -242,14 +248,14 @@ async fn deploy_bitcoin_node_pod(
     ));
     println!("{}", devnet_config);
     deploy_configmap(
-        "chain-coord-devnet-configmap.template.yaml",
+        Template::ChainCoordinatorDevnetConfigmap,
         &namespace,
         Some(vec![("Devnet.toml", &devnet_config)]),
     )
     .await?;
 
     deploy_configmap(
-        "chain-coord-deployment-plan-configmap.template.yaml",
+        Template::ChainCoordinatorDeploymentPlanConfigmap,
         &namespace,
         Some(vec![("default.devnet-plan.yaml", &config.deployment_plan)]),
     )
@@ -260,19 +266,15 @@ async fn deploy_bitcoin_node_pod(
         contracts.push((contract_name, contract_source));
     }
     deploy_configmap(
-        "chain-coord-project-dir-configmap.template.yaml",
+        Template::ChainCoordinatorProjectDirConfigmap,
         &namespace,
         Some(contracts),
     )
     .await?;
 
-    deploy_pod("bitcoind-chain-coordinator-pod.template.yaml", &namespace).await?;
+    deploy_pod(Template::BitcoindChainCoordinatorPod, &namespace).await?;
 
-    deploy_service(
-        "bitcoind-chain-coordinator-service.template.yaml",
-        namespace,
-    )
-    .await?;
+    deploy_service(Template::BitcoindChainCoordinatorService, namespace).await?;
 
     Ok(())
 }
@@ -423,15 +425,15 @@ async fn deploy_stacks_node_pod(
     };
 
     deploy_configmap(
-        "stacks-node-configmap.template.yaml",
+        Template::StacksNodeConfigmap,
         &namespace,
         Some(vec![("Stacks.toml", &stacks_conf)]),
     )
     .await?;
 
-    deploy_pod("stacks-node-pod.template.yaml", &namespace).await?;
+    deploy_pod(Template::StacksNodePod, &namespace).await?;
 
-    deploy_service("stacks-node-service.template.yaml", namespace).await?;
+    deploy_service(Template::StacksNodeService, namespace).await?;
 
     Ok(())
 }
@@ -443,7 +445,7 @@ async fn deploy_stacks_api_pod(namespace: &str) -> Result<(), Box<dyn std::error
         ("POSTGRES_DB", "stacks_api"),
     ]);
     deploy_configmap(
-        "stacks-api-postgres-configmap.template.yaml",
+        Template::StacksApiPostgresConfigmap,
         &namespace,
         Some(stacks_api_pg_env),
     )
@@ -472,7 +474,7 @@ async fn deploy_stacks_api_pod(namespace: &str) -> Result<(), Box<dyn std::error
         ("STACKS_API_LOG_LEVEL", "debug"),
     ]);
     deploy_configmap(
-        "stacks-api-configmap.template.yaml",
+        Template::StacksApiConfigmap,
         &namespace,
         Some(stacks_api_env),
     )
@@ -483,8 +485,8 @@ async fn deploy_stacks_api_pod(namespace: &str) -> Result<(), Box<dyn std::error
         let client = Client::try_default().await?;
         let pvc_api: Api<PersistentVolumeClaim> = Api::namespaced(client, &namespace);
 
-        let file = fs::File::open("./templates/stacks-api-pvc.template.yaml")?;
-        let mut pvc: PersistentVolumeClaim = serde_yaml::from_reader(file)?;
+        let template_str = get_yaml_from_filename(Template::StacksApiPvc);
+        let mut pvc: PersistentVolumeClaim = serde_yaml::from_str(template_str)?;
         pvc.metadata.namespace = Some(namespace.to_owned());
 
         let pp = PostParams::default();
@@ -493,9 +495,9 @@ async fn deploy_stacks_api_pod(namespace: &str) -> Result<(), Box<dyn std::error
         println!("created pod {}", name);
     }
 
-    deploy_pod("stacks-api-pod.template.yaml", &namespace).await?;
+    deploy_pod(Template::StacksApiPod, &namespace).await?;
 
-    deploy_service("stacks-api-service.template.yaml", &namespace).await?;
+    deploy_service(Template::StacksApiService, &namespace).await?;
 
     Ok(())
 }
