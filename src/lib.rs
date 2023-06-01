@@ -54,11 +54,11 @@ pub struct StacksDevnetConfig {
 const BITCOIND_CHAIN_COORDINATOR_SERVICE_NAME: &str = "bitcoind-chain-coordinator-service";
 const STACKS_NODE_SERVICE_NAME: &str = "stacks-node-service";
 
-const BITCOIND_P2P_PORT: &str = "18444";
-const BITCOIND_RPC_PORT: &str = "18443";
-const STACKS_NODE_P2P_PORT: &str = "20444";
-const STACKS_NODE_RPC_PORT: &str = "20443";
-const CHAIN_COORDINATOR_INGESTION_PORT: &str = "20445";
+const BITCOIND_P2P_PORT: i32 = 18444;
+const BITCOIND_RPC_PORT: i32 = 18443;
+const STACKS_NODE_P2P_PORT: i32 = 20444;
+const STACKS_NODE_RPC_PORT: i32 = 20443;
+const CHAIN_COORDINATOR_INGESTION_PORT: i32 = 20445;
 
 pub async fn deploy_devnet(config: StacksDevnetConfig) -> Result<(), Box<dyn std::error::Error>> {
     let namespace = &config.namespace;
@@ -210,9 +210,9 @@ async fn deploy_bitcoin_node_pod(
                 "#,
         config.bitcoin_node_username,
         config.bitcoin_node_password,
-        bitcoind_p2p_port,
-        bitcoind_rpc_port,
-        bitcoind_rpc_port
+        BITCOIND_P2P_PORT,
+        BITCOIND_RPC_PORT,
+        BITCOIND_RPC_PORT
     );
 
     deploy_configmap(
@@ -316,8 +316,8 @@ async fn deploy_stacks_node_pod(
                     block_reward_recipient = "{}"
                     # microblock_attempt_time_ms = 15000
                 "#,
-            rpc_port,
-            p2p_port,
+            STACKS_NODE_RPC_PORT,
+            STACKS_NODE_P2P_PORT,
             config.stacks_miner_secret_key_hex,
             config.stacks_miner_secret_key_hex,
             config.stacks_node_wait_time_for_microblocks,
@@ -454,10 +454,11 @@ async fn deploy_stacks_api_pod(namespace: &str) -> Result<(), Box<dyn std::error
     // configmap env vars for api conatainer
     let namespaced_host = format!("{}.svc.cluster.local", &namespace);
     let stacks_node_host = format!("{}.{}", &STACKS_NODE_SERVICE_NAME, namespaced_host);
+    let rpc_port = STACKS_NODE_RPC_PORT.to_string();
     let stacks_api_env = Vec::from([
         ("STACKS_CORE_RPC_HOST", &stacks_node_host[..]),
         ("STACKS_BLOCKCHAIN_API_DB", "pg"),
-        ("STACKS_CORE_RPC_PORT", STACKS_NODE_RPC_PORT),
+        ("STACKS_CORE_RPC_PORT", &rpc_port),
         ("STACKS_BLOCKCHAIN_API_PORT", "3999"),
         ("STACKS_BLOCKCHAIN_API_HOST", "0.0.0.0"),
         ("STACKS_CORE_EVENT_PORT", "3700"),
