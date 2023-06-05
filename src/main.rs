@@ -14,7 +14,7 @@ struct DevnetRequestQueryPararms {
 
 #[tokio::main]
 async fn main() {
-    const HOST: &str = "127.0.0.1";
+    const HOST: &str = "0.0.0.0";
     const PORT: &str = "8477";
     let endpoint: String = HOST.to_owned() + ":" + PORT;
     let addr: SocketAddr = endpoint.parse().expect("Could not parse ip:port.");
