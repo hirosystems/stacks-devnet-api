@@ -19,6 +19,7 @@ metadata:
   name: stacks-devnet-api-service-account
 rules:
   - apiGroups: [""]
+    # TODO: production version should not be able to create/delete namespaces (only get) 
     resources: ["pods", "services", "configmaps", "persistentvolumeclaims", "namespaces"]
     verbs: ["get", "delete", "create"]
 
@@ -51,8 +52,8 @@ spec:
   - command:
     - ./stacks-devnet-api
     name: stacks-devnet-api-container
-    image: stacks-devnet-api
-    imagePullPolicy: Never
+    image: quay.io/hirosystems/stacks-devnet-api:latest
+    imagePullPolicy: IfNotPresent
     ports:
     - containerPort: 8478
       name: api
