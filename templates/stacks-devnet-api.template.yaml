@@ -1,0 +1,77 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: devnet
+  labels:
+    name: devnet
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: stacks-devnet-api-service-account
+  namespace: devnet
+
+---
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: stacks-devnet-api-service-account
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "configmaps", "persistentvolumeclaims", "namespaces"]
+    verbs: ["get", "delete", "create"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: stacks-devnet-api-service-account
+subjects:
+  - kind: ServiceAccount
+    name: stacks-devnet-api-service-account
+    namespace: devnet
+roleRef:
+  kind: ClusterRole
+  name: stacks-devnet-api-service-account
+  apiGroup: rbac.authorization.k8s.io
+
+---  
+
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    name: stacks-devnet-api
+  name: stacks-devnet-api
+  namespace: devnet
+spec:
+  serviceAccountName: stacks-devnet-api-service-account
+  containers:
+  - command:
+    - ./stacks-devnet-api
+    name: stacks-devnet-api-container
+    image: stacks-devnet-api
+    imagePullPolicy: Never
+    ports:
+    - containerPort: 8478
+      name: api
+      protocol: TCP
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: stacks-devnet-api-service
+  namespace: devnet
+spec:
+  ports:
+  - name: api
+    port: 8478
+    protocol: TCP
+    targetPort: 8478
+    nodePort: 30000
+  selector:
+    name: stacks-devnet-api
+  type: NodePort
+
