@@ -39,7 +39,7 @@ spec:
             name: namespace-conf
             key: NAMESPACE
     image: quay.io/hirosystems/stacks-network-orchestrator:latest
-    imagePullPolicy: IfNotPresent
+    imagePullPolicy: Always
     name: chain-coordinator-container
     ports:
     - containerPort: 20445
