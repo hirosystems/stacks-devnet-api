@@ -1,0 +1,25 @@
+[package]
+name = "stacks-devnet-api"
+version = "0.1.0"
+edition = "2021"
+authors = ["Micaiah Reid <micaiah@hiro.so>"]
+description = "The Stacks Devnet API runs a server that can be used to deploy, delete, manage, and make requests to Stacks Devnets run on Kubernetes."
+readme = "README.md"
+exclude = ["examples/**", "scripts/**"]
+homepage = "https://github.com/hirosystems/stacks-devnet-api"
+repository = "https://github.com/hirosystems/stacks-devnet-api"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+kube = { version="0.82.2", features = ["client", "runtime"] }
+k8s-openapi = { version = "0.18.0", features = ["v1_25"] }
+futures = "0.3.28"
+tokio = { version = "1.27.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.96"
+serde_yaml = "0.9.21"
+toml = "0.7.3"
+tiny_http = "0.12.0"
+url = "2.3.1"
+serde_qs = "0.12.0"
