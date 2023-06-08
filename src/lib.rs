@@ -4,14 +4,13 @@ use k8s_openapi::{
     NamespaceResourceScope,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{collections::BTreeMap, time::Duration};
+use std::collections::BTreeMap;
 use tower::BoxError;
 
 use kube::{
     api::{Api, DeleteParams, PostParams, ResourceExt},
     Client,
 };
-use std::thread::sleep;
 
 mod template_parser;
 use template_parser::{get_yaml_from_filename, Template};
@@ -107,8 +106,6 @@ impl StacksDevnetApiK8sManager {
             }
         }
         self.deploy_bitcoin_node_pod(&config).await?;
-
-        sleep(Duration::from_secs(5));
 
         self.deploy_stacks_node_pod(&config).await?;
 
