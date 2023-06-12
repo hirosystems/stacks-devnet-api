@@ -1,7 +1,8 @@
+use hiro_system_kit::slog;
 use hyper::server::conn::AddrStream;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Client, Method, Request, Response, Server, StatusCode, Uri};
-use stacks_devnet_api::{StacksDevnetApiK8sManager, StacksDevnetConfig};
+use stacks_devnet_api::{Context, StacksDevnetApiK8sManager, StacksDevnetConfig};
 use std::net::IpAddr;
 use std::str::FromStr;
 use std::{convert::Infallible, net::SocketAddr};
@@ -12,24 +13,32 @@ async fn main() {
     const PORT: &str = "8477";
     let endpoint: String = HOST.to_owned() + ":" + PORT;
     let addr: SocketAddr = endpoint.parse().expect("Could not parse ip:port.");
-    let k8s_manager = StacksDevnetApiK8sManager::default().await;
+
+    let logger = hiro_system_kit::log::setup_logger();
+    let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
+    let ctx = Context {
+        logger: Some(logger),
+        tracer: false,
+    };
+    let k8s_manager = StacksDevnetApiK8sManager::default(&ctx).await;
 
     let make_svc = make_service_fn(|conn: &AddrStream| {
         let k8s_manager = k8s_manager.clone();
+        let ctx = ctx.clone();
         let remote_addr = conn.remote_addr().ip();
         async move {
             Ok::<_, Infallible>(service_fn(move |req| {
-                handle_request(remote_addr, req, k8s_manager.clone())
+                handle_request(remote_addr, req, k8s_manager.clone(), ctx.clone())
             }))
         }
     });
 
     let server = Server::bind(&addr).serve(make_svc);
 
-    println!("Running server on {:?}", addr);
+    ctx.try_log(|logger| slog::info!(logger, "Running server on {:?}", addr));
 
     if let Err(e) = server.await {
-        eprintln!("server error: {}", e);
+        ctx.try_log(|logger| slog::error!(logger, "server error: {}", e));
     }
 }
 
@@ -57,16 +66,20 @@ fn mutate_request_for_proxy(
     request
 }
 
-async fn proxy(request: Request<Body>) -> Result<Response<Body>, Infallible> {
+async fn proxy(request: Request<Body>, ctx: &Context) -> Result<Response<Body>, Infallible> {
     let client = Client::new();
 
-    println!("forwarding request to {}", request.uri());
+    ctx.try_log(|logger| slog::info!(logger, "forwarding request to {}", request.uri()));
     match client.request(request).await {
         Ok(response) => Ok(response),
-        Err(_error) => Ok(Response::builder()
-            .status(StatusCode::INTERNAL_SERVER_ERROR)
-            .body(Body::empty())
-            .unwrap()),
+        Err(e) => {
+            let msg = format!("error proxying request: {}", e.to_string());
+            ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+            Ok(Response::builder()
+                .status(StatusCode::INTERNAL_SERVER_ERROR)
+                .body(Body::try_from(msg).unwrap())
+                .unwrap())
+        }
     }
 }
 
@@ -151,20 +164,30 @@ async fn handle_request(
     _client_ip: IpAddr,
     request: Request<Body>,
     k8s_manager: StacksDevnetApiK8sManager,
+    ctx: Context,
 ) -> Result<Response<Body>, Infallible> {
     let uri = request.uri();
     let path = uri.path();
     let method = request.method();
-    println!("received request, method: {}. path: {}", method, path);
+    ctx.try_log(|logger| {
+        slog::info!(
+            logger,
+            "received request with method {} and path {}",
+            method,
+            path
+        )
+    });
 
     if path == "/api/v1/networks" {
         return match method {
             &Method::POST => {
                 let body = hyper::body::to_bytes(request.into_body()).await;
                 if body.is_err() {
+                    let msg = "failed to parse request body";
+                    ctx.try_log(|logger| slog::error!(logger, "{}", msg));
                     return Ok(Response::builder()
                         .status(StatusCode::INTERNAL_SERVER_ERROR)
-                        .body(Body::try_from("failed to parse request body").unwrap())
+                        .body(Body::try_from(msg).unwrap())
                         .unwrap());
                 }
                 let body = body.unwrap();
@@ -236,10 +259,14 @@ async fn handle_request(
                         .status(StatusCode::OK)
                         .body(Body::empty())
                         .unwrap()),
-                    Err(_e) => Ok(Response::builder()
-                        .status(StatusCode::INTERNAL_SERVER_ERROR)
-                        .body(Body::empty())
-                        .unwrap()),
+                    Err(e) => {
+                        let msg = format!("error deleting network {}: {}", &network, e.to_string());
+                        ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                        Ok(Response::builder()
+                            .status(StatusCode::INTERNAL_SERVER_ERROR)
+                            .body(Body::try_from(msg).unwrap())
+                            .unwrap())
+                    }
                 },
                 &Method::GET => Ok(Response::builder()
                     .status(StatusCode::NOT_IMPLEMENTED)
@@ -265,7 +292,7 @@ async fn handle_request(
                 Some(proxy_data) => {
                     let proxy_request =
                         mutate_request_for_proxy(request, &network, &remaining_path, proxy_data);
-                    proxy(proxy_request).await
+                    proxy(proxy_request, &ctx).await
                 }
                 None => Ok(Response::builder()
                     .status(StatusCode::BAD_REQUEST)
@@ -328,7 +355,13 @@ mod tests {
             mock_k8s_handler(&mut handle).await;
         });
 
-        let k8s_manager = StacksDevnetApiK8sManager::new(mock_service, "default").await;
+        let logger = hiro_system_kit::log::setup_logger();
+        let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
+        let ctx = Context {
+            logger: Some(logger),
+            tracer: false,
+        };
+        let k8s_manager = StacksDevnetApiK8sManager::new(mock_service, "default", &ctx).await;
         let client_ip: IpAddr = IpAddr::V4([0, 0, 0, 0].into());
         let invalid_paths = vec![
             "/path",
@@ -340,7 +373,7 @@ mod tests {
         for path in invalid_paths {
             let request_builder = Request::builder().uri(path).method("GET");
             let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
-            let mut response = handle_request(client_ip, request, k8s_manager.clone())
+            let mut response = handle_request(client_ip, request, k8s_manager.clone(), ctx.clone())
                 .await
                 .unwrap();
             assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -358,13 +391,19 @@ mod tests {
             mock_k8s_handler(&mut handle).await;
         });
 
-        let k8s_manager = StacksDevnetApiK8sManager::new(mock_service, "default").await;
+        let logger = hiro_system_kit::log::setup_logger();
+        let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
+        let ctx = Context {
+            logger: Some(logger),
+            tracer: false,
+        };
+        let k8s_manager = StacksDevnetApiK8sManager::new(mock_service, "default", &ctx).await;
         let client_ip: IpAddr = IpAddr::V4([0, 0, 0, 0].into());
         let path = "/api/v1/network/undeployed";
 
         let request_builder = Request::builder().uri(path).method("GET");
         let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
-        let mut response = handle_request(client_ip, request, k8s_manager.clone())
+        let mut response = handle_request(client_ip, request, k8s_manager.clone(), ctx)
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
@@ -381,13 +420,19 @@ mod tests {
             mock_k8s_handler(&mut handle).await;
         });
 
-        let k8s_manager = StacksDevnetApiK8sManager::new(mock_service, "default").await;
+        let logger = hiro_system_kit::log::setup_logger();
+        let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
+        let ctx = Context {
+            logger: Some(logger),
+            tracer: false,
+        };
+        let k8s_manager = StacksDevnetApiK8sManager::new(mock_service, "default", &ctx).await;
         let client_ip: IpAddr = IpAddr::V4([0, 0, 0, 0].into());
         let path = "/api/v1/network/";
 
         let request_builder = Request::builder().uri(path).method("GET");
         let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
-        let mut response = handle_request(client_ip, request, k8s_manager.clone())
+        let mut response = handle_request(client_ip, request, k8s_manager.clone(), ctx)
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -404,7 +449,13 @@ mod tests {
             mock_k8s_handler(&mut handle).await;
         });
 
-        let k8s_manager = StacksDevnetApiK8sManager::new(mock_service, "default").await;
+        let logger = hiro_system_kit::log::setup_logger();
+        let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
+        let ctx = Context {
+            logger: Some(logger),
+            tracer: false,
+        };
+        let k8s_manager = StacksDevnetApiK8sManager::new(mock_service, "default", &ctx).await;
         let client_ip: IpAddr = IpAddr::V4([0, 0, 0, 0].into());
         let path = "/api/v1/networks";
 
@@ -412,7 +463,7 @@ mod tests {
         for method in methods {
             let request_builder = Request::builder().uri(path).method(method);
             let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
-            let mut response = handle_request(client_ip, request, k8s_manager.clone())
+            let mut response = handle_request(client_ip, request, k8s_manager.clone(), ctx.clone())
                 .await
                 .unwrap();
             assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
@@ -429,13 +480,19 @@ mod tests {
             mock_k8s_handler(&mut handle).await;
         });
 
-        let k8s_manager = StacksDevnetApiK8sManager::new(mock_service, "default").await;
+        let logger = hiro_system_kit::log::setup_logger();
+        let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
+        let ctx = Context {
+            logger: Some(logger),
+            tracer: false,
+        };
+        let k8s_manager = StacksDevnetApiK8sManager::new(mock_service, "default", &ctx).await;
         let client_ip: IpAddr = IpAddr::V4([0, 0, 0, 0].into());
         let path = "/api/v1/networks";
 
         let request_builder = Request::builder().uri(path).method("POST");
         let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
-        let mut response = handle_request(client_ip, request, k8s_manager.clone())
+        let mut response = handle_request(client_ip, request, k8s_manager.clone(), ctx)
             .await
             .unwrap();
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
@@ -550,7 +607,7 @@ mod tests {
         let network = path_parts.network.unwrap();
         let subroute = path_parts.subroute.unwrap();
         let remainder = path_parts.remainder.unwrap();
-        println!("{}", &remainder);
+
         let proxy_data = get_proxy_data(&subroute);
         let request_builder = Request::builder().uri("/").method("POST");
         let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
@@ -560,7 +617,7 @@ mod tests {
             "http://stacks-node-service.{}.svc.cluster.local:20443/{}",
             network, &remainder
         );
-        println!("{expected}");
+
         assert_eq!(actual_url, expected);
     }
 }

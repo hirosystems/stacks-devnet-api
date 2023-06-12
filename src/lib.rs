@@ -1,3 +1,4 @@
+use hiro_system_kit::{slog, Logger};
 use hyper::{body::Bytes, Body, Request, Response};
 use k8s_openapi::{
     api::core::v1::{ConfigMap, Namespace, PersistentVolumeClaim, Pod, Service},
@@ -65,21 +66,54 @@ pub struct DevNetError {
     pub message: String,
     pub code: u16,
 }
-
+#[derive(Clone)]
+pub struct Context {
+    pub logger: Option<Logger>,
+    pub tracer: bool,
+}
 #[derive(Clone)]
 pub struct StacksDevnetApiK8sManager {
     client: Client,
+    ctx: Context,
+}
+impl Context {
+    pub fn empty() -> Context {
+        Context {
+            logger: None,
+            tracer: false,
+        }
+    }
+
+    pub fn try_log<F>(&self, closure: F)
+    where
+        F: FnOnce(&Logger),
+    {
+        if let Some(ref logger) = self.logger {
+            closure(logger)
+        }
+    }
+
+    pub fn expect_logger(&self) -> &Logger {
+        self.logger.as_ref().unwrap()
+    }
 }
 
 impl StacksDevnetApiK8sManager {
-    pub async fn default() -> StacksDevnetApiK8sManager {
+    pub async fn default(ctx: &Context) -> StacksDevnetApiK8sManager {
         let client = Client::try_default()
             .await
             .expect("could not create kube client");
-        StacksDevnetApiK8sManager { client }
+        StacksDevnetApiK8sManager {
+            client,
+            ctx: ctx.to_owned(),
+        }
     }
 
-    pub async fn new<S, B, T>(service: S, default_namespace: T) -> StacksDevnetApiK8sManager
+    pub async fn new<S, B, T>(
+        service: S,
+        default_namespace: T,
+        ctx: &Context,
+    ) -> StacksDevnetApiK8sManager
     where
         S: tower::Service<Request<Body>, Response = Response<B>> + Send + 'static,
         S::Future: Send + 'static,
@@ -89,7 +123,10 @@ impl StacksDevnetApiK8sManager {
         T: Into<String>,
     {
         let client = Client::new(service, default_namespace);
-        StacksDevnetApiK8sManager { client }
+        StacksDevnetApiK8sManager {
+            client,
+            ctx: ctx.to_owned(),
+        }
     }
 
     pub async fn deploy_devnet(&self, config: StacksDevnetConfig) -> Result<(), DevNetError> {
@@ -177,16 +214,29 @@ impl StacksDevnetApiK8sManager {
                 if api_error.code == 404 {
                     Ok(false)
                 } else {
+                    let msg = format!(
+                        "error getting namespace {}: {}",
+                        namespace_str, api_error.message
+                    );
+                    self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
                     Err(DevNetError {
-                        message: format!("unable to get namespace: {}", api_error.message),
+                        message: msg,
                         code: api_error.code,
                     })
                 }
             }
-            Err(e) => Err(DevNetError {
-                message: format!("unable to get namespace: {}", e.to_string()),
-                code: 500,
-            }),
+            Err(e) => {
+                let msg = format!(
+                    "error getting namespace {}: {}",
+                    namespace_str,
+                    e.to_string()
+                );
+                self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                Err(DevNetError {
+                    message: msg,
+                    code: 500,
+                })
+            }
         }
     }
 
