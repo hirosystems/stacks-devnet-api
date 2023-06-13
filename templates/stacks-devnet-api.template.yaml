@@ -55,7 +55,7 @@ spec:
     image: quay.io/hirosystems/stacks-devnet-api:latest
     imagePullPolicy: Always
     ports:
-    - containerPort: 8478
+    - containerPort: 8477
       name: api
       protocol: TCP
 
