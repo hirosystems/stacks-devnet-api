@@ -244,9 +244,11 @@ async fn handle_request(
             }
         };
         if !exists {
+            let msg = format!("network {} does not exist", &network);
+            ctx.try_log(|logger| slog::warn!(logger, "{}", msg));
             return Ok(Response::builder()
                 .status(StatusCode::from_u16(404).unwrap())
-                .body(Body::try_from("network does not exist").unwrap())
+                .body(Body::try_from(msg).unwrap())
                 .unwrap());
         }
 
@@ -259,14 +261,17 @@ async fn handle_request(
                         .status(StatusCode::OK)
                         .body(Body::empty())
                         .unwrap()),
-                    Err(e) => {
-                        let msg = format!("error deleting network {}: {}", &network, e.to_string());
-                        ctx.try_log(|logger| slog::error!(logger, "{}", msg));
-                        Ok(Response::builder()
-                            .status(StatusCode::INTERNAL_SERVER_ERROR)
-                            .body(Body::try_from(msg).unwrap())
-                            .unwrap())
-                    }
+                    Err(e) => Ok(Response::builder()
+                        .status(StatusCode::INTERNAL_SERVER_ERROR)
+                        .body(
+                            Body::try_from(format!(
+                                "error deleting network {}: {}",
+                                &network,
+                                e.to_string()
+                            ))
+                            .unwrap(),
+                        )
+                        .unwrap()),
                 },
                 &Method::GET => Ok(Response::builder()
                     .status(StatusCode::NOT_IMPLEMENTED)

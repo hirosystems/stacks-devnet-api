@@ -9,7 +9,7 @@ use std::{collections::BTreeMap, time::Duration};
 use tower::BoxError;
 
 use kube::{
-    api::{Api, DeleteParams, PostParams, ResourceExt},
+    api::{Api, DeleteParams, PostParams},
     Client,
 };
 use std::thread::sleep;
@@ -66,16 +66,13 @@ pub struct DevNetError {
     pub message: String,
     pub code: u16,
 }
+
 #[derive(Clone)]
 pub struct Context {
     pub logger: Option<Logger>,
     pub tracer: bool,
 }
-#[derive(Clone)]
-pub struct StacksDevnetApiK8sManager {
-    client: Client,
-    ctx: Context,
-}
+
 impl Context {
     pub fn empty() -> Context {
         Context {
@@ -96,6 +93,11 @@ impl Context {
     pub fn expect_logger(&self) -> &Logger {
         self.logger.as_ref().unwrap()
     }
+}
+#[derive(Clone)]
+pub struct StacksDevnetApiK8sManager {
+    client: Client,
+    ctx: Context,
 }
 
 impl StacksDevnetApiK8sManager {
@@ -137,8 +139,13 @@ impl StacksDevnetApiK8sManager {
             if cfg!(debug_assertions) {
                 self.deploy_namespace(&namespace).await?;
             } else {
+                let msg = format!(
+                    "cannot create devnet because namespace {} does not exist",
+                    namespace
+                );
+                self.ctx.try_log(|logger| slog::warn!(logger, "{}", msg));
                 return Err(DevNetError {
-                    message: "Cannot create devnet before namespace exists.".into(),
+                    message: msg.into(),
                     code: 400,
                 });
             }
@@ -156,53 +163,44 @@ impl StacksDevnetApiK8sManager {
     }
 
     pub async fn delete_devnet(&self, namespace: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let pods = vec!["bitcoind-chain-coordinator", "stacks-node", "stacks-api"];
+        for pod in pods {
+            let _ = self.delete_resource::<Pod>(namespace, pod).await;
+        }
+
+        let pods = vec!["bitcoind-chain-coordinator", "stacks-node", "stacks-api"];
+        for pod in pods {
+            let _ = self.delete_resource::<Pod>(namespace, pod).await;
+        }
+        let configmaps = vec![
+            "bitcoind-conf",
+            "stacks-node-conf",
+            "stacks-api-conf",
+            "stacks-api-postgres-conf",
+            "deployment-plan-conf",
+            "devnet-conf",
+            "project-dir-conf",
+            "namespace-conf",
+            "project-manifest-conf",
+        ];
+        for configmap in configmaps {
+            let _ = self.delete_resource::<Pod>(namespace, configmap).await;
+        }
+        let services = vec![
+            "bitcoind-chain-coordinator-service",
+            "stacks-node-service",
+            "stacks-api-service",
+        ];
+        for service in services {
+            let _ = self.delete_resource::<Pod>(namespace, service).await;
+        }
+        let pvcs = vec!["stacks-api-pvc"];
+        for pvc in pvcs {
+            let _ = self.delete_resource::<Pod>(namespace, pvc).await;
+        }
         if cfg!(debug_assertions) {
             let _ = self.delete_namespace(namespace).await;
         }
-        let _ = self
-            .delete_resource::<Pod>(namespace, "bitcoind-chain-coordinator")
-            .await;
-        let _ = self.delete_resource::<Pod>(namespace, "stacks-node").await;
-        let _ = self.delete_resource::<Pod>(namespace, "stacks-api").await;
-        let _ = self
-            .delete_resource::<ConfigMap>(namespace, "bitcoind-conf")
-            .await;
-        let _ = self
-            .delete_resource::<ConfigMap>(namespace, "stacks-node-conf")
-            .await;
-        let _ = self
-            .delete_resource::<ConfigMap>(namespace, "stacks-api-conf")
-            .await;
-        let _ = self
-            .delete_resource::<ConfigMap>(namespace, "stacks-api-postgres-conf")
-            .await;
-        let _ = self
-            .delete_resource::<ConfigMap>(namespace, "deployment-plan-conf")
-            .await;
-        let _ = self
-            .delete_resource::<ConfigMap>(namespace, "devnet-conf")
-            .await;
-        let _ = self
-            .delete_resource::<ConfigMap>(namespace, "project-dir-conf")
-            .await;
-        let _ = self
-            .delete_resource::<ConfigMap>(namespace, "namespace-conf")
-            .await;
-        let _ = self
-            .delete_resource::<ConfigMap>(namespace, "project-manifest-conf")
-            .await;
-        let _ = self
-            .delete_resource::<Service>(namespace, "bitcoind-chain-coordinator-service")
-            .await;
-        let _ = self
-            .delete_resource::<Service>(namespace, "stacks-node-service")
-            .await;
-        let _ = self
-            .delete_resource::<Service>(namespace, "stacks-api-service")
-            .await;
-        let _ = self
-            .delete_resource::<PersistentVolumeClaim>(namespace, "stacks-api-pvc")
-            .await;
         Ok(())
     }
 
@@ -241,7 +239,7 @@ impl StacksDevnetApiK8sManager {
     }
 
     async fn deploy_namespace(&self, namespace_str: &str) -> Result<(), DevNetError> {
-        let mut namespace: Namespace = get_resource_from_file(Template::Namespace)?;
+        let mut namespace: Namespace = self.get_resource_from_file(Template::Namespace)?;
 
         namespace.metadata.name = Some(namespace_str.to_owned());
         namespace.metadata.labels =
@@ -250,20 +248,28 @@ impl StacksDevnetApiK8sManager {
         let namespace_api: Api<Namespace> = kube::Api::all(self.client.to_owned());
 
         let pp = PostParams::default();
+
+        self.ctx
+            .try_log(|logger| slog::info!(logger, "creating namespace {}", namespace_str));
         match namespace_api.create(&pp, &namespace).await {
-            Ok(namespace) => {
-                let name = namespace.name_any();
-                println!("created namespace {}", name);
+            Ok(_) => {
+                self.ctx.try_log(|logger| {
+                    slog::info!(logger, "successfully created namespace {}", namespace_str)
+                });
                 Ok(())
             }
-            Err(kube::Error::Api(api_error)) => Err(DevNetError {
-                message: format!("unable to create namespace: {}", api_error.message),
-                code: api_error.code,
-            }),
-            Err(e) => Err(DevNetError {
-                message: format!("unable to create namespace: {}", e.to_string()),
-                code: 500,
-            }),
+            Err(e) => {
+                let e = match e {
+                    kube::Error::Api(api_error) => (api_error.message, api_error.code),
+                    e => (e.to_string(), 500),
+                };
+                let msg = format!("failed to create namespace {}: {}", namespace_str, e.0);
+                self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                Err(DevNetError {
+                    message: msg,
+                    code: e.1,
+                })
+            }
         }
     }
 
@@ -271,7 +277,7 @@ impl StacksDevnetApiK8sManager {
         &self,
         namespace: &str,
         resource: K,
-        resource_name: &str,
+        resource_type: &str,
     ) -> Result<(), DevNetError>
     where
         <K as kube::Resource>::DynamicType: Default,
@@ -283,32 +289,56 @@ impl StacksDevnetApiK8sManager {
         let resource_api: Api<K> = Api::namespaced(self.client.to_owned(), &namespace);
         let pp = PostParams::default();
 
+        let name = match resource.meta().name.as_ref() {
+            Some(name) => name,
+            None => {
+                self.ctx.try_log(|logger| {
+                    slog::warn!(
+                        logger,
+                        "resource does not have a name field. it really should"
+                    )
+                });
+                "no-name"
+            }
+        };
+        let resource_details = format!(
+            "RESOURCE: {}, NAME: {}, NAMESPACE: {}",
+            resource_type, name, namespace
+        );
+        self.ctx
+            .try_log(|logger| slog::info!(logger, "creating {}", resource_details));
+
         match resource_api.create(&pp, &resource).await {
-            Ok(resource) => {
-                let name = resource.name_any();
-                println!("created {} {}", resource_name, name);
+            Ok(_) => {
+                self.ctx.try_log(|logger| {
+                    slog::info!(logger, "successfully created {}", resource_details)
+                });
                 Ok(())
             }
-            Err(kube::Error::Api(api_error)) => Err(DevNetError {
-                message: format!("unable to create {}: {}", resource_name, api_error.message),
-                code: api_error.code,
-            }),
-            Err(e) => Err(DevNetError {
-                message: format!("unable to create {}: {}", resource_name, e.to_string()),
-                code: 500,
-            }),
+            Err(e) => {
+                let e = match e {
+                    kube::Error::Api(api_error) => (api_error.message, api_error.code),
+                    e => (e.to_string(), 500),
+                };
+                let msg = format!("failed to create {}, ERROR: {}", resource_details, e.0);
+                self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                Err(DevNetError {
+                    message: msg,
+                    code: e.1,
+                })
+            }
         }
     }
 
     async fn deploy_pod(&self, template: Template, namespace: &str) -> Result<(), DevNetError> {
-        let mut pod: Pod = get_resource_from_file(template)?;
+        let mut pod: Pod = self.get_resource_from_file(template)?;
 
         pod.metadata.namespace = Some(namespace.to_owned());
         self.deploy_resource(namespace, pod, "pod").await
     }
 
     async fn deploy_service(&self, template: Template, namespace: &str) -> Result<(), DevNetError> {
-        let mut service: Service = get_resource_from_file(template)?;
+        let mut service: Service = self.get_resource_from_file(template)?;
 
         service.metadata.namespace = Some(namespace.to_owned());
         self.deploy_resource(namespace, service, "service").await
@@ -320,7 +350,7 @@ impl StacksDevnetApiK8sManager {
         namespace: &str,
         configmap_data: Option<Vec<(&str, &str)>>,
     ) -> Result<(), DevNetError> {
-        let mut configmap: ConfigMap = get_resource_from_file(template)?;
+        let mut configmap: ConfigMap = self.get_resource_from_file(template)?;
 
         configmap.metadata.namespace = Some(namespace.to_owned());
         if let Some(configmap_data) = configmap_data {
@@ -336,7 +366,7 @@ impl StacksDevnetApiK8sManager {
     }
 
     async fn deploy_pvc(&self, template: Template, namespace: &str) -> Result<(), DevNetError> {
-        let mut pvc: PersistentVolumeClaim = get_resource_from_file(template)?;
+        let mut pvc: PersistentVolumeClaim = self.get_resource_from_file(template)?;
 
         pvc.metadata.namespace = Some(namespace.to_owned());
 
@@ -668,58 +698,82 @@ impl StacksDevnetApiK8sManager {
     {
         let api: Api<K> = Api::namespaced(self.client.to_owned(), &namespace);
         let dp = DeleteParams::default();
+
+        let resource_details = format!(
+            "RESOURCE: {}, NAME: {}, NAMESPACE: {}",
+            std::any::type_name::<K>(),
+            resource_name,
+            namespace
+        );
+        self.ctx
+            .try_log(|logger| slog::info!(logger, "deleting {}", resource_details));
         match api.delete(resource_name, &dp).await {
-            Ok(resource) => {
-                resource.map_left(|del| {
-                    assert_eq!(del.name_any(), resource_name);
-                    println!("Deleting {resource_name} started");
+            Ok(_) => {
+                self.ctx.try_log(|logger| {
+                    slog::info!(logger, "successfully deleted {}", resource_details)
                 });
                 Ok(())
             }
-            Err(kube::Error::Api(api_error)) => Err(DevNetError {
-                message: format!("unable to delete {}: {}", resource_name, api_error.message),
-                code: api_error.code,
-            }),
-            Err(e) => Err(DevNetError {
-                message: format!("unable to delete {}: {}", resource_name, e.to_string()),
-                code: 500,
-            }),
+            Err(e) => {
+                let e = match e {
+                    kube::Error::Api(api_error) => (api_error.message, api_error.code),
+                    e => (e.to_string(), 500),
+                };
+                let msg = format!("failed to delete {}, ERROR: {}", resource_details, e.0);
+                self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                Err(DevNetError {
+                    message: msg,
+                    code: e.1,
+                })
+            }
         }
     }
 
     async fn delete_namespace(&self, namespace_str: &str) -> Result<(), DevNetError> {
         let api: Api<Namespace> = kube::Api::all(self.client.to_owned());
 
+        let resource_details = format!("RESOURCE: namespace, NAME: {}", namespace_str);
+        self.ctx
+            .try_log(|logger| slog::info!(logger, "deleting {}", resource_details));
+
         let dp = DeleteParams::default();
         match api.delete(namespace_str, &dp).await {
-            Ok(namespace) => {
-                namespace.map_left(|del| {
-                    assert_eq!(del.name_any(), namespace_str);
-                    println!("Deleting namespace started");
+            Ok(_) => {
+                self.ctx.try_log(|logger| {
+                    slog::info!(logger, "succesfully deleted {}", resource_details)
                 });
                 Ok(())
             }
-            Err(kube::Error::Api(api_error)) => Err(DevNetError {
-                message: format!("unable to delete namespace: {}", api_error.message),
-                code: api_error.code,
-            }),
-            Err(e) => Err(DevNetError {
-                message: format!("unable to delete namespace: {}", e.to_string()),
-                code: 500,
-            }),
+            Err(e) => {
+                let e = match e {
+                    kube::Error::Api(api_error) => (api_error.message, api_error.code),
+                    e => (e.to_string(), 500),
+                };
+                let msg = format!("failed to delete {}, ERROR: {}", resource_details, e.0);
+                self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                Err(DevNetError {
+                    message: msg,
+                    code: e.1,
+                })
+            }
         }
     }
-}
+    fn get_resource_from_file<K>(&self, template: Template) -> Result<K, DevNetError>
+    where
+        K: DeserializeOwned,
+    {
+        let template_str = get_yaml_from_filename(template);
 
-fn get_resource_from_file<K>(template: Template) -> Result<K, DevNetError>
-where
-    K: DeserializeOwned,
-{
-    let template_str = get_yaml_from_filename(template);
-
-    let resource: K = serde_yaml::from_str(template_str).map_err(|e| DevNetError {
-        message: format!("unable to parse template file: {}", e.to_string()),
-        code: 500,
-    })?;
-    Ok(resource)
+        match serde_yaml::from_str(template_str) {
+            Ok(resource) => Ok(resource),
+            Err(e) => {
+                let msg = format!("unable to parse template file: {}", e.to_string());
+                self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                Err(DevNetError {
+                    message: msg,
+                    code: 500,
+                })
+            }
+        }
+    }
 }
