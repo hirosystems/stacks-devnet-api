@@ -168,10 +168,6 @@ impl StacksDevnetApiK8sManager {
             let _ = self.delete_resource::<Pod>(namespace, pod).await;
         }
 
-        let pods = vec!["bitcoind-chain-coordinator", "stacks-node", "stacks-api"];
-        for pod in pods {
-            let _ = self.delete_resource::<Pod>(namespace, pod).await;
-        }
         let configmaps = vec![
             "bitcoind-conf",
             "stacks-node-conf",
@@ -184,7 +180,9 @@ impl StacksDevnetApiK8sManager {
             "project-manifest-conf",
         ];
         for configmap in configmaps {
-            let _ = self.delete_resource::<Pod>(namespace, configmap).await;
+            let _ = self
+                .delete_resource::<ConfigMap>(namespace, configmap)
+                .await;
         }
         let services = vec![
             "bitcoind-chain-coordinator-service",
@@ -192,14 +190,13 @@ impl StacksDevnetApiK8sManager {
             "stacks-api-service",
         ];
         for service in services {
-            let _ = self.delete_resource::<Pod>(namespace, service).await;
+            let _ = self.delete_resource::<Service>(namespace, service).await;
         }
         let pvcs = vec!["stacks-api-pvc"];
         for pvc in pvcs {
-            let _ = self.delete_resource::<Pod>(namespace, pvc).await;
-        }
-        if cfg!(debug_assertions) {
-            let _ = self.delete_namespace(namespace).await;
+            let _ = self
+                .delete_resource::<PersistentVolumeClaim>(namespace, pvc)
+                .await;
         }
         Ok(())
     }
