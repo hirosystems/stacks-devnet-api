@@ -672,6 +672,7 @@ impl StacksDevnetApiK8sManager {
                     wait_time_for_blocks = 0
                     wait_time_for_microblocks = {}
                     microblock_frequency = 1000
+                    fallback_to_follower = false
 
                     [connection_options]
                     # inv_sync_interval = 10
