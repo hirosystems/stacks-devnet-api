@@ -726,35 +726,6 @@ impl StacksDevnetApiK8sManager {
         }
     }
 
-    async fn delete_namespace(&self, namespace_str: &str) -> Result<(), DevNetError> {
-        let api: Api<Namespace> = kube::Api::all(self.client.to_owned());
-
-        let resource_details = format!("RESOURCE: namespace, NAME: {}", namespace_str);
-        self.ctx
-            .try_log(|logger| slog::info!(logger, "deleting {}", resource_details));
-
-        let dp = DeleteParams::default();
-        match api.delete(namespace_str, &dp).await {
-            Ok(_) => {
-                self.ctx.try_log(|logger| {
-                    slog::info!(logger, "succesfully deleted {}", resource_details)
-                });
-                Ok(())
-            }
-            Err(e) => {
-                let e = match e {
-                    kube::Error::Api(api_error) => (api_error.message, api_error.code),
-                    e => (e.to_string(), 500),
-                };
-                let msg = format!("failed to delete {}, ERROR: {}", resource_details, e.0);
-                self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
-                Err(DevNetError {
-                    message: msg,
-                    code: e.1,
-                })
-            }
-        }
-    }
     fn get_resource_from_file<K>(&self, template: Template) -> Result<K, DevNetError>
     where
         K: DeserializeOwned,
