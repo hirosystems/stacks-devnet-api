@@ -346,6 +346,36 @@ impl StacksDevnetApiK8sManager {
         }
     }
 
+    pub async fn get_devnet_info(&self, namespace: &str) -> Result<StacksDevnetInfo, DevNetError> {
+        self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
+            slog::info!(logger, "getting devnet info NAMESPACE: {}", namespace)
+        });
+
+        let (
+            (bitcoind_node_status, bitcoind_node_started_at),
+            (stacks_node_status, stacks_node_started_at),
+            (stacks_api_status, stacks_api_started_at),
+            chain_info,
+        ) = try_join4(
+            self.get_pod_status_info(&namespace, StacksDevnetPod::BitcoindNode),
+            self.get_pod_status_info(&namespace, StacksDevnetPod::StacksNode),
+            self.get_pod_status_info(&namespace, StacksDevnetPod::StacksApi),
+            self.get_stacks_v2_info(&namespace),
+        )
+        .await?;
+
+        Ok(StacksDevnetInfo {
+            bitcoind_node_status,
+            stacks_node_status,
+            stacks_api_status,
+            bitcoind_node_started_at,
+            stacks_node_started_at,
+            stacks_api_started_at,
+            stacks_chain_tip: chain_info.stacks_tip_height,
+            bitcoin_chain_tip: chain_info.burn_block_height,
+        })
+    }
+
     async fn deploy_namespace(&self, namespace_str: &str) -> Result<(), DevNetError> {
         let mut namespace: Namespace = self.get_resource_from_file(Template::Namespace)?;
 
