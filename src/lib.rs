@@ -102,7 +102,7 @@ impl Context {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct StacksDevnetInfo {
+pub struct StacksDevnetInfoResponse {
     bitcoind_node_status: Option<String>,
     stacks_node_status: Option<String>,
     stacks_api_status: Option<String>,
@@ -112,6 +112,7 @@ pub struct StacksDevnetInfo {
     stacks_chain_tip: u64,
     bitcoin_chain_tip: u64,
 }
+
 #[derive(Serialize, Deserialize, Debug)]
 struct StacksV2InfoResponse {
     burn_block_height: u64,
@@ -346,7 +347,10 @@ impl StacksDevnetApiK8sManager {
         }
     }
 
-    pub async fn get_devnet_info(&self, namespace: &str) -> Result<StacksDevnetInfo, DevNetError> {
+    pub async fn get_devnet_info(
+        &self,
+        namespace: &str,
+    ) -> Result<StacksDevnetInfoResponse, DevNetError> {
         self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
             slog::info!(logger, "getting devnet info NAMESPACE: {}", namespace)
         });
@@ -364,7 +368,7 @@ impl StacksDevnetApiK8sManager {
         )
         .await?;
 
-        Ok(StacksDevnetInfo {
+        Ok(StacksDevnetInfoResponse {
             bitcoind_node_status,
             stacks_node_status,
             stacks_api_status,
