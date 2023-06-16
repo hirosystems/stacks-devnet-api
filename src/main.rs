@@ -236,10 +236,28 @@ async fn handle_request(
                         )
                         .unwrap()),
                 },
-                &Method::GET => Ok(Response::builder()
-                    .status(StatusCode::NOT_IMPLEMENTED)
-                    .body(Body::empty())
+                &Method::GET => match k8s_manager.get_devnet_info(&network).await {
+                    Ok(devnet_info) => match serde_json::to_vec(&devnet_info) {
+                        Ok(body) => Ok(Response::builder()
+                            .status(StatusCode::OK)
+                            .body(Body::from(body))
+                            .unwrap()),
+                        Err(e) => {
+                            let msg = format!("failed to form response body: ACTION: Query Stacks Node, NAMESPACE: {}, ERROR: {}", &network, e.to_string());
+                            ctx.try_log(|logger: &hiro_system_kit::Logger| {
+                                slog::error!(logger, "{}", msg)
+                            });
+                            Ok(Response::builder()
+                                .status(StatusCode::from_u16(500).unwrap())
+                                .body(Body::try_from(msg).unwrap())
+                                .unwrap())
+                        }
+                    },
+                    Err(e) => Ok(Response::builder()
+                        .status(StatusCode::from_u16(e.code).unwrap())
+                        .body(Body::try_from(e.message).unwrap())
                     .unwrap()),
+                },
                 _ => Ok(Response::builder()
                     .status(StatusCode::METHOD_NOT_ALLOWED)
                     .body(Body::empty())
