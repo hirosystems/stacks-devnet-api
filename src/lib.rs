@@ -246,6 +246,38 @@ impl StacksDevnetApiK8sManager {
         }
     }
 
+    async fn get_pod_status_info(
+        &self,
+        namespace: &str,
+        pod: StacksDevnetPod,
+    ) -> Result<(Option<String>, Option<String>), DevNetError> {
+        let pod_api: Api<Pod> = Api::namespaced(self.client.to_owned(), &namespace);
+        let pod_name = pod.to_string();
+        match pod_api.get_status(&pod_name).await {
+            Ok(pod_with_status) => match pod_with_status.status {
+                Some(status) => {
+                    let start_time = match status.start_time {
+                        Some(st) => Some(st.0.to_string()),
+                        None => None,
+                    };
+                    Ok((status.phase, start_time))
+                }
+                None => Ok((None, None)),
+            },
+            Err(e) => {
+                let e = match e {
+                    kube::Error::Api(api_error) => (api_error.message, api_error.code),
+                    e => (e.to_string(), 500),
+                };
+                let msg = format!("failed to get status for pod {}, ERROR: {}", pod_name, e.0);
+                self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                Err(DevNetError {
+                    message: msg,
+                    code: e.1,
+                })
+            }
+        }
+    }
     async fn deploy_namespace(&self, namespace_str: &str) -> Result<(), DevNetError> {
         let mut namespace: Namespace = self.get_resource_from_file(Template::Namespace)?;
 
