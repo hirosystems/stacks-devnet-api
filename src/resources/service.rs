@@ -1,11 +1,20 @@
 use std::fmt;
 use strum_macros::EnumIter;
 
-#[derive(EnumIter, Debug)]
+#[derive(EnumIter, Debug, Clone)]
 pub enum StacksDevnetService {
     BitcoindNode,
     StacksNode,
     StacksApi,
+}
+
+pub enum ServicePort {
+    RPC,
+    P2P,
+    Ingestion,
+    Event,
+    API,
+    DB,
 }
 
 impl fmt::Display for StacksDevnetService {
@@ -18,18 +27,25 @@ impl fmt::Display for StacksDevnetService {
     }
 }
 
-pub fn get_service_url(service: StacksDevnetService, namespace: &str) -> String {
-    let port = match service {
-        StacksDevnetService::BitcoindNode => "18443",
-        StacksDevnetService::StacksNode => "20443",
-        StacksDevnetService::StacksApi => "3999",
-    };
+pub fn get_service_port(service: StacksDevnetService, port_type: ServicePort) -> Option<String> {
+    match (service, port_type) {
+        (StacksDevnetService::BitcoindNode, ServicePort::RPC) => Some("18443".into()),
+        (StacksDevnetService::BitcoindNode, ServicePort::P2P) => Some("18444".into()),
+        (StacksDevnetService::BitcoindNode, ServicePort::Ingestion) => Some("20445".into()),
+        (StacksDevnetService::StacksNode, ServicePort::RPC) => Some("20443".into()),
+        (StacksDevnetService::StacksNode, ServicePort::P2P) => Some("20444".into()),
+        (StacksDevnetService::StacksApi, ServicePort::API) => Some("3999".into()),
+        (StacksDevnetService::StacksApi, ServicePort::Event) => Some("3700".into()),
+        (StacksDevnetService::StacksApi, ServicePort::DB) => Some("5432".into()),
+        (_, _) => None,
+    }
+}
 
+pub fn get_service_url(namespace: &str, service: StacksDevnetService) -> String {
     format!(
-        "http://{}.{}/svc/cluster.local:{}",
+        "http://{}.{}/svc.cluster.local",
         service.to_string(),
-        namespace,
-        port
+        namespace
     )
 }
 
