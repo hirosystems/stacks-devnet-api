@@ -110,6 +110,11 @@ pub struct StacksDevnetInfo {
     stacks_chain_tip: u64,
     bitcoin_chain_tip: u64,
 }
+#[derive(Serialize, Deserialize, Debug)]
+struct StacksV2InfoResponse {
+    burn_block_height: u64,
+    stacks_tip_height: u64,
+}
 #[derive(Clone)]
 pub struct StacksDevnetApiK8sManager {
     client: Client,
