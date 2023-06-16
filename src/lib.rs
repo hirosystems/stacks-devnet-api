@@ -99,6 +99,17 @@ impl Context {
         self.logger.as_ref().unwrap()
     }
 }
+#[derive(Serialize, Deserialize, Debug)]
+pub struct StacksDevnetInfo {
+    bitcoind_node_status: Option<String>,
+    stacks_node_status: Option<String>,
+    stacks_api_status: Option<String>,
+    bitcoind_node_started_at: Option<String>,
+    stacks_node_started_at: Option<String>,
+    stacks_api_started_at: Option<String>,
+    stacks_chain_tip: u64,
+    bitcoin_chain_tip: u64,
+}
 #[derive(Clone)]
 pub struct StacksDevnetApiK8sManager {
     client: Client,
