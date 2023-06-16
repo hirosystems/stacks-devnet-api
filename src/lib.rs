@@ -12,6 +12,7 @@ use kube::{
 use resources::{
     pvc::StacksDevnetPvc,
     service::{get_service_port, ServicePort},
+    StacksDevnetResource,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::thread::sleep;
@@ -20,7 +21,7 @@ use strum::IntoEnumIterator;
 use tower::BoxError;
 
 mod template_parser;
-use template_parser::{get_yaml_from_filename, Template};
+use template_parser::get_yaml_from_resource;
 
 pub mod resources;
 use crate::resources::configmap::StacksDevnetConfigmap;
@@ -378,7 +379,8 @@ impl StacksDevnetApiK8sManager {
     }
 
     async fn deploy_namespace(&self, namespace_str: &str) -> Result<(), DevNetError> {
-        let mut namespace: Namespace = self.get_resource_from_file(Template::Namespace)?;
+        let mut namespace: Namespace =
+            self.get_resource_from_file(StacksDevnetResource::Namespace)?;
 
         namespace.metadata.name = Some(namespace_str.to_owned());
         namespace.metadata.labels =
@@ -469,15 +471,20 @@ impl StacksDevnetApiK8sManager {
         }
     }
 
-    async fn deploy_pod(&self, template: Template, namespace: &str) -> Result<(), DevNetError> {
-        let mut pod: Pod = self.get_resource_from_file(template)?;
+    async fn deploy_pod(&self, pod: StacksDevnetPod, namespace: &str) -> Result<(), DevNetError> {
+        let mut pod: Pod = self.get_resource_from_file(StacksDevnetResource::Pod(pod))?;
 
         pod.metadata.namespace = Some(namespace.to_owned());
         self.deploy_resource(namespace, pod, "pod").await
     }
 
-    async fn deploy_service(&self, template: Template, namespace: &str) -> Result<(), DevNetError> {
-        let mut service: Service = self.get_resource_from_file(template)?;
+    async fn deploy_service(
+        &self,
+        service: StacksDevnetService,
+        namespace: &str,
+    ) -> Result<(), DevNetError> {
+        let mut service: Service =
+            self.get_resource_from_file(StacksDevnetResource::Service(service))?;
 
         service.metadata.namespace = Some(namespace.to_owned());
         self.deploy_resource(namespace, service, "service").await
@@ -485,11 +492,12 @@ impl StacksDevnetApiK8sManager {
 
     async fn deploy_configmap(
         &self,
-        template: Template,
+        configmap: StacksDevnetConfigmap,
         namespace: &str,
         configmap_data: Option<Vec<(&str, &str)>>,
     ) -> Result<(), DevNetError> {
-        let mut configmap: ConfigMap = self.get_resource_from_file(template)?;
+        let mut configmap: ConfigMap =
+            self.get_resource_from_file(StacksDevnetResource::Configmap(configmap))?;
 
         configmap.metadata.namespace = Some(namespace.to_owned());
         if let Some(configmap_data) = configmap_data {
@@ -504,8 +512,9 @@ impl StacksDevnetApiK8sManager {
             .await
     }
 
-    async fn deploy_pvc(&self, template: Template, namespace: &str) -> Result<(), DevNetError> {
-        let mut pvc: PersistentVolumeClaim = self.get_resource_from_file(template)?;
+    async fn deploy_pvc(&self, pvc: StacksDevnetPvc, namespace: &str) -> Result<(), DevNetError> {
+        let mut pvc: PersistentVolumeClaim =
+            self.get_resource_from_file(StacksDevnetResource::Pvc(pvc))?;
 
         pvc.metadata.namespace = Some(namespace.to_owned());
 
@@ -555,21 +564,21 @@ impl StacksDevnetApiK8sManager {
         );
 
         self.deploy_configmap(
-            Template::BitcoindConfigmap,
+            StacksDevnetConfigmap::BitcoindNode,
             &namespace,
             Some(vec![("bitcoin.conf", &bitcoind_conf)]),
         )
         .await?;
 
         self.deploy_configmap(
-            Template::ChainCoordinatorNamespaceConfigmap,
+            StacksDevnetConfigmap::Namespace,
             &namespace,
             Some(vec![("NAMESPACE", &namespace)]),
         )
         .await?;
 
         self.deploy_configmap(
-            Template::ChainCoordinatorProjectManifestConfigmap,
+            StacksDevnetConfigmap::ProjectManifest,
             &namespace,
             Some(vec![("Clarinet.toml", &config.project_manifest)]),
         )
@@ -587,14 +596,14 @@ impl StacksDevnetApiK8sManager {
         ));
 
         self.deploy_configmap(
-            Template::ChainCoordinatorDevnetConfigmap,
+            StacksDevnetConfigmap::Devnet,
             &namespace,
             Some(vec![("Devnet.toml", &devnet_config)]),
         )
         .await?;
 
         self.deploy_configmap(
-            Template::ChainCoordinatorDeploymentPlanConfigmap,
+            StacksDevnetConfigmap::DeploymentPlan,
             &namespace,
             Some(vec![("default.devnet-plan.yaml", &config.deployment_plan)]),
         )
@@ -605,16 +614,16 @@ impl StacksDevnetApiK8sManager {
             contracts.push((contract_name, contract_source));
         }
         self.deploy_configmap(
-            Template::ChainCoordinatorProjectDirConfigmap,
+            StacksDevnetConfigmap::ProjectDir,
             &namespace,
             Some(contracts),
         )
         .await?;
 
-        self.deploy_pod(Template::BitcoindChainCoordinatorPod, &namespace)
+        self.deploy_pod(StacksDevnetPod::BitcoindNode, &namespace)
             .await?;
 
-        self.deploy_service(Template::BitcoindChainCoordinatorService, namespace)
+        self.deploy_service(StacksDevnetService::BitcoindNode, namespace)
             .await?;
 
         Ok(())
@@ -762,15 +771,16 @@ impl StacksDevnetApiK8sManager {
         };
 
         self.deploy_configmap(
-            Template::StacksNodeConfigmap,
+            StacksDevnetConfigmap::StacksNode,
             &namespace,
             Some(vec![("Stacks.toml", &stacks_conf)]),
         )
         .await?;
 
-        self.deploy_pod(Template::StacksNodePod, &namespace).await?;
+        self.deploy_pod(StacksDevnetPod::StacksNode, &namespace)
+            .await?;
 
-        self.deploy_service(Template::StacksNodeService, namespace)
+        self.deploy_service(StacksDevnetService::StacksNode, namespace)
             .await?;
 
         Ok(())
@@ -783,7 +793,7 @@ impl StacksDevnetApiK8sManager {
             ("POSTGRES_DB", "stacks_api"),
         ]);
         self.deploy_configmap(
-            Template::StacksApiPostgresConfigmap,
+            StacksDevnetConfigmap::StacksApiPostgres,
             &namespace,
             Some(stacks_api_pg_env),
         )
@@ -817,17 +827,19 @@ impl StacksDevnetApiK8sManager {
             ("STACKS_API_LOG_LEVEL", "debug"),
         ]);
         self.deploy_configmap(
-            Template::StacksApiConfigmap,
+            StacksDevnetConfigmap::StacksApi,
             &namespace,
             Some(stacks_api_env),
         )
         .await?;
 
-        self.deploy_pvc(Template::StacksApiPvc, &namespace).await?;
+        self.deploy_pvc(StacksDevnetPvc::StacksApi, &namespace)
+            .await?;
 
-        self.deploy_pod(Template::StacksApiPod, &namespace).await?;
+        self.deploy_pod(StacksDevnetPod::StacksApi, &namespace)
+            .await?;
 
-        self.deploy_service(Template::StacksApiService, &namespace)
+        self.deploy_service(StacksDevnetService::StacksApi, &namespace)
             .await?;
 
         Ok(())
@@ -877,11 +889,11 @@ impl StacksDevnetApiK8sManager {
         }
     }
 
-    fn get_resource_from_file<K>(&self, template: Template) -> Result<K, DevNetError>
+    fn get_resource_from_file<K>(&self, template: StacksDevnetResource) -> Result<K, DevNetError>
     where
         K: DeserializeOwned,
     {
-        let template_str = get_yaml_from_filename(template);
+        let template_str = get_yaml_from_resource(template);
 
         match serde_yaml::from_str(template_str) {
             Ok(resource) => Ok(resource),
