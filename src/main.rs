@@ -13,7 +13,7 @@ use std::{convert::Infallible, net::SocketAddr};
 #[tokio::main]
 async fn main() {
     const HOST: &str = "0.0.0.0";
-    const PORT: &str = "8478";
+    const PORT: &str = "8477";
     let endpoint: String = HOST.to_owned() + ":" + PORT;
     let addr: SocketAddr = endpoint.parse().expect("Could not parse ip:port.");
 
