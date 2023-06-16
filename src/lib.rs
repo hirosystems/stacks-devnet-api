@@ -17,6 +17,11 @@ use std::thread::sleep;
 mod template_parser;
 use template_parser::{get_yaml_from_filename, Template};
 
+pub mod utils;
+use crate::utils::configmap::StacksDevnetConfigmap;
+use crate::utils::pod::StacksDevnetPod;
+use crate::utils::service::{get_service_url, StacksDevnetService};
+
 const BITCOIND_CHAIN_COORDINATOR_SERVICE_NAME: &str = "bitcoind-chain-coordinator-service";
 const STACKS_NODE_SERVICE_NAME: &str = "stacks-node-service";
 
@@ -163,35 +168,25 @@ impl StacksDevnetApiK8sManager {
     }
 
     pub async fn delete_devnet(&self, namespace: &str) -> Result<(), Box<dyn std::error::Error>> {
-        let pods = vec!["bitcoind-chain-coordinator", "stacks-node", "stacks-api"];
+        let pods: Vec<String> = StacksDevnetPod::iter().map(|p| p.to_string()).collect();
         for pod in pods {
-            let _ = self.delete_resource::<Pod>(namespace, pod).await;
+            let _ = self.delete_resource::<Pod>(namespace, &pod).await;
         }
 
-        let configmaps = vec![
-            "bitcoind-conf",
-            "stacks-node-conf",
-            "stacks-api-conf",
-            "stacks-api-postgres-conf",
-            "deployment-plan-conf",
-            "devnet-conf",
-            "project-dir-conf",
-            "namespace-conf",
-            "project-manifest-conf",
-        ];
+        let configmaps: Vec<String> = StacksDevnetConfigmap::iter()
+            .map(|c| c.to_string())
+            .collect();
         for configmap in configmaps {
             let _ = self
-                .delete_resource::<ConfigMap>(namespace, configmap)
+                .delete_resource::<ConfigMap>(namespace, &configmap)
                 .await;
         }
-        let services = vec![
-            "bitcoind-chain-coordinator-service",
-            "stacks-node-service",
-            "stacks-api-service",
-        ];
+
+        let services: Vec<String> = StacksDevnetService::iter().map(|s| s.to_string()).collect();
         for service in services {
-            let _ = self.delete_resource::<Service>(namespace, service).await;
+            let _ = self.delete_resource::<Service>(namespace, &service).await;
         }
+
         let pvcs = vec!["stacks-api-pvc"];
         for pvc in pvcs {
             let _ = self
