@@ -1,18 +1,19 @@
+use futures::future::try_join4;
 use hiro_system_kit::{slog, Logger};
-use hyper::{body::Bytes, Body, Request, Response};
+use hyper::{body::Bytes, Body, Client as HttpClient, Request, Response, Uri};
 use k8s_openapi::{
     api::core::v1::{ConfigMap, Namespace, PersistentVolumeClaim, Pod, Service},
     NamespaceResourceScope,
 };
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{collections::BTreeMap, time::Duration};
-use tower::BoxError;
-
 use kube::{
     api::{Api, DeleteParams, PostParams},
     Client,
 };
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::thread::sleep;
+use std::{collections::BTreeMap, str::FromStr, time::Duration};
+use strum::IntoEnumIterator;
+use tower::BoxError;
 
 mod template_parser;
 use template_parser::{get_yaml_from_filename, Template};
@@ -99,6 +100,7 @@ impl Context {
         self.logger.as_ref().unwrap()
     }
 }
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct StacksDevnetInfo {
     bitcoind_node_status: Option<String>,
@@ -278,6 +280,72 @@ impl StacksDevnetApiK8sManager {
             }
         }
     }
+
+    async fn get_stacks_v2_info(
+        &self,
+        namespace: &str,
+    ) -> Result<StacksV2InfoResponse, DevNetError> {
+        let client = HttpClient::new();
+        let url = get_service_url(StacksDevnetService::StacksNode, namespace);
+        let url = format!("{}/v2/info", url);
+
+        let context = format!("ACTION: Query Stacks Node, NAMESPACE: {}", namespace);
+
+        match Uri::from_str(&url) {
+            Ok(uri) => match client.get(uri).await {
+                Ok(response) => match hyper::body::to_bytes(response.into_body()).await {
+                    Ok(body) => match serde_json::from_slice::<StacksV2InfoResponse>(&body) {
+                        Ok(config) => Ok(config),
+                        Err(e) => {
+                            let msg = format!(
+                                "failed to parse response: {}, ERROR: {}",
+                                context,
+                                e.to_string()
+                            );
+                            self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                            Err(DevNetError {
+                                message: msg,
+                                code: 500,
+                            })
+                        }
+                    },
+                    Err(e) => {
+                        let msg = format!(
+                            "failed to parse response: {}, ERROR: {}",
+                            context,
+                            e.to_string()
+                        );
+                        self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                        Err(DevNetError {
+                            message: msg,
+                            code: 500,
+                        })
+                    }
+                },
+                Err(e) => {
+                    let msg = format!(
+                        "failed to query stacks node: {}, ERROR: {}",
+                        context,
+                        e.to_string()
+                    );
+                    self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                    Err(DevNetError {
+                        message: msg,
+                        code: 500,
+                    })
+                }
+            },
+            Err(e) => {
+                let msg = format!("failed to parse url: {} ERROR: {}", context, e.to_string());
+                self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                Err(DevNetError {
+                    message: msg,
+                    code: 500,
+                })
+            }
+        }
+    }
+
     async fn deploy_namespace(&self, namespace_str: &str) -> Result<(), DevNetError> {
         let mut namespace: Namespace = self.get_resource_from_file(Template::Namespace)?;
 
