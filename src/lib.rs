@@ -14,6 +14,7 @@ use std::thread::sleep;
 use std::{collections::BTreeMap, str::FromStr, time::Duration};
 use strum::IntoEnumIterator;
 use tower::BoxError;
+use utils::pvc::StacksDevnetPvc;
 
 mod template_parser;
 use template_parser::{get_yaml_from_filename, Template};
@@ -206,10 +207,10 @@ impl StacksDevnetApiK8sManager {
             let _ = self.delete_resource::<Service>(namespace, &service).await;
         }
 
-        let pvcs = vec!["stacks-api-pvc"];
+        let pvcs: Vec<String> = StacksDevnetPvc::iter().map(|s| s.to_string()).collect();
         for pvc in pvcs {
             let _ = self
-                .delete_resource::<PersistentVolumeClaim>(namespace, pvc)
+                .delete_resource::<PersistentVolumeClaim>(namespace, &pvc)
                 .await;
         }
         Ok(())
