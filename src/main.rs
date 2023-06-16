@@ -2,7 +2,7 @@ use hiro_system_kit::slog;
 use hyper::server::conn::AddrStream;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Client, Method, Request, Response, Server, StatusCode, Uri};
-use stacks_devnet_api::utils::service::{get_service_from_path_part, get_service_url};
+use stacks_devnet_api::resources::service::{get_service_from_path_part, get_service_url};
 use stacks_devnet_api::{Context, StacksDevnetApiK8sManager, StacksDevnetConfig};
 use std::net::IpAddr;
 use std::str::FromStr;

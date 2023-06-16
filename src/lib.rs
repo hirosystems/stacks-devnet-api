@@ -9,20 +9,20 @@ use kube::{
     api::{Api, DeleteParams, PostParams},
     Client,
 };
+use resources::pvc::StacksDevnetPvc;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::thread::sleep;
 use std::{collections::BTreeMap, str::FromStr, time::Duration};
 use strum::IntoEnumIterator;
 use tower::BoxError;
-use utils::pvc::StacksDevnetPvc;
 
 mod template_parser;
 use template_parser::{get_yaml_from_filename, Template};
 
-pub mod utils;
-use crate::utils::configmap::StacksDevnetConfigmap;
-use crate::utils::pod::StacksDevnetPod;
-use crate::utils::service::{get_service_url, StacksDevnetService};
+pub mod resources;
+use crate::resources::configmap::StacksDevnetConfigmap;
+use crate::resources::pod::StacksDevnetPod;
+use crate::resources::service::{get_service_url, StacksDevnetService};
 
 const BITCOIND_CHAIN_COORDINATOR_SERVICE_NAME: &str = "bitcoind-chain-coordinator-service";
 const STACKS_NODE_SERVICE_NAME: &str = "stacks-node-service";
