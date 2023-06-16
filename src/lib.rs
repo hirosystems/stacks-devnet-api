@@ -9,7 +9,10 @@ use kube::{
     api::{Api, DeleteParams, PostParams},
     Client,
 };
-use resources::pvc::StacksDevnetPvc;
+use resources::{
+    pvc::StacksDevnetPvc,
+    service::{get_service_port, ServicePort},
+};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::thread::sleep;
 use std::{collections::BTreeMap, str::FromStr, time::Duration};
@@ -24,14 +27,6 @@ use crate::resources::configmap::StacksDevnetConfigmap;
 use crate::resources::pod::StacksDevnetPod;
 use crate::resources::service::{get_service_url, StacksDevnetService};
 
-const BITCOIND_CHAIN_COORDINATOR_SERVICE_NAME: &str = "bitcoind-chain-coordinator-service";
-const STACKS_NODE_SERVICE_NAME: &str = "stacks-node-service";
-
-const BITCOIND_P2P_PORT: i32 = 18444;
-const BITCOIND_RPC_PORT: i32 = 18443;
-const STACKS_NODE_P2P_PORT: i32 = 20444;
-const STACKS_NODE_RPC_PORT: i32 = 20443;
-const CHAIN_COORDINATOR_INGESTION_PORT: i32 = 20445;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct StacksDevnetConfig {
     namespace: String,
@@ -288,8 +283,9 @@ impl StacksDevnetApiK8sManager {
         namespace: &str,
     ) -> Result<StacksV2InfoResponse, DevNetError> {
         let client = HttpClient::new();
-        let url = get_service_url(StacksDevnetService::StacksNode, namespace);
-        let url = format!("{}/v2/info", url);
+        let url = get_service_url(namespace, StacksDevnetService::StacksNode);
+        let port = get_service_port(StacksDevnetService::StacksNode, ServicePort::RPC).unwrap();
+        let url = format!("{}:{}/v2/info", url, port);
 
         let context = format!("ACTION: Query Stacks Node, NAMESPACE: {}", namespace);
 
@@ -522,6 +518,11 @@ impl StacksDevnetApiK8sManager {
     ) -> Result<(), DevNetError> {
         let namespace = &config.namespace;
 
+        let bitcoin_rpc_port =
+            get_service_port(StacksDevnetService::BitcoindNode, ServicePort::RPC).unwrap();
+        let bitcoin_p2p_port =
+            get_service_port(StacksDevnetService::BitcoindNode, ServicePort::P2P).unwrap();
+
         let bitcoind_conf = format!(
             r#"
                 server=1
@@ -548,9 +549,9 @@ impl StacksDevnetApiK8sManager {
                 "#,
             config.bitcoin_node_username,
             config.bitcoin_node_password,
-            BITCOIND_P2P_PORT,
-            BITCOIND_RPC_PORT,
-            BITCOIND_RPC_PORT
+            bitcoin_p2p_port,
+            bitcoin_rpc_port,
+            bitcoin_rpc_port
         );
 
         self.deploy_configmap(
@@ -622,6 +623,9 @@ impl StacksDevnetApiK8sManager {
     async fn deploy_stacks_node_pod(&self, config: &StacksDevnetConfig) -> Result<(), DevNetError> {
         let namespace = &config.namespace;
 
+        let chain_coordinator_ingestion_port =
+            get_service_port(StacksDevnetService::BitcoindNode, ServicePort::Ingestion).unwrap();
+
         let stacks_conf = {
             let mut stacks_conf = format!(
                 r#"
@@ -652,8 +656,8 @@ impl StacksDevnetApiK8sManager {
                     block_reward_recipient = "{}"
                     # microblock_attempt_time_ms = 15000
                 "#,
-                STACKS_NODE_RPC_PORT,
-                STACKS_NODE_P2P_PORT,
+                get_service_port(StacksDevnetService::StacksNode, ServicePort::RPC).unwrap(),
+                get_service_port(StacksDevnetService::StacksNode, ServicePort::P2P).unwrap(),
                 config.stacks_miner_secret_key_hex,
                 config.stacks_miner_secret_key_hex,
                 config.stacks_node_wait_time_for_microblocks,
@@ -683,11 +687,8 @@ impl StacksDevnetApiK8sManager {
                 config.miner_coinbase_recipient, balance
             ));
 
-            let namespaced_host = format!("{}.svc.cluster.local", &namespace);
-            let bitcoind_chain_coordinator_host = format!(
-                "{}.{}",
-                &BITCOIND_CHAIN_COORDINATOR_SERVICE_NAME, namespaced_host
-            );
+            let bitcoind_chain_coordinator_host =
+                get_service_url(&namespace, StacksDevnetService::BitcoindNode);
 
             stacks_conf.push_str(&format!(
                 r#"
@@ -698,7 +699,7 @@ impl StacksDevnetApiK8sManager {
                 include_data_events = true
                 events_keys = ["*"]
                 "#,
-                bitcoind_chain_coordinator_host, CHAIN_COORDINATOR_INGESTION_PORT
+                bitcoind_chain_coordinator_host, chain_coordinator_ingestion_port
             ));
 
             //         stacks_conf.push_str(&format!(
@@ -731,8 +732,8 @@ impl StacksDevnetApiK8sManager {
                 bitcoind_chain_coordinator_host,
                 config.bitcoin_node_username,
                 config.bitcoin_node_password,
-                CHAIN_COORDINATOR_INGESTION_PORT,
-                BITCOIND_P2P_PORT
+                chain_coordinator_ingestion_port,
+                get_service_port(StacksDevnetService::BitcoindNode, ServicePort::P2P).unwrap()
             ));
 
             stacks_conf.push_str(&format!(
@@ -789,20 +790,24 @@ impl StacksDevnetApiK8sManager {
         .await?;
 
         // configmap env vars for api conatainer
-        let namespaced_host = format!("{}.svc.cluster.local", &namespace);
-        let stacks_node_host = format!("{}.{}", &STACKS_NODE_SERVICE_NAME, namespaced_host);
-        let rpc_port = STACKS_NODE_RPC_PORT.to_string();
+        let stacks_node_host = get_service_url(&namespace, StacksDevnetService::StacksNode);
+        let rpc_port = get_service_port(StacksDevnetService::StacksNode, ServicePort::RPC).unwrap();
+        let api_port = get_service_port(StacksDevnetService::StacksApi, ServicePort::API).unwrap();
+        let event_port =
+            get_service_port(StacksDevnetService::StacksNode, ServicePort::Event).unwrap();
+        let db_port =
+            get_service_port(StacksDevnetService::StacksNode, ServicePort::Event).unwrap();
         let stacks_api_env = Vec::from([
             ("STACKS_CORE_RPC_HOST", &stacks_node_host[..]),
             ("STACKS_BLOCKCHAIN_API_DB", "pg"),
             ("STACKS_CORE_RPC_PORT", &rpc_port),
-            ("STACKS_BLOCKCHAIN_API_PORT", "3999"),
+            ("STACKS_BLOCKCHAIN_API_PORT", &api_port),
             ("STACKS_BLOCKCHAIN_API_HOST", "0.0.0.0"),
-            ("STACKS_CORE_EVENT_PORT", "3700"),
+            ("STACKS_CORE_EVENT_PORT", &event_port),
             ("STACKS_CORE_EVENT_HOST", "0.0.0.0"),
             ("STACKS_API_ENABLE_FT_METADATA", "1"),
             ("PG_HOST", "0.0.0.0"),
-            ("PG_PORT", "5432"),
+            ("PG_PORT", &db_port),
             ("PG_USER", "postgres"),
             ("PG_PASSWORD", "postgres"),
             ("PG_DATABASE", "stacks_api"),

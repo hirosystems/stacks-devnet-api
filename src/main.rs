@@ -2,7 +2,9 @@ use hiro_system_kit::slog;
 use hyper::server::conn::AddrStream;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Client, Method, Request, Response, Server, StatusCode, Uri};
-use stacks_devnet_api::resources::service::{get_service_from_path_part, get_service_url};
+use stacks_devnet_api::resources::service::{
+    get_service_from_path_part, get_service_port, get_service_url, ServicePort,
+};
 use stacks_devnet_api::{Context, StacksDevnetApiK8sManager, StacksDevnetConfig};
 use std::net::IpAddr;
 use std::str::FromStr;
@@ -11,7 +13,7 @@ use std::{convert::Infallible, net::SocketAddr};
 #[tokio::main]
 async fn main() {
     const HOST: &str = "0.0.0.0";
-    const PORT: &str = "8477";
+    const PORT: &str = "8478";
     let endpoint: String = HOST.to_owned() + ":" + PORT;
     let addr: SocketAddr = endpoint.parse().expect("Could not parse ip:port.");
 
@@ -256,7 +258,7 @@ async fn handle_request(
                     Err(e) => Ok(Response::builder()
                         .status(StatusCode::from_u16(e.code).unwrap())
                         .body(Body::try_from(e.message).unwrap())
-                    .unwrap()),
+                        .unwrap()),
                 },
                 _ => Ok(Response::builder()
                     .status(StatusCode::METHOD_NOT_ALLOWED)
@@ -276,7 +278,9 @@ async fn handle_request(
             let service = get_service_from_path_part(&subroute);
             return match service {
                 Some(service) => {
-                    let forward_url = get_service_url(service, &network);
+                    let base_url = get_service_url(&network, service.clone());
+                    let port = get_service_port(service, ServicePort::RPC).unwrap();
+                    let forward_url = format!("{}:{}", base_url, port);
                     let proxy_request =
                         mutate_request_for_proxy(request, &forward_url, &remaining_path);
                     proxy(proxy_request, &ctx).await
@@ -300,6 +304,7 @@ mod tests {
     use super::*;
     use hyper::body;
     use k8s_openapi::api::core::v1::Namespace;
+    use stacks_devnet_api::resources::service::{get_service_port, StacksDevnetService};
     use tower_test::mock::{self, Handle};
 
     async fn mock_k8s_handler(handle: &mut Handle<Request<Body>, Response<Body>>) {
@@ -596,14 +601,21 @@ mod tests {
         let remainder = path_parts.remainder.unwrap();
 
         let service = get_service_from_path_part(&subroute).unwrap();
-        let forward_url = get_service_url(service, &network);
+        let forward_url = format!(
+            "{}:{}",
+            get_service_url(&network, service.clone()),
+            get_service_port(service, ServicePort::RPC).unwrap()
+        );
         let request_builder = Request::builder().uri("/").method("POST");
         let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
         let request = mutate_request_for_proxy(request, &forward_url, &remainder);
         let actual_url = request.uri().to_string();
         let expected = format!(
-            "http://stacks-node-service.{}.svc.cluster.local:20443/{}",
-            network, &remainder
+            "http://{}.{}.svc.cluster.local:{}/{}",
+            StacksDevnetService::StacksNode,
+            network,
+            get_service_port(StacksDevnetService::StacksNode, ServicePort::RPC).unwrap(),
+            &remainder
         );
 
         assert_eq!(actual_url, expected);
