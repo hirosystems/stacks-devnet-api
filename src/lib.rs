@@ -251,11 +251,18 @@ impl StacksDevnetApiK8sManager {
         namespace: &str,
         pod: StacksDevnetPod,
     ) -> Result<(Option<String>, Option<String>), DevNetError> {
+        let context = format!("NAMESPACE: {}, POD: {}", namespace, pod);
+        self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
+            slog::info!(logger, "getting pod status {}", context)
+        });
         let pod_api: Api<Pod> = Api::namespaced(self.client.to_owned(), &namespace);
         let pod_name = pod.to_string();
         match pod_api.get_status(&pod_name).await {
             Ok(pod_with_status) => match pod_with_status.status {
                 Some(status) => {
+                    self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
+                        slog::info!(logger, "successfully retrieved pod status {}", context)
+                    });
                     let start_time = match status.start_time {
                         Some(st) => Some(st.0.to_string()),
                         None => None,
@@ -269,7 +276,7 @@ impl StacksDevnetApiK8sManager {
                     kube::Error::Api(api_error) => (api_error.message, api_error.code),
                     e => (e.to_string(), 500),
                 };
-                let msg = format!("failed to get status for pod {}, ERROR: {}", pod_name, e.0);
+                let msg = format!("failed to get pod status {}, ERROR: {}", context, e.0);
                 self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
                 Err(DevNetError {
                     message: msg,
@@ -288,13 +295,29 @@ impl StacksDevnetApiK8sManager {
         let port = get_service_port(StacksDevnetService::StacksNode, ServicePort::RPC).unwrap();
         let url = format!("{}:{}/v2/info", url, port);
 
-        let context = format!("ACTION: Query Stacks Node, NAMESPACE: {}", namespace);
+        let context = format!("NAMESPACE: {}", namespace);
+        self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
+            slog::info!(
+                logger,
+                "requesting /v2/info route of stacks node {}",
+                context
+            )
+        });
 
         match Uri::from_str(&url) {
             Ok(uri) => match client.get(uri).await {
                 Ok(response) => match hyper::body::to_bytes(response.into_body()).await {
                     Ok(body) => match serde_json::from_slice::<StacksV2InfoResponse>(&body) {
-                        Ok(config) => Ok(config),
+                        Ok(config) => {
+                            self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
+                                slog::info!(
+                                    logger,
+                                    "successfully requested /v2/info route of stacks node {}",
+                                    context
+                                )
+                            });
+                            Ok(config)
+                        }
                         Err(e) => {
                             let msg = format!(
                                 "failed to parse response: {}, ERROR: {}",

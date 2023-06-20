@@ -245,7 +245,11 @@ async fn handle_request(
                             .body(Body::from(body))
                             .unwrap()),
                         Err(e) => {
-                            let msg = format!("failed to form response body: ACTION: Query Stacks Node, NAMESPACE: {}, ERROR: {}", &network, e.to_string());
+                            let msg = format!(
+                                "failed to form response body: NAMESPACE: {}, ERROR: {}",
+                                &network,
+                                e.to_string()
+                            );
                             ctx.try_log(|logger: &hiro_system_kit::Logger| {
                                 slog::error!(logger, "{}", msg)
                             });
