@@ -622,7 +622,6 @@ mod tests {
             get_service_port(StacksDevnetService::StacksNode, ServicePort::RPC).unwrap(),
             &remainder
         );
-
         assert_eq!(actual_url, expected);
     }
 }
