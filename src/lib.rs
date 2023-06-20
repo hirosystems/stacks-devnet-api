@@ -221,7 +221,7 @@ impl StacksDevnetApiK8sManager {
                     Ok(false)
                 } else {
                     let msg = format!(
-                        "error getting namespace {}: {}",
+                        "error getting namespace: {}: {}",
                         namespace_str, api_error.message
                     );
                     self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
@@ -233,7 +233,7 @@ impl StacksDevnetApiK8sManager {
             }
             Err(e) => {
                 let msg = format!(
-                    "error getting namespace {}: {}",
+                    "error getting namespace: {}: {}",
                     namespace_str,
                     e.to_string()
                 );
@@ -253,7 +253,7 @@ impl StacksDevnetApiK8sManager {
     ) -> Result<(Option<String>, Option<String>), DevNetError> {
         let context = format!("NAMESPACE: {}, POD: {}", namespace, pod);
         self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
-            slog::info!(logger, "getting pod status {}", context)
+            slog::info!(logger, "getting pod status: {}", context)
         });
         let pod_api: Api<Pod> = Api::namespaced(self.client.to_owned(), &namespace);
         let pod_name = pod.to_string();
@@ -261,7 +261,7 @@ impl StacksDevnetApiK8sManager {
             Ok(pod_with_status) => match pod_with_status.status {
                 Some(status) => {
                     self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
-                        slog::info!(logger, "successfully retrieved pod status {}", context)
+                        slog::info!(logger, "successfully retrieved pod status: {}", context)
                     });
                     let start_time = match status.start_time {
                         Some(st) => Some(st.0.to_string()),
@@ -276,7 +276,7 @@ impl StacksDevnetApiK8sManager {
                     kube::Error::Api(api_error) => (api_error.message, api_error.code),
                     e => (e.to_string(), 500),
                 };
-                let msg = format!("failed to get pod status {}, ERROR: {}", context, e.0);
+                let msg = format!("failed to get pod status: {}, ERROR: {}", context, e.0);
                 self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
                 Err(DevNetError {
                     message: msg,
@@ -299,7 +299,7 @@ impl StacksDevnetApiK8sManager {
         self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
             slog::info!(
                 logger,
-                "requesting /v2/info route of stacks node {}",
+                "requesting /v2/info route of stacks node: {}",
                 context
             )
         });
@@ -312,7 +312,7 @@ impl StacksDevnetApiK8sManager {
                             self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
                                 slog::info!(
                                     logger,
-                                    "successfully requested /v2/info route of stacks node {}",
+                                    "successfully requested /v2/info route of stacks node: {}",
                                     context
                                 )
                             });
@@ -373,7 +373,7 @@ impl StacksDevnetApiK8sManager {
         namespace: &str,
     ) -> Result<StacksDevnetInfoResponse, DevNetError> {
         self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
-            slog::info!(logger, "getting devnet info NAMESPACE: {}", namespace)
+            slog::info!(logger, "getting devnet info: NAMESPACE: {}", namespace)
         });
 
         let (
@@ -414,11 +414,11 @@ impl StacksDevnetApiK8sManager {
         let pp = PostParams::default();
 
         self.ctx
-            .try_log(|logger| slog::info!(logger, "creating namespace {}", namespace_str));
+            .try_log(|logger| slog::info!(logger, "creating namespace: {}", namespace_str));
         match namespace_api.create(&pp, &namespace).await {
             Ok(_) => {
                 self.ctx.try_log(|logger| {
-                    slog::info!(logger, "successfully created namespace {}", namespace_str)
+                    slog::info!(logger, "successfully created namespace: {}", namespace_str)
                 });
                 Ok(())
             }
@@ -470,12 +470,12 @@ impl StacksDevnetApiK8sManager {
             resource_type, name, namespace
         );
         self.ctx
-            .try_log(|logger| slog::info!(logger, "creating {}", context));
+            .try_log(|logger| slog::info!(logger, "creating: {}", context));
 
         match resource_api.create(&pp, &resource).await {
             Ok(_) => {
                 self.ctx
-                    .try_log(|logger| slog::info!(logger, "successfully created {}", context));
+                    .try_log(|logger| slog::info!(logger, "successfully created: {}", context));
                 Ok(())
             }
             Err(e) => {
@@ -483,7 +483,7 @@ impl StacksDevnetApiK8sManager {
                     kube::Error::Api(api_error) => (api_error.message, api_error.code),
                     e => (e.to_string(), 500),
                 };
-                let msg = format!("failed to create {}, ERROR: {}", context, e.0);
+                let msg = format!("failed to create: {}, ERROR: {}", context, e.0);
                 self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
                 Err(DevNetError {
                     message: msg,
@@ -888,11 +888,11 @@ impl StacksDevnetApiK8sManager {
             namespace
         );
         self.ctx
-            .try_log(|logger| slog::info!(logger, "deleting {}", context));
+            .try_log(|logger| slog::info!(logger, "deleting: {}", context));
         match api.delete(resource_name, &dp).await {
             Ok(_) => {
                 self.ctx
-                    .try_log(|logger| slog::info!(logger, "successfully deleted {}", context));
+                    .try_log(|logger| slog::info!(logger, "successfully deleted: {}", context));
                 Ok(())
             }
             Err(e) => {
@@ -900,7 +900,7 @@ impl StacksDevnetApiK8sManager {
                     kube::Error::Api(api_error) => (api_error.message, api_error.code),
                     e => (e.to_string(), 500),
                 };
-                let msg = format!("failed to delete {}, ERROR: {}", context, e.0);
+                let msg = format!("failed to delete: {}, ERROR: {}", context, e.0);
                 self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
                 Err(DevNetError {
                     message: msg,
