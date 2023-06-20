@@ -465,18 +465,17 @@ impl StacksDevnetApiK8sManager {
                 "no-name"
             }
         };
-        let resource_details = format!(
+        let context = format!(
             "RESOURCE: {}, NAME: {}, NAMESPACE: {}",
             resource_type, name, namespace
         );
         self.ctx
-            .try_log(|logger| slog::info!(logger, "creating {}", resource_details));
+            .try_log(|logger| slog::info!(logger, "creating {}", context));
 
         match resource_api.create(&pp, &resource).await {
             Ok(_) => {
-                self.ctx.try_log(|logger| {
-                    slog::info!(logger, "successfully created {}", resource_details)
-                });
+                self.ctx
+                    .try_log(|logger| slog::info!(logger, "successfully created {}", context));
                 Ok(())
             }
             Err(e) => {
@@ -484,7 +483,7 @@ impl StacksDevnetApiK8sManager {
                     kube::Error::Api(api_error) => (api_error.message, api_error.code),
                     e => (e.to_string(), 500),
                 };
-                let msg = format!("failed to create {}, ERROR: {}", resource_details, e.0);
+                let msg = format!("failed to create {}, ERROR: {}", context, e.0);
                 self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
                 Err(DevNetError {
                     message: msg,
@@ -882,19 +881,18 @@ impl StacksDevnetApiK8sManager {
         let api: Api<K> = Api::namespaced(self.client.to_owned(), &namespace);
         let dp = DeleteParams::default();
 
-        let resource_details = format!(
+        let context = format!(
             "RESOURCE: {}, NAME: {}, NAMESPACE: {}",
             std::any::type_name::<K>(),
             resource_name,
             namespace
         );
         self.ctx
-            .try_log(|logger| slog::info!(logger, "deleting {}", resource_details));
+            .try_log(|logger| slog::info!(logger, "deleting {}", context));
         match api.delete(resource_name, &dp).await {
             Ok(_) => {
-                self.ctx.try_log(|logger| {
-                    slog::info!(logger, "successfully deleted {}", resource_details)
-                });
+                self.ctx
+                    .try_log(|logger| slog::info!(logger, "successfully deleted {}", context));
                 Ok(())
             }
             Err(e) => {
@@ -902,7 +900,7 @@ impl StacksDevnetApiK8sManager {
                     kube::Error::Api(api_error) => (api_error.message, api_error.code),
                     e => (e.to_string(), 500),
                 };
-                let msg = format!("failed to delete {}, ERROR: {}", resource_details, e.0);
+                let msg = format!("failed to delete {}, ERROR: {}", context, e.0);
                 self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
                 Err(DevNetError {
                     message: msg,
