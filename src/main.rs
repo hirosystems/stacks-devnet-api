@@ -612,7 +612,6 @@ mod tests {
         let network = path_parts.network.unwrap();
         let subroute = path_parts.subroute.unwrap();
         let remainder = path_parts.remainder.unwrap();
-
         let proxy_data = get_proxy_data(&subroute);
         let request_builder = Request::builder().uri("/").method("POST");
         let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
@@ -622,7 +621,6 @@ mod tests {
             "http://stacks-node-service.{}.svc.cluster.local:20443/{}",
             network, &remainder
         );
-
         assert_eq!(actual_url, expected);
     }
 }
