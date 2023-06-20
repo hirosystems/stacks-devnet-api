@@ -2,6 +2,9 @@ use hiro_system_kit::slog;
 use hyper::server::conn::AddrStream;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Client, Method, Request, Response, Server, StatusCode, Uri};
+use stacks_devnet_api::resources::service::{
+    get_service_from_path_part, get_service_port, get_service_url, ServicePort,
+};
 use stacks_devnet_api::{Context, StacksDevnetApiK8sManager, StacksDevnetConfig};
 use std::net::IpAddr;
 use std::str::FromStr;
@@ -44,15 +47,9 @@ async fn main() {
 
 fn mutate_request_for_proxy(
     mut request: Request<Body>,
-    network: &str,
+    forward_url: &str,
     path_to_forward: &str,
-    proxy_data: ProxyData,
 ) -> Request<Body> {
-    let forward_url = format!(
-        "http://{}.{}.svc.cluster.local:{}",
-        proxy_data.destination_service, network, proxy_data.destination_port
-    );
-
     let query = match request.uri().query() {
         Some(query) => format!("?{}", query),
         None => String::new(),
@@ -80,38 +77,6 @@ async fn proxy(request: Request<Body>, ctx: &Context) -> Result<Response<Body>, 
                 .body(Body::try_from(msg).unwrap())
                 .unwrap())
         }
-    }
-}
-
-struct ProxyData {
-    destination_service: String,
-    destination_port: String,
-}
-fn get_proxy_data(proxy_path: &str) -> Option<ProxyData> {
-    const BITCOIN_NODE_PATH: &str = "bitcoin-node";
-    const STACKS_NODE_PATH: &str = "stacks-node";
-    const STACKS_API_PATH: &str = "stacks-api";
-    const BITCOIN_NODE_SERVICE: &str = "bitcoind-chain-coordinator-service";
-    const STACKS_NODE_SERVICE: &str = "stacks-node-service";
-    const STACKS_API_SERVICE: &str = "stacks-api-service";
-    const BITCOIN_NODE_PORT: &str = "18443";
-    const STACKS_NODE_PORT: &str = "20443";
-    const STACKS_API_PORT: &str = "3999";
-
-    match proxy_path {
-        BITCOIN_NODE_PATH => Some(ProxyData {
-            destination_service: BITCOIN_NODE_SERVICE.into(),
-            destination_port: BITCOIN_NODE_PORT.into(),
-        }),
-        STACKS_NODE_PATH => Some(ProxyData {
-            destination_service: STACKS_NODE_SERVICE.into(),
-            destination_port: STACKS_NODE_PORT.into(),
-        }),
-        STACKS_API_PATH => Some(ProxyData {
-            destination_service: STACKS_API_SERVICE.into(),
-            destination_port: STACKS_API_PORT.into(),
-        }),
-        _ => None,
     }
 }
 
@@ -273,10 +238,33 @@ async fn handle_request(
                         )
                         .unwrap()),
                 },
-                &Method::GET => Ok(Response::builder()
-                    .status(StatusCode::NOT_IMPLEMENTED)
-                    .body(Body::empty())
-                    .unwrap()),
+                &Method::GET => match k8s_manager.get_devnet_info(&network).await {
+                    Ok(devnet_info) => match serde_json::to_vec(&devnet_info) {
+                        Ok(body) => Ok(Response::builder()
+                            .status(StatusCode::OK)
+                            .header("Content-Type", "application/json")
+                            .body(Body::from(body))
+                            .unwrap()),
+                        Err(e) => {
+                            let msg = format!(
+                                "failed to form response body: NAMESPACE: {}, ERROR: {}",
+                                &network,
+                                e.to_string()
+                            );
+                            ctx.try_log(|logger: &hiro_system_kit::Logger| {
+                                slog::error!(logger, "{}", msg)
+                            });
+                            Ok(Response::builder()
+                                .status(StatusCode::from_u16(500).unwrap())
+                                .body(Body::try_from(msg).unwrap())
+                                .unwrap())
+                        }
+                    },
+                    Err(e) => Ok(Response::builder()
+                        .status(StatusCode::from_u16(e.code).unwrap())
+                        .body(Body::try_from(e.message).unwrap())
+                        .unwrap()),
+                },
                 _ => Ok(Response::builder()
                     .status(StatusCode::METHOD_NOT_ALLOWED)
                     .body(Body::empty())
@@ -292,11 +280,14 @@ async fn handle_request(
         } else {
             let remaining_path = path_parts.remainder.unwrap_or(String::new());
 
-            let proxy_data = get_proxy_data(&subroute);
-            return match proxy_data {
-                Some(proxy_data) => {
+            let service = get_service_from_path_part(&subroute);
+            return match service {
+                Some(service) => {
+                    let base_url = get_service_url(&network, service.clone());
+                    let port = get_service_port(service, ServicePort::RPC).unwrap();
+                    let forward_url = format!("{}:{}", base_url, port);
                     let proxy_request =
-                        mutate_request_for_proxy(request, &network, &remaining_path, proxy_data);
+                        mutate_request_for_proxy(request, &forward_url, &remaining_path);
                     proxy(proxy_request, &ctx).await
                 }
                 None => Ok(Response::builder()
@@ -318,6 +309,7 @@ mod tests {
     use super::*;
     use hyper::body;
     use k8s_openapi::api::core::v1::Namespace;
+    use stacks_devnet_api::resources::service::{get_service_port, StacksDevnetService};
     use tower_test::mock::{self, Handle};
 
     async fn mock_k8s_handler(handle: &mut Handle<Request<Body>, Response<Body>>) {
@@ -612,14 +604,23 @@ mod tests {
         let network = path_parts.network.unwrap();
         let subroute = path_parts.subroute.unwrap();
         let remainder = path_parts.remainder.unwrap();
-        let proxy_data = get_proxy_data(&subroute);
+
+        let service = get_service_from_path_part(&subroute).unwrap();
+        let forward_url = format!(
+            "{}:{}",
+            get_service_url(&network, service.clone()),
+            get_service_port(service, ServicePort::RPC).unwrap()
+        );
         let request_builder = Request::builder().uri("/").method("POST");
         let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
-        let request = mutate_request_for_proxy(request, &network, &remainder, proxy_data.unwrap());
+        let request = mutate_request_for_proxy(request, &forward_url, &remainder);
         let actual_url = request.uri().to_string();
         let expected = format!(
-            "http://stacks-node-service.{}.svc.cluster.local:20443/{}",
-            network, &remainder
+            "http://{}.{}.svc.cluster.local:{}/{}",
+            StacksDevnetService::StacksNode,
+            network,
+            get_service_port(StacksDevnetService::StacksNode, ServicePort::RPC).unwrap(),
+            &remainder
         );
         assert_eq!(actual_url, expected);
     }
