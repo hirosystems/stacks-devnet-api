@@ -242,6 +242,7 @@ async fn handle_request(
                     Ok(devnet_info) => match serde_json::to_vec(&devnet_info) {
                         Ok(body) => Ok(Response::builder()
                             .status(StatusCode::OK)
+                            .header("Content-Type", "application/json")
                             .body(Body::from(body))
                             .unwrap()),
                         Err(e) => {
