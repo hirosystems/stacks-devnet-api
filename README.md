@@ -26,8 +26,3 @@ cargo run
 to start the server. Currently, the server is hosted on `localhost:8477` and exposes two routes:
  - `POST localhost:8477/api/v1/networks` - Creates a new devnet with configuration provided in request body. See [this example](./examples/new-network.example.json) object for the required parameters.
  - `DELETE localhost:8477/api/v1/network?network={namespace}` - Deletes all k8s assets deployed under the given namespace.
-
-### Notes
-This project is still very eary in development and the code is fragile and will change a lot. Some known issues:
- - if a k8s deployment fails, the app crashes. K8s deployments fail for a lot of reasons, so you'll need to restart the service a lot.
- - the project relies on a docker image called `stacks-network`, which is not yet deployed to docker hub. This is in progress.

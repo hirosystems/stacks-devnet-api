@@ -38,8 +38,8 @@ spec:
           configMapKeyRef:
             name: namespace-conf
             key: NAMESPACE
-    image: stacks-network
-    imagePullPolicy: Never
+    image: quay.io/hirosystems/stacks-network-orchestrator:latest
+    imagePullPolicy: Always
     name: chain-coordinator-container
     ports:
     - containerPort: 20445
