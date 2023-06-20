@@ -43,7 +43,7 @@ pub fn get_service_port(service: StacksDevnetService, port_type: ServicePort) ->
 
 pub fn get_service_url(namespace: &str, service: StacksDevnetService) -> String {
     format!(
-        "http://{}.{}/svc.cluster.local",
+        "http://{}.{}.svc.cluster.local",
         service.to_string(),
         namespace
     )
