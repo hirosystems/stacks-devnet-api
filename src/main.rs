@@ -3,7 +3,7 @@ use hyper::server::conn::AddrStream;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Client, Method, Request, Response, Server, StatusCode, Uri};
 use stacks_devnet_api::resources::service::{
-    get_service_from_path_part, get_service_port, get_service_url, ServicePort,
+    get_service_from_path_part, get_service_url, get_user_facing_port,
 };
 use stacks_devnet_api::{Context, StacksDevnetApiK8sManager, StacksDevnetConfig};
 use std::net::IpAddr;
@@ -284,7 +284,7 @@ async fn handle_request(
             return match service {
                 Some(service) => {
                     let base_url = get_service_url(&network, service.clone());
-                    let port = get_service_port(service, ServicePort::RPC).unwrap();
+                    let port = get_user_facing_port(service).unwrap();
                     let forward_url = format!("{}:{}", base_url, port);
                     let proxy_request =
                         mutate_request_for_proxy(request, &forward_url, &remaining_path);
