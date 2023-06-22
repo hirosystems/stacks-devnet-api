@@ -1,0 +1,54 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  labels:
+    name: chain-coordinator
+    service: bitcoind-chain-coordinator
+  name: chain-coordinator
+  namespace: "{namespace}"
+spec:
+  containers:
+  - command:
+    - ./stacks-network
+    - --namespace=$(NAMESPACE)
+    - --manifest-path=/etc/stacks-network/project/Clarinet.toml
+    - --deployment-plan-path=/etc/stacks-network/project/deployments/default.devnet-plan.yaml
+    - --project-root-path=/etc/stacks-network/project/
+    env:
+      - name: NAMESPACE
+        valueFrom:
+          configMapKeyRef:
+            name: namespace-conf
+            key: NAMESPACE
+    image: stacks-network-orchestrator
+    imagePullPolicy: Never
+    name: chain-coordinator-container
+    ports:
+    - containerPort: 20445
+      name: coordinator-in
+      protocol: TCP
+    - containerPort: 20446
+      name: coordinator-con
+      protocol: TCP
+    volumeMounts:
+    - mountPath: /etc/stacks-network/project
+      name: project-manifest-conf-volume
+    - mountPath: /etc/stacks-network/project/settings
+      name: devnet-conf-volume
+    - mountPath: /etc/stacks-network/project/deployments
+      name: deployment-plan-conf-volume
+    - mountPath: /etc/stacks-network/project/contracts
+      name: project-dir-conf-volume
+  volumes:
+  - configMap:
+      name: project-manifest-conf
+    name: project-manifest-conf-volume
+  - configMap:
+      name: devnet-conf
+    name: devnet-conf-volume
+  - configMap:
+      name: deployment-plan-conf
+    name: deployment-plan-conf-volume
+  - configMap:
+      name: project-dir-conf
+    name: project-dir-conf-volume

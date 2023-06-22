@@ -17,9 +17,11 @@ spec:
     - name: BLOCKSTACK_USE_TEST_GENESIS_CHAINSTATE
       value: "1"
     - name: STACKS_LOG_DEBUG
-      value: "0"
-    image: quay.io/hirosystems/stacks-node:devnet-v3
-    imagePullPolicy: IfNotPresent
+      value: "1"
+    image: stacks-node-mine
+    imagePullPolicy: Never
+    # image: quay.io/hirosystems/stacks-node:devnet-v3
+    # imagePullPolicy: IfNotPresent
     name: stacks-node-container
     ports:
     - containerPort: 20444
