@@ -15,8 +15,7 @@ use resources::{
     StacksDevnetResource,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::thread::sleep;
-use std::{collections::BTreeMap, str::FromStr, time::Duration};
+use std::{collections::BTreeMap, str::FromStr};
 use strum::IntoEnumIterator;
 use tower::BoxError;
 
@@ -171,10 +170,8 @@ impl StacksDevnetApiK8sManager {
                 });
             }
         }
+
         self.deploy_bitcoin_node_pod(&config).await?;
-
-        sleep(Duration::from_secs(5));
-
         self.deploy_stacks_node_pod(&config).await?;
 
         if !config.disable_stacks_api {
