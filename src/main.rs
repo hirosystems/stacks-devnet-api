@@ -56,7 +56,7 @@ fn mutate_request_for_proxy(
     };
 
     *request.uri_mut() = {
-        let forward_uri = format!("{}/{}{}", forward_url, path_to_forward, query);
+        let forward_uri = format!("http://{}/{}{}", forward_url, path_to_forward, query);
         Uri::from_str(forward_uri.as_str())
     }
     .unwrap();
