@@ -41,6 +41,15 @@ pub fn get_service_port(service: StacksDevnetService, port_type: ServicePort) ->
     }
 }
 
+pub fn get_user_facing_port(service: StacksDevnetService) -> Option<String> {
+    match service {
+        StacksDevnetService::BitcoindNode | StacksDevnetService::StacksNode => {
+            get_service_port(service, ServicePort::RPC)
+        }
+        StacksDevnetService::StacksApi => get_service_port(service, ServicePort::API),
+    }
+}
+
 pub fn get_service_url(namespace: &str, service: StacksDevnetService) -> String {
     format!("{}.{}.svc.cluster.local", service.to_string(), namespace)
 }
