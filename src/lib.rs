@@ -827,9 +827,8 @@ impl StacksDevnetApiK8sManager {
         let rpc_port = get_service_port(StacksDevnetService::StacksNode, ServicePort::RPC).unwrap();
         let api_port = get_service_port(StacksDevnetService::StacksApi, ServicePort::API).unwrap();
         let event_port =
-            get_service_port(StacksDevnetService::StacksNode, ServicePort::Event).unwrap();
-        let db_port =
-            get_service_port(StacksDevnetService::StacksNode, ServicePort::Event).unwrap();
+            get_service_port(StacksDevnetService::StacksApi, ServicePort::Event).unwrap();
+        let db_port = get_service_port(StacksDevnetService::StacksApi, ServicePort::DB).unwrap();
         let stacks_api_env = Vec::from([
             ("STACKS_CORE_RPC_HOST", &stacks_node_host[..]),
             ("STACKS_BLOCKCHAIN_API_DB", "pg"),
