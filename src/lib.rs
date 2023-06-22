@@ -293,7 +293,7 @@ impl StacksDevnetApiK8sManager {
         let client = HttpClient::new();
         let url = get_service_url(namespace, StacksDevnetService::StacksNode);
         let port = get_service_port(StacksDevnetService::StacksNode, ServicePort::RPC).unwrap();
-        let url = format!("{}:{}/v2/info", url, port);
+        let url = format!("http://{}:{}/v2/info", url, port);
 
         let context = format!("NAMESPACE: {}", namespace);
         self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
