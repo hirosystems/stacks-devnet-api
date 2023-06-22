@@ -309,7 +309,9 @@ mod tests {
     use super::*;
     use hyper::body;
     use k8s_openapi::api::core::v1::Namespace;
-    use stacks_devnet_api::resources::service::{get_service_port, StacksDevnetService};
+    use stacks_devnet_api::resources::service::{
+        get_service_port, ServicePort, StacksDevnetService,
+    };
     use tower_test::mock::{self, Handle};
 
     async fn mock_k8s_handler(handle: &mut Handle<Request<Body>, Response<Body>>) {
