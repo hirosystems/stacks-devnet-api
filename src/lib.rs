@@ -20,6 +20,9 @@ use std::{collections::BTreeMap, str::FromStr, time::Duration};
 use strum::IntoEnumIterator;
 use tower::BoxError;
 
+pub mod config;
+use config::StacksDevnetConfig;
+
 mod template_parser;
 use template_parser::get_yaml_from_resource;
 
@@ -27,43 +30,6 @@ pub mod resources;
 use crate::resources::configmap::StacksDevnetConfigmap;
 use crate::resources::pod::StacksDevnetPod;
 use crate::resources::service::{get_service_url, StacksDevnetService};
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct StacksDevnetConfig {
-    namespace: String,
-    label: String,
-    network_id: u32,
-    stacks_node_wait_time_for_microblocks: u32,
-    stacks_node_first_attempt_time_ms: u32,
-    stacks_node_subsequent_attempt_time_ms: u32,
-    bitcoin_node_username: String,
-    bitcoin_node_password: String,
-    miner_mnemonic: String,
-    miner_derivation_path: String,
-    miner_coinbase_recipient: String,
-    faucet_mnemonic: String,
-    faucet_derivation_path: String,
-    bitcoin_controller_block_time: u32,
-    bitcoin_controller_automining_disabled: bool,
-    disable_bitcoin_explorer: bool,
-    disable_stacks_explorer: bool,
-    disable_stacks_api: bool,
-    epoch_2_0: u32,
-    epoch_2_05: u32,
-    epoch_2_1: u32,
-    epoch_2_2: u32,
-    pox_2_activation: u32,
-    pox_2_unlock_height: u32,
-    accounts: Vec<(String, u64)>,
-    // needed for chain coordinator
-    project_manifest: String,
-    devnet_config: String,
-    deployment_plan: String,
-    contracts: Vec<(String, String)>,
-    // to remove and compute
-    stacks_miner_secret_key_hex: String,
-    miner_stx_address: String,
-}
 
 pub struct DevNetError {
     pub message: String,
@@ -171,6 +137,14 @@ impl StacksDevnetApiK8sManager {
                 });
             }
         }
+        println!(
+            "project_manifest\n: {}",
+            &config.get_project_manifest_yaml_string()
+        );
+        println!(
+            "network_manifest\n: {}",
+            &config.get_network_manifest_yaml_string()
+        );
         self.deploy_bitcoin_node_pod(&config).await?;
 
         sleep(Duration::from_secs(5));
@@ -603,25 +577,20 @@ impl StacksDevnetApiK8sManager {
         self.deploy_configmap(
             StacksDevnetConfigmap::ProjectManifest,
             &namespace,
-            Some(vec![("Clarinet.toml", &config.project_manifest)]),
+            Some(vec![(
+                "Clarinet.toml",
+                &config.get_project_manifest_yaml_string(),
+            )]),
         )
         .await?;
-
-        let mut devnet_config = config.devnet_config.clone();
-        //devnet_config.push_str("\n[devnet]");
-        devnet_config.push_str(&format!(
-            "\nbitcoin_node_username = \"{}\"",
-            &config.bitcoin_node_username
-        ));
-        devnet_config.push_str(&format!(
-            "\nbitcoin_node_password = \"{}\"",
-            &config.bitcoin_node_password
-        ));
 
         self.deploy_configmap(
             StacksDevnetConfigmap::Devnet,
             &namespace,
-            Some(vec![("Devnet.toml", &devnet_config)]),
+            Some(vec![(
+                "Devnet.toml",
+                &config.get_network_manifest_yaml_string(),
+            )]),
         )
         .await?;
 
