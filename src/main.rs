@@ -158,10 +158,16 @@ async fn handle_request(
                 }
                 let body = body.unwrap();
                 let config: Result<StacksDevnetConfig, _> = serde_json::from_slice(&body);
-                if config.is_err() {
+                if let Err(e) = config {
                     return Ok(Response::builder()
                         .status(StatusCode::BAD_REQUEST)
-                        .body(Body::try_from("invalid configuration to create network").unwrap())
+                        .body(
+                            Body::try_from(format!(
+                                "invalid configuration to create network: {}",
+                                e
+                            ))
+                            .unwrap(),
+                        )
                         .unwrap());
                 }
                 let config = config.unwrap();
