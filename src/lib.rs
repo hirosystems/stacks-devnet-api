@@ -1,3 +1,5 @@
+use chainhook_types::StacksNetwork;
+use clarinet_files::compute_addresses;
 use futures::future::try_join4;
 use hiro_system_kit::{slog, Logger};
 use hyper::{body::Bytes, Body, Client as HttpClient, Request, Response, Uri};
@@ -627,6 +629,12 @@ impl StacksDevnetApiK8sManager {
         let chain_coordinator_ingestion_port =
             get_service_port(StacksDevnetService::BitcoindNode, ServicePort::Ingestion).unwrap();
 
+        let (_, _, stacks_miner_secret_key_hex) = compute_addresses(
+            &config.miner_mnemonic,
+            &config.miner_derivation_path,
+            &StacksNetwork::Devnet.get_networks(),
+        );
+
         let stacks_conf = {
             let mut stacks_conf = format!(
                 r#"
@@ -659,22 +667,22 @@ impl StacksDevnetApiK8sManager {
                 "#,
                 get_service_port(StacksDevnetService::StacksNode, ServicePort::RPC).unwrap(),
                 get_service_port(StacksDevnetService::StacksNode, ServicePort::P2P).unwrap(),
-                config.stacks_miner_secret_key_hex,
-                config.stacks_miner_secret_key_hex,
+                stacks_miner_secret_key_hex,
+                stacks_miner_secret_key_hex,
                 config.stacks_node_wait_time_for_microblocks,
                 config.stacks_node_first_attempt_time_ms,
                 config.stacks_node_subsequent_attempt_time_ms,
                 config.miner_coinbase_recipient
             );
 
-            for (address, balance) in config.accounts.iter() {
+            for (_name, account) in config.network_manifest.accounts.clone().iter() {
                 stacks_conf.push_str(&format!(
                     r#"
                     [[ustx_balance]]
                     address = "{}"
                     amount = {}
                 "#,
-                    address, balance
+                    account.stx_address, account.balance
                 ));
             }
 
