@@ -20,7 +20,7 @@ metadata:
 rules:
   - apiGroups: [""]
     # TODO: production version should not be able to create/delete namespaces (only get) 
-    resources: ["pods", "services", "configmaps", "persistentvolumeclaims", "namespaces"]
+    resources: ["pods", "pods/status", "services", "configmaps", "persistentvolumeclaims", "namespaces"]
     verbs: ["get", "delete", "create"]
 
 ---
@@ -55,7 +55,7 @@ spec:
     image: quay.io/hirosystems/stacks-devnet-api:latest
     imagePullPolicy: Always
     ports:
-    - containerPort: 8478
+    - containerPort: 8477
       name: api
       protocol: TCP
 

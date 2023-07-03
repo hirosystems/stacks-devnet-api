@@ -1,29 +1,33 @@
-use hyper::{body::Bytes, Body, Request, Response};
+use futures::future::try_join4;
+use hiro_system_kit::{slog, Logger};
+use hyper::{body::Bytes, Body, Client as HttpClient, Request, Response, Uri};
 use k8s_openapi::{
     api::core::v1::{ConfigMap, Namespace, PersistentVolumeClaim, Pod, Service},
     NamespaceResourceScope,
 };
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{collections::BTreeMap, time::Duration};
-use tower::BoxError;
-
 use kube::{
-    api::{Api, DeleteParams, PostParams, ResourceExt},
+    api::{Api, DeleteParams, PostParams},
     Client,
 };
+use resources::{
+    pvc::StacksDevnetPvc,
+    service::{get_service_port, ServicePort},
+    StacksDevnetResource,
+};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::thread::sleep;
+use std::{collections::BTreeMap, str::FromStr, time::Duration};
+use strum::IntoEnumIterator;
+use tower::BoxError;
 
 mod template_parser;
-use template_parser::{get_yaml_from_filename, Template};
+use template_parser::get_yaml_from_resource;
 
-const BITCOIND_CHAIN_COORDINATOR_SERVICE_NAME: &str = "bitcoind-chain-coordinator-service";
-const STACKS_NODE_SERVICE_NAME: &str = "stacks-node-service";
+pub mod resources;
+use crate::resources::configmap::StacksDevnetConfigmap;
+use crate::resources::pod::StacksDevnetPod;
+use crate::resources::service::{get_service_url, StacksDevnetService};
 
-const BITCOIND_P2P_PORT: i32 = 18444;
-const BITCOIND_RPC_PORT: i32 = 18443;
-const STACKS_NODE_P2P_PORT: i32 = 20444;
-const STACKS_NODE_RPC_PORT: i32 = 20443;
-const CHAIN_COORDINATOR_INGESTION_PORT: i32 = 20445;
 #[derive(Serialize, Deserialize, Debug)]
 pub struct StacksDevnetConfig {
     namespace: String,
@@ -67,19 +71,72 @@ pub struct DevNetError {
 }
 
 #[derive(Clone)]
+pub struct Context {
+    pub logger: Option<Logger>,
+    pub tracer: bool,
+}
+
+impl Context {
+    pub fn empty() -> Context {
+        Context {
+            logger: None,
+            tracer: false,
+        }
+    }
+
+    pub fn try_log<F>(&self, closure: F)
+    where
+        F: FnOnce(&Logger),
+    {
+        if let Some(ref logger) = self.logger {
+            closure(logger)
+        }
+    }
+
+    pub fn expect_logger(&self) -> &Logger {
+        self.logger.as_ref().unwrap()
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct StacksDevnetInfoResponse {
+    bitcoind_node_status: Option<String>,
+    stacks_node_status: Option<String>,
+    stacks_api_status: Option<String>,
+    bitcoind_node_started_at: Option<String>,
+    stacks_node_started_at: Option<String>,
+    stacks_api_started_at: Option<String>,
+    stacks_chain_tip: u64,
+    bitcoin_chain_tip: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct StacksV2InfoResponse {
+    burn_block_height: u64,
+    stacks_tip_height: u64,
+}
+#[derive(Clone)]
 pub struct StacksDevnetApiK8sManager {
     client: Client,
+    ctx: Context,
 }
 
 impl StacksDevnetApiK8sManager {
-    pub async fn default() -> StacksDevnetApiK8sManager {
+    pub async fn default(ctx: &Context) -> StacksDevnetApiK8sManager {
         let client = Client::try_default()
             .await
             .expect("could not create kube client");
-        StacksDevnetApiK8sManager { client }
+        StacksDevnetApiK8sManager {
+            client,
+            ctx: ctx.to_owned(),
+        }
     }
 
-    pub async fn new<S, B, T>(service: S, default_namespace: T) -> StacksDevnetApiK8sManager
+    pub async fn new<S, B, T>(
+        service: S,
+        default_namespace: T,
+        ctx: &Context,
+    ) -> StacksDevnetApiK8sManager
     where
         S: tower::Service<Request<Body>, Response = Response<B>> + Send + 'static,
         S::Future: Send + 'static,
@@ -89,7 +146,10 @@ impl StacksDevnetApiK8sManager {
         T: Into<String>,
     {
         let client = Client::new(service, default_namespace);
-        StacksDevnetApiK8sManager { client }
+        StacksDevnetApiK8sManager {
+            client,
+            ctx: ctx.to_owned(),
+        }
     }
 
     pub async fn deploy_devnet(&self, config: StacksDevnetConfig) -> Result<(), DevNetError> {
@@ -100,8 +160,13 @@ impl StacksDevnetApiK8sManager {
             if cfg!(debug_assertions) {
                 self.deploy_namespace(&namespace).await?;
             } else {
+                let msg = format!(
+                    "cannot create devnet because namespace {} does not exist",
+                    namespace
+                );
+                self.ctx.try_log(|logger| slog::warn!(logger, "{}", msg));
                 return Err(DevNetError {
-                    message: "Cannot create devnet before namespace exists.".into(),
+                    message: msg.into(),
                     code: 400,
                 });
             }
@@ -119,53 +184,31 @@ impl StacksDevnetApiK8sManager {
     }
 
     pub async fn delete_devnet(&self, namespace: &str) -> Result<(), Box<dyn std::error::Error>> {
-        if cfg!(debug_assertions) {
-            let _ = self.delete_namespace(namespace).await;
+        let pods: Vec<String> = StacksDevnetPod::iter().map(|p| p.to_string()).collect();
+        for pod in pods {
+            let _ = self.delete_resource::<Pod>(namespace, &pod).await;
         }
-        let _ = self
-            .delete_resource::<Pod>(namespace, "bitcoind-chain-coordinator")
-            .await;
-        let _ = self.delete_resource::<Pod>(namespace, "stacks-node").await;
-        let _ = self.delete_resource::<Pod>(namespace, "stacks-api").await;
-        let _ = self
-            .delete_resource::<ConfigMap>(namespace, "bitcoind-conf")
-            .await;
-        let _ = self
-            .delete_resource::<ConfigMap>(namespace, "stacks-node-conf")
-            .await;
-        let _ = self
-            .delete_resource::<ConfigMap>(namespace, "stacks-api-conf")
-            .await;
-        let _ = self
-            .delete_resource::<ConfigMap>(namespace, "stacks-api-postgres-conf")
-            .await;
-        let _ = self
-            .delete_resource::<ConfigMap>(namespace, "deployment-plan-conf")
-            .await;
-        let _ = self
-            .delete_resource::<ConfigMap>(namespace, "devnet-conf")
-            .await;
-        let _ = self
-            .delete_resource::<ConfigMap>(namespace, "project-dir-conf")
-            .await;
-        let _ = self
-            .delete_resource::<ConfigMap>(namespace, "namespace-conf")
-            .await;
-        let _ = self
-            .delete_resource::<ConfigMap>(namespace, "project-manifest-conf")
-            .await;
-        let _ = self
-            .delete_resource::<Service>(namespace, "bitcoind-chain-coordinator-service")
-            .await;
-        let _ = self
-            .delete_resource::<Service>(namespace, "stacks-node-service")
-            .await;
-        let _ = self
-            .delete_resource::<Service>(namespace, "stacks-api-service")
-            .await;
-        let _ = self
-            .delete_resource::<PersistentVolumeClaim>(namespace, "stacks-api-pvc")
-            .await;
+
+        let configmaps: Vec<String> = StacksDevnetConfigmap::iter()
+            .map(|c| c.to_string())
+            .collect();
+        for configmap in configmaps {
+            let _ = self
+                .delete_resource::<ConfigMap>(namespace, &configmap)
+                .await;
+        }
+
+        let services: Vec<String> = StacksDevnetService::iter().map(|s| s.to_string()).collect();
+        for service in services {
+            let _ = self.delete_resource::<Service>(namespace, &service).await;
+        }
+
+        let pvcs: Vec<String> = StacksDevnetPvc::iter().map(|s| s.to_string()).collect();
+        for pvc in pvcs {
+            let _ = self
+                .delete_resource::<PersistentVolumeClaim>(namespace, &pvc)
+                .await;
+        }
         Ok(())
     }
 
@@ -177,21 +220,190 @@ impl StacksDevnetApiK8sManager {
                 if api_error.code == 404 {
                     Ok(false)
                 } else {
+                    let msg = format!(
+                        "error getting namespace {}: {}",
+                        namespace_str, api_error.message
+                    );
+                    self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
                     Err(DevNetError {
-                        message: format!("unable to get namespace: {}", api_error.message),
+                        message: msg,
                         code: api_error.code,
                     })
                 }
             }
-            Err(e) => Err(DevNetError {
-                message: format!("unable to get namespace: {}", e.to_string()),
-                code: 500,
-            }),
+            Err(e) => {
+                let msg = format!(
+                    "error getting namespace {}: {}",
+                    namespace_str,
+                    e.to_string()
+                );
+                self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                Err(DevNetError {
+                    message: msg,
+                    code: 500,
+                })
+            }
         }
     }
 
+    async fn get_pod_status_info(
+        &self,
+        namespace: &str,
+        pod: StacksDevnetPod,
+    ) -> Result<(Option<String>, Option<String>), DevNetError> {
+        let context = format!("NAMESPACE: {}, POD: {}", namespace, pod);
+        self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
+            slog::info!(logger, "getting pod status {}", context)
+        });
+        let pod_api: Api<Pod> = Api::namespaced(self.client.to_owned(), &namespace);
+        let pod_name = pod.to_string();
+        match pod_api.get_status(&pod_name).await {
+            Ok(pod_with_status) => match pod_with_status.status {
+                Some(status) => {
+                    self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
+                        slog::info!(logger, "successfully retrieved pod status {}", context)
+                    });
+                    let start_time = match status.start_time {
+                        Some(st) => Some(st.0.to_string()),
+                        None => None,
+                    };
+                    Ok((status.phase, start_time))
+                }
+                None => Ok((None, None)),
+            },
+            Err(e) => {
+                let e = match e {
+                    kube::Error::Api(api_error) => (api_error.message, api_error.code),
+                    e => (e.to_string(), 500),
+                };
+                let msg = format!("failed to get pod status {}, ERROR: {}", context, e.0);
+                self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                Err(DevNetError {
+                    message: msg,
+                    code: e.1,
+                })
+            }
+        }
+    }
+
+    async fn get_stacks_v2_info(
+        &self,
+        namespace: &str,
+    ) -> Result<StacksV2InfoResponse, DevNetError> {
+        let client = HttpClient::new();
+        let url = get_service_url(namespace, StacksDevnetService::StacksNode);
+        let port = get_service_port(StacksDevnetService::StacksNode, ServicePort::RPC).unwrap();
+        let url = format!("http://{}:{}/v2/info", url, port);
+
+        let context = format!("NAMESPACE: {}", namespace);
+        self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
+            slog::info!(
+                logger,
+                "requesting /v2/info route of stacks node {}",
+                context
+            )
+        });
+
+        match Uri::from_str(&url) {
+            Ok(uri) => match client.get(uri).await {
+                Ok(response) => match hyper::body::to_bytes(response.into_body()).await {
+                    Ok(body) => match serde_json::from_slice::<StacksV2InfoResponse>(&body) {
+                        Ok(config) => {
+                            self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
+                                slog::info!(
+                                    logger,
+                                    "successfully requested /v2/info route of stacks node {}",
+                                    context
+                                )
+                            });
+                            Ok(config)
+                        }
+                        Err(e) => {
+                            let msg = format!(
+                                "failed to parse response: {}, ERROR: {}",
+                                context,
+                                e.to_string()
+                            );
+                            self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                            Err(DevNetError {
+                                message: msg,
+                                code: 500,
+                            })
+                        }
+                    },
+                    Err(e) => {
+                        let msg = format!(
+                            "failed to parse response: {}, ERROR: {}",
+                            context,
+                            e.to_string()
+                        );
+                        self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                        Err(DevNetError {
+                            message: msg,
+                            code: 500,
+                        })
+                    }
+                },
+                Err(e) => {
+                    let msg = format!(
+                        "failed to query stacks node: {}, ERROR: {}",
+                        context,
+                        e.to_string()
+                    );
+                    self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                    Err(DevNetError {
+                        message: msg,
+                        code: 500,
+                    })
+                }
+            },
+            Err(e) => {
+                let msg = format!("failed to parse url: {} ERROR: {}", context, e.to_string());
+                self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                Err(DevNetError {
+                    message: msg,
+                    code: 500,
+                })
+            }
+        }
+    }
+
+    pub async fn get_devnet_info(
+        &self,
+        namespace: &str,
+    ) -> Result<StacksDevnetInfoResponse, DevNetError> {
+        self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
+            slog::info!(logger, "getting devnet info NAMESPACE: {}", namespace)
+        });
+
+        let (
+            (bitcoind_node_status, bitcoind_node_started_at),
+            (stacks_node_status, stacks_node_started_at),
+            (stacks_api_status, stacks_api_started_at),
+            chain_info,
+        ) = try_join4(
+            self.get_pod_status_info(&namespace, StacksDevnetPod::BitcoindNode),
+            self.get_pod_status_info(&namespace, StacksDevnetPod::StacksNode),
+            self.get_pod_status_info(&namespace, StacksDevnetPod::StacksApi),
+            self.get_stacks_v2_info(&namespace),
+        )
+        .await?;
+
+        Ok(StacksDevnetInfoResponse {
+            bitcoind_node_status,
+            stacks_node_status,
+            stacks_api_status,
+            bitcoind_node_started_at,
+            stacks_node_started_at,
+            stacks_api_started_at,
+            stacks_chain_tip: chain_info.stacks_tip_height,
+            bitcoin_chain_tip: chain_info.burn_block_height,
+        })
+    }
+
     async fn deploy_namespace(&self, namespace_str: &str) -> Result<(), DevNetError> {
-        let mut namespace: Namespace = get_resource_from_file(Template::Namespace)?;
+        let mut namespace: Namespace =
+            self.get_resource_from_file(StacksDevnetResource::Namespace)?;
 
         namespace.metadata.name = Some(namespace_str.to_owned());
         namespace.metadata.labels =
@@ -200,20 +412,28 @@ impl StacksDevnetApiK8sManager {
         let namespace_api: Api<Namespace> = kube::Api::all(self.client.to_owned());
 
         let pp = PostParams::default();
+
+        self.ctx
+            .try_log(|logger| slog::info!(logger, "creating namespace {}", namespace_str));
         match namespace_api.create(&pp, &namespace).await {
-            Ok(namespace) => {
-                let name = namespace.name_any();
-                println!("created namespace {}", name);
+            Ok(_) => {
+                self.ctx.try_log(|logger| {
+                    slog::info!(logger, "successfully created namespace {}", namespace_str)
+                });
                 Ok(())
             }
-            Err(kube::Error::Api(api_error)) => Err(DevNetError {
-                message: format!("unable to create namespace: {}", api_error.message),
-                code: api_error.code,
-            }),
-            Err(e) => Err(DevNetError {
-                message: format!("unable to create namespace: {}", e.to_string()),
-                code: 500,
-            }),
+            Err(e) => {
+                let e = match e {
+                    kube::Error::Api(api_error) => (api_error.message, api_error.code),
+                    e => (e.to_string(), 500),
+                };
+                let msg = format!("failed to create namespace {}: {}", namespace_str, e.0);
+                self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                Err(DevNetError {
+                    message: msg,
+                    code: e.1,
+                })
+            }
         }
     }
 
@@ -221,7 +441,7 @@ impl StacksDevnetApiK8sManager {
         &self,
         namespace: &str,
         resource: K,
-        resource_name: &str,
+        resource_type: &str,
     ) -> Result<(), DevNetError>
     where
         <K as kube::Resource>::DynamicType: Default,
@@ -233,32 +453,61 @@ impl StacksDevnetApiK8sManager {
         let resource_api: Api<K> = Api::namespaced(self.client.to_owned(), &namespace);
         let pp = PostParams::default();
 
+        let name = match resource.meta().name.as_ref() {
+            Some(name) => name,
+            None => {
+                self.ctx.try_log(|logger| {
+                    slog::warn!(
+                        logger,
+                        "resource does not have a name field. it really should"
+                    )
+                });
+                "no-name"
+            }
+        };
+        let resource_details = format!(
+            "RESOURCE: {}, NAME: {}, NAMESPACE: {}",
+            resource_type, name, namespace
+        );
+        self.ctx
+            .try_log(|logger| slog::info!(logger, "creating {}", resource_details));
+
         match resource_api.create(&pp, &resource).await {
-            Ok(resource) => {
-                let name = resource.name_any();
-                println!("created {} {}", resource_name, name);
+            Ok(_) => {
+                self.ctx.try_log(|logger| {
+                    slog::info!(logger, "successfully created {}", resource_details)
+                });
                 Ok(())
             }
-            Err(kube::Error::Api(api_error)) => Err(DevNetError {
-                message: format!("unable to create {}: {}", resource_name, api_error.message),
-                code: api_error.code,
-            }),
-            Err(e) => Err(DevNetError {
-                message: format!("unable to create {}: {}", resource_name, e.to_string()),
-                code: 500,
-            }),
+            Err(e) => {
+                let e = match e {
+                    kube::Error::Api(api_error) => (api_error.message, api_error.code),
+                    e => (e.to_string(), 500),
+                };
+                let msg = format!("failed to create {}, ERROR: {}", resource_details, e.0);
+                self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                Err(DevNetError {
+                    message: msg,
+                    code: e.1,
+                })
+            }
         }
     }
 
-    async fn deploy_pod(&self, template: Template, namespace: &str) -> Result<(), DevNetError> {
-        let mut pod: Pod = get_resource_from_file(template)?;
+    async fn deploy_pod(&self, pod: StacksDevnetPod, namespace: &str) -> Result<(), DevNetError> {
+        let mut pod: Pod = self.get_resource_from_file(StacksDevnetResource::Pod(pod))?;
 
         pod.metadata.namespace = Some(namespace.to_owned());
         self.deploy_resource(namespace, pod, "pod").await
     }
 
-    async fn deploy_service(&self, template: Template, namespace: &str) -> Result<(), DevNetError> {
-        let mut service: Service = get_resource_from_file(template)?;
+    async fn deploy_service(
+        &self,
+        service: StacksDevnetService,
+        namespace: &str,
+    ) -> Result<(), DevNetError> {
+        let mut service: Service =
+            self.get_resource_from_file(StacksDevnetResource::Service(service))?;
 
         service.metadata.namespace = Some(namespace.to_owned());
         self.deploy_resource(namespace, service, "service").await
@@ -266,11 +515,12 @@ impl StacksDevnetApiK8sManager {
 
     async fn deploy_configmap(
         &self,
-        template: Template,
+        configmap: StacksDevnetConfigmap,
         namespace: &str,
         configmap_data: Option<Vec<(&str, &str)>>,
     ) -> Result<(), DevNetError> {
-        let mut configmap: ConfigMap = get_resource_from_file(template)?;
+        let mut configmap: ConfigMap =
+            self.get_resource_from_file(StacksDevnetResource::Configmap(configmap))?;
 
         configmap.metadata.namespace = Some(namespace.to_owned());
         if let Some(configmap_data) = configmap_data {
@@ -285,8 +535,9 @@ impl StacksDevnetApiK8sManager {
             .await
     }
 
-    async fn deploy_pvc(&self, template: Template, namespace: &str) -> Result<(), DevNetError> {
-        let mut pvc: PersistentVolumeClaim = get_resource_from_file(template)?;
+    async fn deploy_pvc(&self, pvc: StacksDevnetPvc, namespace: &str) -> Result<(), DevNetError> {
+        let mut pvc: PersistentVolumeClaim =
+            self.get_resource_from_file(StacksDevnetResource::Pvc(pvc))?;
 
         pvc.metadata.namespace = Some(namespace.to_owned());
 
@@ -298,6 +549,11 @@ impl StacksDevnetApiK8sManager {
         config: &StacksDevnetConfig,
     ) -> Result<(), DevNetError> {
         let namespace = &config.namespace;
+
+        let bitcoin_rpc_port =
+            get_service_port(StacksDevnetService::BitcoindNode, ServicePort::RPC).unwrap();
+        let bitcoin_p2p_port =
+            get_service_port(StacksDevnetService::BitcoindNode, ServicePort::P2P).unwrap();
 
         let bitcoind_conf = format!(
             r#"
@@ -325,27 +581,27 @@ impl StacksDevnetApiK8sManager {
                 "#,
             config.bitcoin_node_username,
             config.bitcoin_node_password,
-            BITCOIND_P2P_PORT,
-            BITCOIND_RPC_PORT,
-            BITCOIND_RPC_PORT
+            bitcoin_p2p_port,
+            bitcoin_rpc_port,
+            bitcoin_rpc_port
         );
 
         self.deploy_configmap(
-            Template::BitcoindConfigmap,
+            StacksDevnetConfigmap::BitcoindNode,
             &namespace,
             Some(vec![("bitcoin.conf", &bitcoind_conf)]),
         )
         .await?;
 
         self.deploy_configmap(
-            Template::ChainCoordinatorNamespaceConfigmap,
+            StacksDevnetConfigmap::Namespace,
             &namespace,
             Some(vec![("NAMESPACE", &namespace)]),
         )
         .await?;
 
         self.deploy_configmap(
-            Template::ChainCoordinatorProjectManifestConfigmap,
+            StacksDevnetConfigmap::ProjectManifest,
             &namespace,
             Some(vec![("Clarinet.toml", &config.project_manifest)]),
         )
@@ -363,14 +619,14 @@ impl StacksDevnetApiK8sManager {
         ));
 
         self.deploy_configmap(
-            Template::ChainCoordinatorDevnetConfigmap,
+            StacksDevnetConfigmap::Devnet,
             &namespace,
             Some(vec![("Devnet.toml", &devnet_config)]),
         )
         .await?;
 
         self.deploy_configmap(
-            Template::ChainCoordinatorDeploymentPlanConfigmap,
+            StacksDevnetConfigmap::DeploymentPlan,
             &namespace,
             Some(vec![("default.devnet-plan.yaml", &config.deployment_plan)]),
         )
@@ -381,16 +637,16 @@ impl StacksDevnetApiK8sManager {
             contracts.push((contract_name, contract_source));
         }
         self.deploy_configmap(
-            Template::ChainCoordinatorProjectDirConfigmap,
+            StacksDevnetConfigmap::ProjectDir,
             &namespace,
             Some(contracts),
         )
         .await?;
 
-        self.deploy_pod(Template::BitcoindChainCoordinatorPod, &namespace)
+        self.deploy_pod(StacksDevnetPod::BitcoindNode, &namespace)
             .await?;
 
-        self.deploy_service(Template::BitcoindChainCoordinatorService, namespace)
+        self.deploy_service(StacksDevnetService::BitcoindNode, namespace)
             .await?;
 
         Ok(())
@@ -398,6 +654,9 @@ impl StacksDevnetApiK8sManager {
 
     async fn deploy_stacks_node_pod(&self, config: &StacksDevnetConfig) -> Result<(), DevNetError> {
         let namespace = &config.namespace;
+
+        let chain_coordinator_ingestion_port =
+            get_service_port(StacksDevnetService::BitcoindNode, ServicePort::Ingestion).unwrap();
 
         let stacks_conf = {
             let mut stacks_conf = format!(
@@ -429,8 +688,8 @@ impl StacksDevnetApiK8sManager {
                     block_reward_recipient = "{}"
                     # microblock_attempt_time_ms = 15000
                 "#,
-                STACKS_NODE_RPC_PORT,
-                STACKS_NODE_P2P_PORT,
+                get_service_port(StacksDevnetService::StacksNode, ServicePort::RPC).unwrap(),
+                get_service_port(StacksDevnetService::StacksNode, ServicePort::P2P).unwrap(),
                 config.stacks_miner_secret_key_hex,
                 config.stacks_miner_secret_key_hex,
                 config.stacks_node_wait_time_for_microblocks,
@@ -460,11 +719,8 @@ impl StacksDevnetApiK8sManager {
                 config.miner_coinbase_recipient, balance
             ));
 
-            let namespaced_host = format!("{}.svc.cluster.local", &namespace);
-            let bitcoind_chain_coordinator_host = format!(
-                "{}.{}",
-                &BITCOIND_CHAIN_COORDINATOR_SERVICE_NAME, namespaced_host
-            );
+            let bitcoind_chain_coordinator_host =
+                get_service_url(&namespace, StacksDevnetService::BitcoindNode);
 
             stacks_conf.push_str(&format!(
                 r#"
@@ -475,7 +731,7 @@ impl StacksDevnetApiK8sManager {
                 include_data_events = true
                 events_keys = ["*"]
                 "#,
-                bitcoind_chain_coordinator_host, CHAIN_COORDINATOR_INGESTION_PORT
+                bitcoind_chain_coordinator_host, chain_coordinator_ingestion_port
             ));
 
             //         stacks_conf.push_str(&format!(
@@ -508,8 +764,8 @@ impl StacksDevnetApiK8sManager {
                 bitcoind_chain_coordinator_host,
                 config.bitcoin_node_username,
                 config.bitcoin_node_password,
-                CHAIN_COORDINATOR_INGESTION_PORT,
-                BITCOIND_P2P_PORT
+                chain_coordinator_ingestion_port,
+                get_service_port(StacksDevnetService::BitcoindNode, ServicePort::P2P).unwrap()
             ));
 
             stacks_conf.push_str(&format!(
@@ -538,15 +794,16 @@ impl StacksDevnetApiK8sManager {
         };
 
         self.deploy_configmap(
-            Template::StacksNodeConfigmap,
+            StacksDevnetConfigmap::StacksNode,
             &namespace,
             Some(vec![("Stacks.toml", &stacks_conf)]),
         )
         .await?;
 
-        self.deploy_pod(Template::StacksNodePod, &namespace).await?;
+        self.deploy_pod(StacksDevnetPod::StacksNode, &namespace)
+            .await?;
 
-        self.deploy_service(Template::StacksNodeService, namespace)
+        self.deploy_service(StacksDevnetService::StacksNode, namespace)
             .await?;
 
         Ok(())
@@ -559,27 +816,30 @@ impl StacksDevnetApiK8sManager {
             ("POSTGRES_DB", "stacks_api"),
         ]);
         self.deploy_configmap(
-            Template::StacksApiPostgresConfigmap,
+            StacksDevnetConfigmap::StacksApiPostgres,
             &namespace,
             Some(stacks_api_pg_env),
         )
         .await?;
 
         // configmap env vars for api conatainer
-        let namespaced_host = format!("{}.svc.cluster.local", &namespace);
-        let stacks_node_host = format!("{}.{}", &STACKS_NODE_SERVICE_NAME, namespaced_host);
-        let rpc_port = STACKS_NODE_RPC_PORT.to_string();
+        let stacks_node_host = get_service_url(&namespace, StacksDevnetService::StacksNode);
+        let rpc_port = get_service_port(StacksDevnetService::StacksNode, ServicePort::RPC).unwrap();
+        let api_port = get_service_port(StacksDevnetService::StacksApi, ServicePort::API).unwrap();
+        let event_port =
+            get_service_port(StacksDevnetService::StacksApi, ServicePort::Event).unwrap();
+        let db_port = get_service_port(StacksDevnetService::StacksApi, ServicePort::DB).unwrap();
         let stacks_api_env = Vec::from([
             ("STACKS_CORE_RPC_HOST", &stacks_node_host[..]),
             ("STACKS_BLOCKCHAIN_API_DB", "pg"),
             ("STACKS_CORE_RPC_PORT", &rpc_port),
-            ("STACKS_BLOCKCHAIN_API_PORT", "3999"),
+            ("STACKS_BLOCKCHAIN_API_PORT", &api_port),
             ("STACKS_BLOCKCHAIN_API_HOST", "0.0.0.0"),
-            ("STACKS_CORE_EVENT_PORT", "3700"),
+            ("STACKS_CORE_EVENT_PORT", &event_port),
             ("STACKS_CORE_EVENT_HOST", "0.0.0.0"),
             ("STACKS_API_ENABLE_FT_METADATA", "1"),
             ("PG_HOST", "0.0.0.0"),
-            ("PG_PORT", "5432"),
+            ("PG_PORT", &db_port),
             ("PG_USER", "postgres"),
             ("PG_PASSWORD", "postgres"),
             ("PG_DATABASE", "stacks_api"),
@@ -589,17 +849,19 @@ impl StacksDevnetApiK8sManager {
             ("STACKS_API_LOG_LEVEL", "debug"),
         ]);
         self.deploy_configmap(
-            Template::StacksApiConfigmap,
+            StacksDevnetConfigmap::StacksApi,
             &namespace,
             Some(stacks_api_env),
         )
         .await?;
 
-        self.deploy_pvc(Template::StacksApiPvc, &namespace).await?;
+        self.deploy_pvc(StacksDevnetPvc::StacksApi, &namespace)
+            .await?;
 
-        self.deploy_pod(Template::StacksApiPod, &namespace).await?;
+        self.deploy_pod(StacksDevnetPod::StacksApi, &namespace)
+            .await?;
 
-        self.deploy_service(Template::StacksApiService, &namespace)
+        self.deploy_service(StacksDevnetService::StacksApi, &namespace)
             .await?;
 
         Ok(())
@@ -618,58 +880,53 @@ impl StacksDevnetApiK8sManager {
     {
         let api: Api<K> = Api::namespaced(self.client.to_owned(), &namespace);
         let dp = DeleteParams::default();
+
+        let resource_details = format!(
+            "RESOURCE: {}, NAME: {}, NAMESPACE: {}",
+            std::any::type_name::<K>(),
+            resource_name,
+            namespace
+        );
+        self.ctx
+            .try_log(|logger| slog::info!(logger, "deleting {}", resource_details));
         match api.delete(resource_name, &dp).await {
-            Ok(resource) => {
-                resource.map_left(|del| {
-                    assert_eq!(del.name_any(), resource_name);
-                    println!("Deleting {resource_name} started");
+            Ok(_) => {
+                self.ctx.try_log(|logger| {
+                    slog::info!(logger, "successfully deleted {}", resource_details)
                 });
                 Ok(())
             }
-            Err(kube::Error::Api(api_error)) => Err(DevNetError {
-                message: format!("unable to delete {}: {}", resource_name, api_error.message),
-                code: api_error.code,
-            }),
-            Err(e) => Err(DevNetError {
-                message: format!("unable to delete {}: {}", resource_name, e.to_string()),
-                code: 500,
-            }),
-        }
-    }
-
-    async fn delete_namespace(&self, namespace_str: &str) -> Result<(), DevNetError> {
-        let api: Api<Namespace> = kube::Api::all(self.client.to_owned());
-
-        let dp = DeleteParams::default();
-        match api.delete(namespace_str, &dp).await {
-            Ok(namespace) => {
-                namespace.map_left(|del| {
-                    assert_eq!(del.name_any(), namespace_str);
-                    println!("Deleting namespace started");
-                });
-                Ok(())
+            Err(e) => {
+                let e = match e {
+                    kube::Error::Api(api_error) => (api_error.message, api_error.code),
+                    e => (e.to_string(), 500),
+                };
+                let msg = format!("failed to delete {}, ERROR: {}", resource_details, e.0);
+                self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                Err(DevNetError {
+                    message: msg,
+                    code: e.1,
+                })
             }
-            Err(kube::Error::Api(api_error)) => Err(DevNetError {
-                message: format!("unable to delete namespace: {}", api_error.message),
-                code: api_error.code,
-            }),
-            Err(e) => Err(DevNetError {
-                message: format!("unable to delete namespace: {}", e.to_string()),
-                code: 500,
-            }),
         }
     }
-}
 
-fn get_resource_from_file<K>(template: Template) -> Result<K, DevNetError>
-where
-    K: DeserializeOwned,
-{
-    let template_str = get_yaml_from_filename(template);
+    fn get_resource_from_file<K>(&self, template: StacksDevnetResource) -> Result<K, DevNetError>
+    where
+        K: DeserializeOwned,
+    {
+        let template_str = get_yaml_from_resource(template);
 
-    let resource: K = serde_yaml::from_str(template_str).map_err(|e| DevNetError {
-        message: format!("unable to parse template file: {}", e.to_string()),
-        code: 500,
-    })?;
-    Ok(resource)
+        match serde_yaml::from_str(template_str) {
+            Ok(resource) => Ok(resource),
+            Err(e) => {
+                let msg = format!("unable to parse template file: {}", e.to_string());
+                self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                Err(DevNetError {
+                    message: msg,
+                    code: 500,
+                })
+            }
+        }
+    }
 }
