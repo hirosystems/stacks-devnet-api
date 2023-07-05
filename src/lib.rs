@@ -1,7 +1,7 @@
 use chainhook_types::StacksNetwork;
 use clarinet_files::{
     compute_addresses, DEFAULT_DERIVATION_PATH, DEFAULT_EPOCH_2_0, DEFAULT_EPOCH_2_05,
-    DEFAULT_EPOCH_2_1, DEFAULT_STACKS_MINER_MNEMONIC,
+    DEFAULT_EPOCH_2_1, DEFAULT_POX2_ACTIVATION, DEFAULT_STACKS_MINER_MNEMONIC,
 };
 use futures::future::try_join4;
 use hiro_system_kit::{slog, Logger};
@@ -791,7 +791,7 @@ impl StacksDevnetApiK8sManager {
                 epoch_name = "2.2"
                 start_height = {}
                 "#,
-                config.pox_2_activation,
+                config.pox_2_activation.unwrap_or(DEFAULT_POX2_ACTIVATION),
                 config.epoch_2_0.unwrap_or(DEFAULT_EPOCH_2_0),
                 config.epoch_2_05.unwrap_or(DEFAULT_EPOCH_2_05),
                 config.epoch_2_1.unwrap_or(DEFAULT_EPOCH_2_1),
