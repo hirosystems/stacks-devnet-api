@@ -1,51 +1,133 @@
-use std::collections::BTreeMap;
+use std::fmt;
 
-use clarinet_files::PoxStackingOrder;
-use clarity::types::StacksEpochId;
-use clarity_repl::repl::ContractDeployer;
+use clarinet_deployments::types::{DeploymentSpecificationFile, EpochSpec};
+use clarinet_files::{
+    DEFAULT_DERIVATION_PATH, DEFAULT_EPOCH_2_0, DEFAULT_EPOCH_2_05, DEFAULT_EPOCH_2_1,
+    DEFAULT_EPOCH_2_2, DEFAULT_FAUCET_MNEMONIC, DEFAULT_STACKS_MINER_MNEMONIC,
+};
 use serde::{Deserialize, Serialize};
 
-use crate::resources::service::{
-    get_service_port, get_service_url, ServicePort, StacksDevnetService,
-};
+use crate::resources::service::{get_service_port, ServicePort, StacksDevnetService};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct StacksDevnetConfig {
     pub namespace: String,
-    pub stacks_node_wait_time_for_microblocks: u32,
-    pub stacks_node_first_attempt_time_ms: u32,
-    pub stacks_node_subsequent_attempt_time_ms: u32,
+    pub stacks_node_wait_time_for_microblocks: Option<u32>,
+    pub stacks_node_first_attempt_time_ms: Option<u32>,
+    pub stacks_node_subsequent_attempt_time_ms: Option<u32>,
     pub bitcoin_node_username: String,
     pub bitcoin_node_password: String,
-    pub miner_mnemonic: String, // todo: should we remove these and just get them from the network manifest's accounts?
-    pub miner_derivation_path: String,
-    pub miner_coinbase_recipient: String,
-    pub faucet_mnemonic: String,
-    pub faucet_derivation_path: String,
-    pub bitcoin_controller_block_time: u32,
-    pub bitcoin_controller_automining_disabled: bool,
-    pub disable_bitcoin_explorer: bool,
-    pub disable_stacks_explorer: bool,
+    pub miner_mnemonic: Option<String>, // todo: should we remove these and just get them from the `accounts` field?
+    pub miner_derivation_path: Option<String>,
+    pub miner_coinbase_recipient: Option<String>,
+    faucet_mnemonic: Option<String>,
+    faucet_derivation_path: Option<String>,
+    bitcoin_controller_block_time: Option<u32>,
+    bitcoin_controller_automining_disabled: Option<bool>,
+    disable_bitcoin_explorer: bool, // todo
+    disable_stacks_explorer: bool,  // todo
     pub disable_stacks_api: bool,
-    pub epoch_2_0: u32,
-    pub epoch_2_05: u32,
-    pub epoch_2_1: u32,
-    pub epoch_2_2: u32,
+    pub epoch_2_0: Option<u64>,
+    pub epoch_2_05: Option<u64>,
+    pub epoch_2_1: Option<u64>,
+    pub epoch_2_2: Option<u64>,
     pub pox_2_activation: u32,
-    pub pox_2_unlock_height: u32,
-    pub project_manifest: ProjectManifestConfig,
-    pub network_manifest: NetworkManifestConfig,
-    pub deployment_plan: String,
-    pub contracts: Vec<(String, String)>,
+    pub pox_2_unlock_height: Option<u32>, // todo (not currently used)
+    deployment_fee_rate: Option<u64>,
+    project_manifest: ProjectManifestConfig,
+    pub accounts: Vec<AccountConfig>,
+    deployment_plan: DeploymentSpecificationFile,
+    pub contracts: Vec<ContractConfig>,
 }
-
 impl StacksDevnetConfig {
     pub fn get_project_manifest_yaml_string(&self) -> String {
-        self.project_manifest.to_yaml_string()
+        self.project_manifest.to_yaml_string(&self)
     }
 
     pub fn get_network_manifest_yaml_string(&self) -> String {
-        self.network_manifest.to_yaml_string(&self)
+        let mut config = format!(
+            r#"
+                [network]
+                name = 'devnet'
+            "#,
+        );
+
+        if let Some(deployment_fee_rate) = &self.deployment_fee_rate {
+            config.push_str(&format!(
+                r#"
+                    deployment_fee_rate = {}
+                "#,
+                deployment_fee_rate
+            ))
+        }
+
+        config.push_str(
+            &self
+                .accounts
+                .clone()
+                .iter()
+                .map(|a| a.to_yaml_string())
+                .collect::<Vec<String>>()
+                .join("\n"),
+        );
+        config.push_str(&format!(
+            r#"
+                [devnet]
+                miner_mnemonic = "{}"
+                miner_derivation_path = "{}"
+                bitcoin_node_username = "{}"
+                bitcoin_node_password = "{}"
+                faucet_mnemonic = "{}"
+                faucet_derivation_path = "{}"
+                orchestrator_ingestion_port = {}
+                orchestrator_control_port = {}
+                bitcoin_node_rpc_port = {}
+                stacks_node_rpc_port = {}
+                stacks_api_port = {}
+                epoch_2_0 = {}
+                epoch_2_05 = {}
+                epoch_2_1 = {}
+                epoch_2_2 = {}
+                working_dir = "/devnet"
+                bitcoin_controller_block_time = "{}"
+                bitcoin_controller_automining_disabled = "{}"
+            "#,
+            &self
+                .miner_mnemonic
+                .clone()
+                .unwrap_or(DEFAULT_STACKS_MINER_MNEMONIC.into()),
+            &self
+                .miner_derivation_path
+                .clone()
+                .unwrap_or(DEFAULT_DERIVATION_PATH.into()),
+            &self.bitcoin_node_username,
+            &self.bitcoin_node_password,
+            &self
+                .faucet_mnemonic
+                .clone()
+                .unwrap_or(DEFAULT_FAUCET_MNEMONIC.into()),
+            &self
+                .faucet_derivation_path
+                .clone()
+                .unwrap_or(DEFAULT_DERIVATION_PATH.into()),
+            get_service_port(StacksDevnetService::BitcoindNode, ServicePort::Ingestion).unwrap(),
+            get_service_port(StacksDevnetService::BitcoindNode, ServicePort::Control).unwrap(),
+            get_service_port(StacksDevnetService::BitcoindNode, ServicePort::RPC).unwrap(),
+            get_service_port(StacksDevnetService::StacksNode, ServicePort::RPC).unwrap(),
+            get_service_port(StacksDevnetService::StacksApi, ServicePort::API).unwrap(),
+            &self.epoch_2_0.unwrap_or(DEFAULT_EPOCH_2_0),
+            &self.epoch_2_05.unwrap_or(DEFAULT_EPOCH_2_05),
+            &self.epoch_2_1.unwrap_or(DEFAULT_EPOCH_2_1),
+            &self.epoch_2_2.unwrap_or(DEFAULT_EPOCH_2_2),
+            &self.bitcoin_controller_block_time.unwrap_or(50),
+            &self.bitcoin_controller_automining_disabled.unwrap_or(false)
+        ));
+
+        config
+    }
+
+    pub fn get_deployment_plan_yaml_string(&self) -> String {
+        serde_yaml::to_string(&self.deployment_plan).unwrap()
     }
 }
 
@@ -55,11 +137,10 @@ pub struct ProjectManifestConfig {
     description: Option<String>,
     authors: Option<Vec<String>>,
     requirements: Option<Vec<String>>,
-    contracts: Vec<ProjectManifestContractConfig>,
 }
 
 impl ProjectManifestConfig {
-    pub fn to_yaml_string(&self) -> String {
+    pub fn to_yaml_string(&self, config: &StacksDevnetConfig) -> String {
         let description = match &self.description {
             Some(d) => d.to_owned(),
             None => String::new(),
@@ -86,11 +167,11 @@ impl ProjectManifestConfig {
             description,
             authors,
             requirements,
-            &self
+            &config
                 .contracts
                 .clone()
                 .into_iter()
-                .map(|c| c.to_yaml_string())
+                .map(|c| c.to_project_manifest_yaml_string())
                 .collect::<Vec<String>>()
                 .join("\n")
         )
@@ -98,141 +179,82 @@ impl ProjectManifestConfig {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ProjectManifestContractConfig {
-    name: String,
-    clarity_version: u8, // todo: fix type
-    epoch: StacksEpochId,
-    deployer: Option<ContractDeployer>, // todo: add to `to_yaml_str`. also, can this just be derived from the NetworkManifest Accounts?
+enum ClarityVersion {
+    Clarity1,
+    Clarity2,
+}
+impl fmt::Display for ClarityVersion {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ClarityVersion::Clarity1 => write!(f, "1"),
+            ClarityVersion::Clarity2 => write!(f, "2"),
+        }
+    }
 }
 
-impl ProjectManifestContractConfig {
-    pub fn to_yaml_string(&self) -> String {
-        format!(
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ContractConfig {
+    pub name: String,
+    pub source: String,
+    clarity_version: ClarityVersion,
+    epoch: EpochSpec,
+    deployer: Option<String>, // todo: can this just be derived from the NetworkManifest Accounts?
+}
+
+impl ContractConfig {
+    pub fn to_project_manifest_yaml_string(&self) -> String {
+        let mut config = format!(
             r#"
                 [contracts.{}]
                 path = "contracts/{}.clar"
                 clarity_version = {}
-                epoch = {}
-
+                epoch = {:?}
             "#,
             &self.name, &self.name, self.clarity_version, self.epoch,
-        )
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct NetworkManifestConfig {
-    pub accounts: BTreeMap<String, AccountConfig>,
-    devnet: DevnetConfig,
-}
-impl NetworkManifestConfig {
-    pub fn to_yaml_string(&self, stacks_devnet_config: &StacksDevnetConfig) -> String {
-        let namespace = &stacks_devnet_config.namespace;
-        let mut config = format!(
-            r#"
-                [network]
-                name = 'devnet'
-                stacks_node_rpc_address = "{}" # todo: confirm if we need this field
-                bitcoin_node_rpc_address = "{}" # todo: confirm if we need this field
-
-            "#,
-            format!(
-                "http://{}:{}",
-                get_service_url(namespace, StacksDevnetService::StacksNode),
-                get_service_port(StacksDevnetService::StacksNode, ServicePort::RPC).unwrap()
-            ),
-            format!(
-                "http://{}:{}",
-                get_service_url(namespace, StacksDevnetService::BitcoindNode),
-                get_service_port(StacksDevnetService::BitcoindNode, ServicePort::RPC).unwrap()
-            )
         );
-
-        config.push_str(
-            &self
-                .accounts
-                .clone()
-                .iter()
-                .map(|(name, account)| account.to_yaml_string(name))
-                .collect::<Vec<String>>()
-                .join("\n"),
-        );
-
-        config.push_str(&self.devnet.to_yaml_string(stacks_devnet_config));
+        if let Some(deployer) = &self.deployer {
+            config.push_str(&format!(
+                r#"
+                    deployer = {}
+                "#,
+                deployer,
+            ));
+        }
         config
     }
-}
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-// todo: see if any of these fields are needed
-pub struct DevnetConfig {
-    pub pox_stacking_orders: Option<Vec<PoxStackingOrder>>,
-    pub enable_subnet_node: Option<bool>,
-    pub subnet_leader_stx_address: Option<String>,
-    pub subnet_contract_id: Option<String>,
-}
-impl DevnetConfig {
-    pub fn to_yaml_string(&self, config: &StacksDevnetConfig) -> String {
-        format!(
-            r#"
-                [devnet]
-                miner_mnemonic = "{}"
-                miner_derivation_path = "{}"
-                faucet_mnemonic = "{}"
-                faucet_derivation_path = "{}"
-                bitcoin_node_username = "{}"
-                bitcoin_node_password = "{}"
-                orchestrator_ingestion_port = {}
-                orchestrator_control_port = {}
-                bitcoin_node_rpc_port = {}
-                stacks_node_rpc_port = {}
-                stacks_api_port = {}
-                bitcoin_controller_block_time = {}
-                bitcoin_controller_automining_disabled = {}
-                epoch_2_0 = {}
-                epoch_2_05 = {}
-                epoch_2_1 = {}
-                epoch_2_2 = {}
-                working_dir = "/devnet"
-            "#,
-            config.miner_mnemonic,
-            config.miner_derivation_path,
-            config.faucet_mnemonic,
-            config.faucet_derivation_path,
-            config.bitcoin_node_username,
-            config.bitcoin_node_password,
-            get_service_port(StacksDevnetService::BitcoindNode, ServicePort::Ingestion).unwrap(),
-            get_service_port(StacksDevnetService::BitcoindNode, ServicePort::Control).unwrap(),
-            get_service_port(StacksDevnetService::BitcoindNode, ServicePort::RPC).unwrap(),
-            get_service_port(StacksDevnetService::StacksNode, ServicePort::RPC).unwrap(),
-            get_service_port(StacksDevnetService::StacksApi, ServicePort::API).unwrap(),
-            config.bitcoin_controller_block_time,
-            config.bitcoin_controller_automining_disabled,
-            config.epoch_2_0,
-            config.epoch_2_05,
-            config.epoch_2_1,
-            config.epoch_2_2,
-        )
+    pub fn to_configmap_data(&self) -> (String, &str) {
+        let decoded = &self.source;
+        let filename = format!("{}.clar", &self.name);
+        (filename, decoded)
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct AccountConfig {
+    pub name: String,
     pub mnemonic: String,
-    //pub derivation: String,
+    pub derivation: Option<String>,
     pub balance: u64,
-    pub stx_address: String,
-    //pub btc_address: String,
 }
 impl AccountConfig {
-    pub fn to_yaml_string(&self, name: &String) -> String {
-        format!(
+    pub fn to_yaml_string(&self) -> String {
+        let mut config = format!(
             r#"
                 [accounts.{}]
                 mnemonic = "{}"
                 balance = "{}"
             "#,
-            name, self.mnemonic, self.balance
-        )
+            &self.name, &self.mnemonic, &self.balance
+        );
+        if let Some(derivation) = &self.derivation {
+            config.push_str(&format!(
+                r#"
+                    derivation = "{}"
+                "#,
+                derivation
+            ));
+        }
+        config
     }
 }

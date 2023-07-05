@@ -1,5 +1,8 @@
 use chainhook_types::StacksNetwork;
-use clarinet_files::compute_addresses;
+use clarinet_files::{
+    compute_addresses, DEFAULT_DERIVATION_PATH, DEFAULT_EPOCH_2_0, DEFAULT_EPOCH_2_05,
+    DEFAULT_EPOCH_2_1, DEFAULT_STACKS_MINER_MNEMONIC,
+};
 use futures::future::try_join4;
 use hiro_system_kit::{slog, Logger};
 use hyper::{body::Bytes, Body, Client as HttpClient, Request, Response, Uri};
@@ -631,9 +634,15 @@ impl StacksDevnetApiK8sManager {
         let chain_coordinator_ingestion_port =
             get_service_port(StacksDevnetService::BitcoindNode, ServicePort::Ingestion).unwrap();
 
-        let (_, _, stacks_miner_secret_key_hex) = compute_addresses(
-            &config.miner_mnemonic,
-            &config.miner_derivation_path,
+        let (miner_coinbase_recipient, _, stacks_miner_secret_key_hex) = compute_addresses(
+            &config
+                .miner_mnemonic
+                .clone()
+                .unwrap_or(DEFAULT_STACKS_MINER_MNEMONIC.into()),
+            &config
+                .miner_derivation_path
+                .clone()
+                .unwrap_or(DEFAULT_DERIVATION_PATH.into()),
             &StacksNetwork::Devnet.get_networks(),
         );
 
@@ -671,20 +680,31 @@ impl StacksDevnetApiK8sManager {
                 get_service_port(StacksDevnetService::StacksNode, ServicePort::P2P).unwrap(),
                 stacks_miner_secret_key_hex,
                 stacks_miner_secret_key_hex,
-                config.stacks_node_wait_time_for_microblocks,
-                config.stacks_node_first_attempt_time_ms,
-                config.stacks_node_subsequent_attempt_time_ms,
-                config.miner_coinbase_recipient
+                config.stacks_node_wait_time_for_microblocks.unwrap_or(50),
+                config.stacks_node_first_attempt_time_ms.unwrap_or(500),
+                config
+                    .stacks_node_subsequent_attempt_time_ms
+                    .unwrap_or(1_000),
+                miner_coinbase_recipient
             );
 
-            for (_name, account) in config.network_manifest.accounts.clone().iter() {
+            for account in config.accounts.clone().iter() {
+                let derivation_path = account
+                    .derivation
+                    .clone()
+                    .unwrap_or(DEFAULT_DERIVATION_PATH.into());
+                let (stx_address, _, _) = compute_addresses(
+                    &account.mnemonic,
+                    &derivation_path,
+                    &StacksNetwork::Devnet.get_networks(),
+                );
                 stacks_conf.push_str(&format!(
                     r#"
                     [[ustx_balance]]
                     address = "{}"
                     amount = {}
                 "#,
-                    account.stx_address, account.balance
+                    stx_address, account.balance
                 ));
             }
 
@@ -695,7 +715,7 @@ impl StacksDevnetApiK8sManager {
                 address = "{}"
                 amount = {}
                 "#,
-                config.miner_coinbase_recipient, balance
+                miner_coinbase_recipient, balance
             ));
 
             let bitcoind_chain_coordinator_host =
@@ -766,8 +786,16 @@ impl StacksDevnetApiK8sManager {
                 [[burnchain.epochs]]
                 epoch_name = "2.1"
                 start_height = {}
+
+                [[burnchain.epochs]]
+                epoch_name = "2.2"
+                start_height = {}
                 "#,
-                config.pox_2_activation, config.epoch_2_0, config.epoch_2_05, config.epoch_2_1
+                config.pox_2_activation,
+                config.epoch_2_0.unwrap_or(DEFAULT_EPOCH_2_0),
+                config.epoch_2_05.unwrap_or(DEFAULT_EPOCH_2_05),
+                config.epoch_2_1.unwrap_or(DEFAULT_EPOCH_2_1),
+                config.epoch_2_2.unwrap_or(110) //todo
             ));
             stacks_conf
         };
@@ -775,7 +803,7 @@ impl StacksDevnetApiK8sManager {
         self.deploy_configmap(
             StacksDevnetConfigmap::StacksNode,
             &namespace,
-            Some(vec![("Stacks.toml", &stacks_conf)]),
+            Some(vec![("Stacks.toml".into(), &stacks_conf)]),
         )
         .await?;
 
