@@ -25,7 +25,7 @@ kubectl --context kind-kind apply -f ./templates/stacks-devnet-api.template.yaml
 to install the [latest version of this service](https://quay.io/repository/hirosystems/stacks-devnet-api?tab=history) that has been deployed to docker (or, to quay for now). This service should now be fully running on your Kubernetes cluster. See the [usage](#usage) sections for steps on how to use the service.
 
 ## Deploying a Development Build
-Any changes made to this code base can be tested, in part, by running `cargo run`. However, some features won't be available when running the service this way. Some of the inter-pod communication that takes place requires connected services to be running _in_ Kubernetes.
+Any changes made to this codebase can be tested, in part, by running `cargo run`. However, some features won't be available when running the service this way. Some of the inter-pod communication that takes place requires connected services to be running _in_ Kubernetes.
 
 To deploy a local version of this tool to you Kubernetes cluster, create a docker build and load it to your kind cluster:
 ```
