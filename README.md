@@ -18,11 +18,11 @@ brew install kind
 You should now be ready to deploy this service to your local Kubernetes cluster!
 
 ## Deploying the Stable Version
-Running 
+In your terminal, rum 
 ```
 kubectl --context kind-kind apply -f ./templates/stacks-devnet-api.template.yaml
 ```
-installs the [latest version of this service](https://quay.io/repository/hirosystems/stacks-devnet-api?tab=history) that has been deployed to docker (or, to quay for now). This service should now be fully running on your Kubernetes cluster. See the [usage](#usage) sections for steps on how to use the service.
+to install the [latest version of this service](https://quay.io/repository/hirosystems/stacks-devnet-api?tab=history) that has been deployed to docker (or, to quay for now). This service should now be fully running on your Kubernetes cluster. See the [usage](#usage) sections for steps on how to use the service.
 
 ## Deploying a Development Build
 Any changes made to this code base can be tested, in part, by running `cargo run`. However, some features won't be available when running the service this way. Some of the inter-pod communication that takes place requires connected services to be running _in_ Kubernetes.
