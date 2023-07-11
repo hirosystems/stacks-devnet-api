@@ -28,8 +28,8 @@ pub struct StacksDevnetConfig {
     faucet_derivation_path: Option<String>,
     bitcoin_controller_block_time: Option<u32>,
     bitcoin_controller_automining_disabled: Option<bool>,
-    disable_bitcoin_explorer: bool, // todo
-    disable_stacks_explorer: bool,  // todo
+    disable_bitcoin_explorer: bool, // todo: currently unused
+    disable_stacks_explorer: bool,  // todo: currently unused
     pub disable_stacks_api: bool,
     pub epoch_2_0: Option<u64>,
     pub epoch_2_05: Option<u64>,
