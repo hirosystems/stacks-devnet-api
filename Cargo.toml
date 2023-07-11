@@ -26,7 +26,10 @@ hiro-system-kit = {version = "0.1.0", features = ["log"]}
 strum_macros = "0.24.3"
 strum = "0.24.1"
 clarity-vm = "2.1.1"
-chainhook-types = "1"
+clarity-repl = "1.6.4"
+clarinet-files = "1.0.0"
+chainhook-types = "1.0.1"
+clarinet-deployments = "1.0.1"
 
 [dev-dependencies]
 tower-test = "0.4.0"
