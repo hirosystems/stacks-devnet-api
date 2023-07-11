@@ -66,7 +66,7 @@ to deploy to your local cluster.
 ## Usage
 
 When the service has been deployed to your Kubernetes cluster, it should be reachable at `localhost:8477`. The following routes are currently exposed:
- - `POST localhost:8477/api/v1/networks` - Creates a new devnet from the configuration provided in request body. See [this example](./examples/new-network.example.json) object for the required parameters.
+ - `POST localhost:8477/api/v1/networks` - Creates a new devnet from the configuration provided in request body. See [this example](./examples/new-network.example.json) object for the required parameters. **Note: If the namespace for this devnet has not already been created for the cluster, this will fail, unless running a development build (via `cargo run`). A production build expects the namespace to already exist (because the platform should have already created the namespace before creating a devnet). This devnet service should not have permissions to create a namespace. To manually create a namespace, run `kubectl create namespace <namespace>`**
  - `DELETE localhost:8477/api/v1/network/<network-id>` - Deletes all k8s assets deployed under the given namespace.
  - `GET localhost:8477/api/v1/network/<network-id>` - Gets the pod and chaintip status for the specified devnet. For example:
 ```JSON
