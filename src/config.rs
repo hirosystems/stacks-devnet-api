@@ -2,8 +2,12 @@ use std::fmt;
 
 use clarinet_deployments::types::{DeploymentSpecificationFile, EpochSpec};
 use clarinet_files::{
-    DEFAULT_DERIVATION_PATH, DEFAULT_EPOCH_2_0, DEFAULT_EPOCH_2_05, DEFAULT_EPOCH_2_1,
-    DEFAULT_EPOCH_2_2, DEFAULT_FAUCET_MNEMONIC, DEFAULT_STACKS_MINER_MNEMONIC,
+    DEFAULT_DERIVATION_PATH,
+    DEFAULT_EPOCH_2_0,
+    DEFAULT_EPOCH_2_05,
+    DEFAULT_EPOCH_2_1,
+    DEFAULT_FAUCET_MNEMONIC,
+    DEFAULT_STACKS_MINER_MNEMONIC, //DEFAULT_EPOCH_2_2 (TODO, add when clarinet_files is updated)
 };
 use serde::{Deserialize, Serialize};
 
@@ -118,7 +122,7 @@ impl StacksDevnetConfig {
             &self.epoch_2_0.unwrap_or(DEFAULT_EPOCH_2_0),
             &self.epoch_2_05.unwrap_or(DEFAULT_EPOCH_2_05),
             &self.epoch_2_1.unwrap_or(DEFAULT_EPOCH_2_1),
-            &self.epoch_2_2.unwrap_or(DEFAULT_EPOCH_2_2),
+            &self.epoch_2_2.unwrap_or(122), // todo: should be DEFAULT_EPOCH_2_2 when clarinet_files is updated
             &self.bitcoin_controller_block_time.unwrap_or(50),
             &self.bitcoin_controller_automining_disabled.unwrap_or(false)
         ));
