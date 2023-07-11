@@ -142,14 +142,7 @@ impl StacksDevnetApiK8sManager {
                 });
             }
         }
-        println!(
-            "project_manifest\n: {}",
-            &config.get_project_manifest_yaml_string()
-        );
-        println!(
-            "network_manifest\n: {}",
-            &config.get_network_manifest_yaml_string()
-        );
+
         self.deploy_bitcoin_node_pod(&config).await?;
 
         sleep(Duration::from_secs(5));
