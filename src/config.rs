@@ -36,7 +36,6 @@ pub struct StacksDevnetConfig {
     pub epoch_2_1: Option<u64>,
     pub epoch_2_2: Option<u64>,
     pub pox_2_activation: Option<u64>,
-    pub pox_2_unlock_height: Option<u32>, // todo (not currently used)
     deployment_fee_rate: Option<u64>,
     project_manifest: ProjectManifestConfig,
     pub accounts: Vec<AccountConfig>,
