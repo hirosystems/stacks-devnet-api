@@ -21,7 +21,7 @@ pub struct StacksDevnetConfig {
     pub stacks_node_subsequent_attempt_time_ms: Option<u32>,
     pub bitcoin_node_username: String,
     pub bitcoin_node_password: String,
-    pub miner_mnemonic: Option<String>, // todo: should we remove these and just get them from the `accounts` field?
+    pub miner_mnemonic: Option<String>,
     pub miner_derivation_path: Option<String>,
     pub miner_coinbase_recipient: Option<String>,
     faucet_mnemonic: Option<String>,
@@ -202,7 +202,7 @@ pub struct ContractConfig {
     pub source: String,
     clarity_version: ClarityVersion,
     epoch: EpochSpec,
-    deployer: Option<String>, // todo: can this just be derived from the NetworkManifest Accounts?
+    deployer: Option<String>,
 }
 
 impl ContractConfig {
