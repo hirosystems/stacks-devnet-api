@@ -1,6 +1,5 @@
-use std::fmt;
-
-use clarinet_deployments::types::{DeploymentSpecificationFile, EpochSpec};
+use base64::{engine::general_purpose, Engine as _};
+use clarinet_deployments::types::DeploymentSpecificationFile;
 use clarinet_files::{
     DEFAULT_DERIVATION_PATH,
     DEFAULT_EPOCH_2_0,
@@ -9,10 +8,23 @@ use clarinet_files::{
     DEFAULT_FAUCET_MNEMONIC,
     DEFAULT_STACKS_MINER_MNEMONIC, //DEFAULT_EPOCH_2_2 (TODO, add when clarinet_files is updated)
 };
+use hiro_system_kit::slog;
 use serde::{Deserialize, Serialize};
+use std::str::from_utf8;
 
-use crate::resources::service::{get_service_port, ServicePort, StacksDevnetService};
+use crate::{
+    resources::service::{get_service_port, ServicePort, StacksDevnetService},
+    Context, DevNetError,
+};
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct ValidatedStacksDevnetConfig {
+    pub user_config: StacksDevnetConfig,
+    pub project_manifest_yaml_string: String,
+    pub network_manifest_yaml_string: String,
+    pub deployment_plan_yaml_string: String,
+    pub contract_configmap_data: Vec<(String, String)>,
+}
 #[derive(Serialize, Deserialize, Debug)]
 pub struct StacksDevnetConfig {
     pub namespace: String,
@@ -21,7 +33,7 @@ pub struct StacksDevnetConfig {
     pub stacks_node_subsequent_attempt_time_ms: Option<u32>,
     pub bitcoin_node_username: String,
     pub bitcoin_node_password: String,
-    pub miner_mnemonic: Option<String>, // todo: should we remove these and just get them from the `accounts` field?
+    pub miner_mnemonic: Option<String>,
     pub miner_derivation_path: Option<String>,
     pub miner_coinbase_recipient: Option<String>,
     faucet_mnemonic: Option<String>,
@@ -36,18 +48,65 @@ pub struct StacksDevnetConfig {
     pub epoch_2_1: Option<u64>,
     pub epoch_2_2: Option<u64>,
     pub pox_2_activation: Option<u64>,
+    pub pox_2_unlock_height: Option<u32>, // todo (not currently used)
     deployment_fee_rate: Option<u64>,
     project_manifest: ProjectManifestConfig,
     pub accounts: Vec<AccountConfig>,
     deployment_plan: DeploymentSpecificationFile,
-    pub contracts: Vec<ContractConfig>,
+    contracts: Vec<ContractConfig>,
 }
 impl StacksDevnetConfig {
-    pub fn get_project_manifest_yaml_string(&self) -> String {
+    pub fn to_validated_config(
+        self,
+        ctx: Context,
+    ) -> Result<ValidatedStacksDevnetConfig, DevNetError> {
+        let context = format!(
+            "failed to validate config for NAMESPACE: {}",
+            self.namespace
+        );
+        let project_manifest_yaml_string = self.get_project_manifest_yaml_string();
+        let network_manifest_yaml_string = self.get_network_manifest_yaml_string();
+        let deployment_plan_yaml_string = match self.get_deployment_plan_yaml_string() {
+            Ok(s) => Ok(s),
+            Err(e) => {
+                let msg = format!("{context}, ERROR: {e}");
+                ctx.try_log(|logger| slog::warn!(logger, "{}", msg));
+                Err(DevNetError {
+                    message: msg.into(),
+                    code: 400,
+                })
+            }
+        }?;
+
+        let mut contracts: Vec<(String, String)> = vec![];
+        for contract in &self.contracts {
+            let data = match contract.to_configmap_data() {
+                Ok(d) => Ok(d),
+                Err(e) => {
+                    let msg = format!("{context}, ERROR: {e}");
+                    ctx.try_log(|logger| slog::warn!(logger, "{}", msg));
+                    Err(DevNetError {
+                        message: msg.into(),
+                        code: 400,
+                    })
+                }
+            }?;
+            contracts.push(data);
+        }
+        Ok(ValidatedStacksDevnetConfig {
+            user_config: self,
+            project_manifest_yaml_string,
+            network_manifest_yaml_string,
+            deployment_plan_yaml_string,
+            contract_configmap_data: contracts,
+        })
+    }
+
+    fn get_project_manifest_yaml_string(&self) -> String {
         self.project_manifest.to_yaml_string(&self)
     }
 
-    pub fn get_network_manifest_yaml_string(&self) -> String {
+    fn get_network_manifest_yaml_string(&self) -> String {
         let mut config = format!(
             r#"
                 [network]
@@ -92,8 +151,8 @@ impl StacksDevnetConfig {
                 epoch_2_1 = {}
                 epoch_2_2 = {}
                 working_dir = "/devnet"
-                bitcoin_controller_block_time = "{}"
-                bitcoin_controller_automining_disabled = "{}"
+                bitcoin_controller_block_time = {}
+                bitcoin_controller_automining_disabled = {}
             "#,
             &self
                 .miner_mnemonic
@@ -129,13 +188,14 @@ impl StacksDevnetConfig {
         config
     }
 
-    pub fn get_deployment_plan_yaml_string(&self) -> String {
-        serde_yaml::to_string(&self.deployment_plan).unwrap()
+    pub fn get_deployment_plan_yaml_string(&self) -> Result<String, String> {
+        serde_yaml::to_string(&self.deployment_plan)
+            .map_err(|e| format!("failed to parse deployment plan config: {}", e))
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ProjectManifestConfig {
+struct ProjectManifestConfig {
     name: String,
     description: Option<String>,
     authors: Option<Vec<String>>,
@@ -143,7 +203,7 @@ pub struct ProjectManifestConfig {
 }
 
 impl ProjectManifestConfig {
-    pub fn to_yaml_string(&self, config: &StacksDevnetConfig) -> String {
+    fn to_yaml_string(&self, config: &StacksDevnetConfig) -> String {
         let description = match &self.description {
             Some(d) => d.to_owned(),
             None => String::new(),
@@ -182,36 +242,22 @@ impl ProjectManifestConfig {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-enum ClarityVersion {
-    Clarity1,
-    Clarity2,
-}
-impl fmt::Display for ClarityVersion {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ClarityVersion::Clarity1 => write!(f, "1"),
-            ClarityVersion::Clarity2 => write!(f, "2"),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ContractConfig {
     pub name: String,
     pub source: String,
-    clarity_version: ClarityVersion,
-    epoch: EpochSpec,
-    deployer: Option<String>, // todo: can this just be derived from the NetworkManifest Accounts?
+    clarity_version: u32,
+    epoch: f64,
+    deployer: Option<String>,
 }
 
 impl ContractConfig {
-    pub fn to_project_manifest_yaml_string(&self) -> String {
+    fn to_project_manifest_yaml_string(&self) -> String {
         let mut config = format!(
             r#"
                 [contracts.{}]
                 path = "contracts/{}.clar"
                 clarity_version = {}
-                epoch = {:?}
+                epoch = "{}"
             "#,
             &self.name, &self.name, self.clarity_version, self.epoch,
         );
@@ -226,10 +272,19 @@ impl ContractConfig {
         config
     }
 
-    pub fn to_configmap_data(&self) -> (String, &str) {
-        let decoded = &self.source;
+    fn to_configmap_data(&self) -> Result<(String, String), String> {
+        let bytes = general_purpose::STANDARD
+            .decode(&self.source)
+            .map_err(|e| format!("unable to decode contract source: {}", e.to_string()))?;
+
+        let decoded = from_utf8(&bytes).map_err(|e| {
+            format!(
+                "invalid UTF-8 sequence when decoding contract source: {}",
+                e.to_string()
+            )
+        })?;
         let filename = format!("{}.clar", &self.name);
-        (filename, decoded)
+        Ok((filename, decoded.to_owned()))
     }
 }
 

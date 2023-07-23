@@ -73,4 +73,3 @@ spec:
   - configMap:
       name: project-dir-conf
     name: project-dir-conf-volume
-    # when you create a network, we'll pass an augmented deployment plan that will include the contract source code. 

@@ -24,23 +24,28 @@ pub async fn handle_new_devnet(
     }
     let body = body.unwrap();
     let config: Result<StacksDevnetConfig, _> = serde_json::from_slice(&body);
-    if let Err(e) = config {
-        return Ok(Response::builder()
+    match config {
+        Ok(config) => match config.to_validated_config(ctx) {
+            Ok(config) => match k8s_manager.deploy_devnet(config).await {
+                Ok(_) => Ok(Response::builder()
+                    .status(StatusCode::OK)
+                    .body(Body::empty())
+                    .unwrap()),
+                Err(e) => Ok(Response::builder()
+                    .status(StatusCode::from_u16(e.code).unwrap())
+                    .body(Body::try_from(e.message).unwrap())
+                    .unwrap()),
+            },
+            Err(e) => Ok(Response::builder()
+                .status(StatusCode::from_u16(e.code).unwrap())
+                .body(Body::try_from(e.message).unwrap())
+                .unwrap()),
+        },
+        Err(e) => Ok(Response::builder()
             .status(StatusCode::BAD_REQUEST)
             .body(
                 Body::try_from(format!("invalid configuration to create network: {}", e)).unwrap(),
             )
-            .unwrap());
-    }
-    let config = config.unwrap();
-    match k8s_manager.deploy_devnet(config).await {
-        Ok(_) => Ok(Response::builder()
-            .status(StatusCode::OK)
-            .body(Body::empty())
-            .unwrap()),
-        Err(e) => Ok(Response::builder()
-            .status(StatusCode::from_u16(e.code).unwrap())
-            .body(Body::try_from(e.message).unwrap())
             .unwrap()),
     }
 }
