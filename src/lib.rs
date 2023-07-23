@@ -729,17 +729,18 @@ impl StacksDevnetApiK8sManager {
                 bitcoind_chain_coordinator_host, chain_coordinator_ingestion_port
             ));
 
-            //         stacks_conf.push_str(&format!(
-            //             r#"
-            // # Add stacks-api as an event observer
-            // [[events_observer]]
-            // endpoint = "host.docker.internal:{}"
-            // retry_count = 255
-            // include_data_events = false
-            // events_keys = ["*"]
-            // "#,
-            //             30007,
-            //         ));
+            stacks_conf.push_str(&format!(
+                r#"
+            # Add stacks-api as an event observer
+            [[events_observer]]
+            endpoint = "{}:{}"
+            retry_count = 255
+            include_data_events = false
+            events_keys = ["*"]
+            "#,
+                get_service_url(&namespace, StacksDevnetService::StacksApi),
+                get_service_port(StacksDevnetService::StacksApi, ServicePort::Event).unwrap(),
+            ));
 
             stacks_conf.push_str(&format!(
                 r#"
