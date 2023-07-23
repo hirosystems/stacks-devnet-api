@@ -1,6 +1,5 @@
-use std::fmt;
-
-use clarinet_deployments::types::{DeploymentSpecificationFile, EpochSpec};
+use base64::{engine::general_purpose, Engine as _};
+use clarinet_deployments::types::DeploymentSpecificationFile;
 use clarinet_files::{
     DEFAULT_DERIVATION_PATH,
     DEFAULT_EPOCH_2_0,
@@ -9,9 +8,14 @@ use clarinet_files::{
     DEFAULT_FAUCET_MNEMONIC,
     DEFAULT_STACKS_MINER_MNEMONIC, //DEFAULT_EPOCH_2_2 (TODO, add when clarinet_files is updated)
 };
+use hiro_system_kit::slog;
 use serde::{Deserialize, Serialize};
+use std::str::from_utf8;
 
-use crate::resources::service::{get_service_port, ServicePort, StacksDevnetService};
+use crate::{
+    resources::service::{get_service_port, ServicePort, StacksDevnetService},
+    Context, DevNetError,
+};
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ValidatedStacksDevnetConfig {
@@ -49,7 +53,7 @@ pub struct StacksDevnetConfig {
     project_manifest: ProjectManifestConfig,
     pub accounts: Vec<AccountConfig>,
     deployment_plan: DeploymentSpecificationFile,
-    pub contracts: Vec<ContractConfig>,
+    contracts: Vec<ContractConfig>,
 }
 impl StacksDevnetConfig {
     pub fn to_validated_config(
@@ -147,8 +151,8 @@ impl StacksDevnetConfig {
                 epoch_2_1 = {}
                 epoch_2_2 = {}
                 working_dir = "/devnet"
-                bitcoin_controller_block_time = "{}"
-                bitcoin_controller_automining_disabled = "{}"
+                bitcoin_controller_block_time = {}
+                bitcoin_controller_automining_disabled = {}
             "#,
             &self
                 .miner_mnemonic
@@ -238,25 +242,11 @@ impl ProjectManifestConfig {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-enum ClarityVersion {
-    Clarity1,
-    Clarity2,
-}
-impl fmt::Display for ClarityVersion {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            ClarityVersion::Clarity1 => write!(f, "1"),
-            ClarityVersion::Clarity2 => write!(f, "2"),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct ContractConfig {
     pub name: String,
     pub source: String,
-    clarity_version: ClarityVersion,
-    epoch: EpochSpec,
+    clarity_version: u32,
+    epoch: f64,
     deployer: Option<String>,
 }
 
@@ -267,7 +257,7 @@ impl ContractConfig {
                 [contracts.{}]
                 path = "contracts/{}.clar"
                 clarity_version = {}
-                epoch = {:?}
+                epoch = "{}"
             "#,
             &self.name, &self.name, self.clarity_version, self.epoch,
         );
