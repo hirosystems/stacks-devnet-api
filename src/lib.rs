@@ -26,7 +26,7 @@ use strum::IntoEnumIterator;
 use tower::BoxError;
 
 pub mod config;
-use config::StacksDevnetConfig;
+use config::{StacksDevnetConfig, ValidatedStacksDevnetConfig};
 
 mod template_parser;
 use template_parser::get_yaml_from_resource;
@@ -123,8 +123,12 @@ impl StacksDevnetApiK8sManager {
         }
     }
 
-    pub async fn deploy_devnet(&self, config: StacksDevnetConfig) -> Result<(), DevNetError> {
-        let namespace = &config.namespace;
+    pub async fn deploy_devnet(
+        &self,
+        config: ValidatedStacksDevnetConfig,
+    ) -> Result<(), DevNetError> {
+        let user_config = config.user_config;
+        let namespace = &user_config.namespace;
 
         let namespace_exists = &self.check_namespace_exists(&namespace).await?;
         if !namespace_exists {
@@ -143,13 +147,20 @@ impl StacksDevnetApiK8sManager {
             }
         }
 
-        self.deploy_bitcoin_node_pod(&config).await?;
+        self.deploy_bitcoin_node_pod(
+            &user_config,
+            config.project_manifest_yaml_string,
+            config.network_manifest_yaml_string,
+            config.deployment_plan_yaml_string,
+            config.contract_configmap_data,
+        )
+        .await?;
 
         sleep(Duration::from_secs(5));
 
-        self.deploy_stacks_node_pod(&config).await?;
+        self.deploy_stacks_node_pod(&user_config).await?;
 
-        if !config.disable_stacks_api {
+        if !user_config.disable_stacks_api {
             self.deploy_stacks_api_pod(&namespace).await?;
         }
         Ok(())
@@ -519,6 +530,10 @@ impl StacksDevnetApiK8sManager {
     async fn deploy_bitcoin_node_pod(
         &self,
         config: &StacksDevnetConfig,
+        project_mainfest: String,
+        network_manifest: String,
+        deployment_plan: String,
+        contracts: Vec<(String, String)>,
     ) -> Result<(), DevNetError> {
         let namespace = &config.namespace;
 

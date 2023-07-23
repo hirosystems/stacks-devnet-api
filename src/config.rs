@@ -14,6 +14,14 @@ use serde::{Deserialize, Serialize};
 use crate::resources::service::{get_service_port, ServicePort, StacksDevnetService};
 
 #[derive(Serialize, Deserialize, Debug)]
+pub struct ValidatedStacksDevnetConfig {
+    pub user_config: StacksDevnetConfig,
+    pub project_manifest_yaml_string: String,
+    pub network_manifest_yaml_string: String,
+    pub deployment_plan_yaml_string: String,
+    pub contract_configmap_data: Vec<(String, String)>,
+}
+#[derive(Serialize, Deserialize, Debug)]
 pub struct StacksDevnetConfig {
     pub namespace: String,
     pub stacks_node_wait_time_for_microblocks: Option<u32>,
@@ -44,11 +52,57 @@ pub struct StacksDevnetConfig {
     pub contracts: Vec<ContractConfig>,
 }
 impl StacksDevnetConfig {
-    pub fn get_project_manifest_yaml_string(&self) -> String {
+    pub fn to_validated_config(
+        self,
+        ctx: Context,
+    ) -> Result<ValidatedStacksDevnetConfig, DevNetError> {
+        let context = format!(
+            "failed to validate config for NAMESPACE: {}",
+            self.namespace
+        );
+        let project_manifest_yaml_string = self.get_project_manifest_yaml_string();
+        let network_manifest_yaml_string = self.get_network_manifest_yaml_string();
+        let deployment_plan_yaml_string = match self.get_deployment_plan_yaml_string() {
+            Ok(s) => Ok(s),
+            Err(e) => {
+                let msg = format!("{context}, ERROR: {e}");
+                ctx.try_log(|logger| slog::warn!(logger, "{}", msg));
+                Err(DevNetError {
+                    message: msg.into(),
+                    code: 400,
+                })
+            }
+        }?;
+
+        let mut contracts: Vec<(String, String)> = vec![];
+        for contract in &self.contracts {
+            let data = match contract.to_configmap_data() {
+                Ok(d) => Ok(d),
+                Err(e) => {
+                    let msg = format!("{context}, ERROR: {e}");
+                    ctx.try_log(|logger| slog::warn!(logger, "{}", msg));
+                    Err(DevNetError {
+                        message: msg.into(),
+                        code: 400,
+                    })
+                }
+            }?;
+            contracts.push(data);
+        }
+        Ok(ValidatedStacksDevnetConfig {
+            user_config: self,
+            project_manifest_yaml_string,
+            network_manifest_yaml_string,
+            deployment_plan_yaml_string,
+            contract_configmap_data: contracts,
+        })
+    }
+
+    fn get_project_manifest_yaml_string(&self) -> String {
         self.project_manifest.to_yaml_string(&self)
     }
 
-    pub fn get_network_manifest_yaml_string(&self) -> String {
+    fn get_network_manifest_yaml_string(&self) -> String {
         let mut config = format!(
             r#"
                 [network]
@@ -130,13 +184,14 @@ impl StacksDevnetConfig {
         config
     }
 
-    pub fn get_deployment_plan_yaml_string(&self) -> String {
-        serde_yaml::to_string(&self.deployment_plan).unwrap()
+    pub fn get_deployment_plan_yaml_string(&self) -> Result<String, String> {
+        serde_yaml::to_string(&self.deployment_plan)
+            .map_err(|e| format!("failed to parse deployment plan config: {}", e))
     }
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct ProjectManifestConfig {
+struct ProjectManifestConfig {
     name: String,
     description: Option<String>,
     authors: Option<Vec<String>>,
@@ -144,7 +199,7 @@ pub struct ProjectManifestConfig {
 }
 
 impl ProjectManifestConfig {
-    pub fn to_yaml_string(&self, config: &StacksDevnetConfig) -> String {
+    fn to_yaml_string(&self, config: &StacksDevnetConfig) -> String {
         let description = match &self.description {
             Some(d) => d.to_owned(),
             None => String::new(),
@@ -206,7 +261,7 @@ pub struct ContractConfig {
 }
 
 impl ContractConfig {
-    pub fn to_project_manifest_yaml_string(&self) -> String {
+    fn to_project_manifest_yaml_string(&self) -> String {
         let mut config = format!(
             r#"
                 [contracts.{}]
