@@ -500,7 +500,7 @@ impl StacksDevnetApiK8sManager {
         &self,
         configmap: StacksDevnetConfigmap,
         namespace: &str,
-        configmap_data: Option<Vec<(String, &str)>>,
+        configmap_data: Option<Vec<(String, String)>>,
     ) -> Result<(), DevNetError> {
         let mut configmap: ConfigMap =
             self.get_resource_from_file(StacksDevnetResource::Configmap(configmap))?;
@@ -576,39 +576,31 @@ impl StacksDevnetApiK8sManager {
         self.deploy_configmap(
             StacksDevnetConfigmap::BitcoindNode,
             &namespace,
-            Some(vec![("bitcoin.conf".into(), &bitcoind_conf)]),
+            Some(vec![("bitcoin.conf".into(), bitcoind_conf)]),
         )
         .await?;
 
         self.deploy_configmap(
             StacksDevnetConfigmap::Namespace,
             &namespace,
-            Some(vec![("NAMESPACE".into(), &namespace)]),
+            Some(vec![("NAMESPACE".into(), namespace.clone())]),
         )
         .await?;
 
         self.deploy_configmap(
             StacksDevnetConfigmap::ProjectManifest,
             &namespace,
-            Some(vec![(
-                "Clarinet.toml".into(),
-                &config.get_project_manifest_yaml_string(),
-            )]),
+            Some(vec![("Clarinet.toml".into(), project_mainfest)]),
         )
         .await?;
 
         self.deploy_configmap(
             StacksDevnetConfigmap::Devnet,
             &namespace,
-            Some(vec![(
-                "Devnet.toml".into(),
-                &config.get_network_manifest_yaml_string(),
-            )]),
+            Some(vec![("Devnet.toml".into(), network_manifest)]),
         )
         .await?;
 
-        let deployment_plan = &config.get_deployment_plan_yaml_string();
-        println!("{}", deployment_plan);
         self.deploy_configmap(
             StacksDevnetConfigmap::DeploymentPlan,
             &namespace,
@@ -616,10 +608,6 @@ impl StacksDevnetApiK8sManager {
         )
         .await?;
 
-        let mut contracts: Vec<(String, &str)> = vec![];
-        for contract in &config.contracts {
-            contracts.push(contract.to_configmap_data());
-        }
         self.deploy_configmap(
             StacksDevnetConfigmap::ProjectDir,
             &namespace,
@@ -795,15 +783,15 @@ impl StacksDevnetApiK8sManager {
                 epoch_name = "2.1"
                 start_height = {}
 
-                [[burnchain.epochs]]
-                epoch_name = "2.2"
-                start_height = {}
+                # [[burnchain.epochs]]
+                # epoch_name = "2.2"
+                # start_height = {}
                 "#,
                 config.pox_2_activation.unwrap_or(DEFAULT_POX2_ACTIVATION),
                 config.epoch_2_0.unwrap_or(DEFAULT_EPOCH_2_0),
                 config.epoch_2_05.unwrap_or(DEFAULT_EPOCH_2_05),
                 config.epoch_2_1.unwrap_or(DEFAULT_EPOCH_2_1),
-                config.epoch_2_2.unwrap_or(110) //todo
+                config.epoch_2_2.unwrap_or(110) //todo - get default value and uncomment config once stacks image is updated
             ));
             stacks_conf
         };
@@ -811,7 +799,7 @@ impl StacksDevnetApiK8sManager {
         self.deploy_configmap(
             StacksDevnetConfigmap::StacksNode,
             &namespace,
-            Some(vec![("Stacks.toml".into(), &stacks_conf)]),
+            Some(vec![("Stacks.toml".into(), stacks_conf)]),
         )
         .await?;
 
@@ -827,8 +815,8 @@ impl StacksDevnetApiK8sManager {
     async fn deploy_stacks_api_pod(&self, namespace: &str) -> Result<(), DevNetError> {
         // configmap env vars for pg conatainer
         let stacks_api_pg_env = Vec::from([
-            ("POSTGRES_PASSWORD".into(), "postgres"),
-            ("POSTGRES_DB".into(), "stacks_api"),
+            ("POSTGRES_PASSWORD".into(), "postgres".into()),
+            ("POSTGRES_DB".into(), "stacks_api".into()),
         ]);
         self.deploy_configmap(
             StacksDevnetConfigmap::StacksApiPostgres,
@@ -845,23 +833,23 @@ impl StacksDevnetApiK8sManager {
             get_service_port(StacksDevnetService::StacksApi, ServicePort::Event).unwrap();
         let db_port = get_service_port(StacksDevnetService::StacksApi, ServicePort::DB).unwrap();
         let stacks_api_env = Vec::from([
-            ("STACKS_CORE_RPC_HOST".into(), &stacks_node_host[..]),
-            ("STACKS_BLOCKCHAIN_API_DB".into(), "pg"),
-            ("STACKS_CORE_RPC_PORT".into(), &rpc_port),
-            ("STACKS_BLOCKCHAIN_API_PORT".into(), &api_port),
-            ("STACKS_BLOCKCHAIN_API_HOST".into(), "0.0.0.0"),
-            ("STACKS_CORE_EVENT_PORT".into(), &event_port),
-            ("STACKS_CORE_EVENT_HOST".into(), "0.0.0.0"),
-            ("STACKS_API_ENABLE_FT_METADATA".into(), "1"),
-            ("PG_HOST".into(), "0.0.0.0"),
-            ("PG_PORT".into(), &db_port),
-            ("PG_USER".into(), "postgres"),
-            ("PG_PASSWORD".into(), "postgres"),
-            ("PG_DATABASE".into(), "stacks_api"),
-            ("STACKS_CHAIN_ID".into(), "2147483648"),
-            ("V2_POX_MIN_AMOUNT_USTX".into(), "90000000260"),
-            ("NODE_ENV".into(), "production"),
-            ("STACKS_API_LOG_LEVEL".into(), "debug"),
+            ("STACKS_CORE_RPC_HOST".into(), stacks_node_host),
+            ("STACKS_BLOCKCHAIN_API_DB".into(), "pg".into()),
+            ("STACKS_CORE_RPC_PORT".into(), rpc_port),
+            ("STACKS_BLOCKCHAIN_API_PORT".into(), api_port),
+            ("STACKS_BLOCKCHAIN_API_HOST".into(), "0.0.0.0".into()),
+            ("STACKS_CORE_EVENT_PORT".into(), event_port),
+            ("STACKS_CORE_EVENT_HOST".into(), "0.0.0.0".into()),
+            ("STACKS_API_ENABLE_FT_METADATA".into(), "1".into()),
+            ("PG_HOST".into(), "0.0.0.0".into()),
+            ("PG_PORT".into(), db_port),
+            ("PG_USER".into(), "postgres".into()),
+            ("PG_PASSWORD".into(), "postgres".into()),
+            ("PG_DATABASE".into(), "stacks_api".into()),
+            ("STACKS_CHAIN_ID".into(), "2147483648".into()),
+            ("V2_POX_MIN_AMOUNT_USTX".into(), "90000000260".into()),
+            ("NODE_ENV".into(), "production".into()),
+            ("STACKS_API_LOG_LEVEL".into(), "debug".into()),
         ]);
         self.deploy_configmap(
             StacksDevnetConfigmap::StacksApi,

@@ -282,10 +282,19 @@ impl ContractConfig {
         config
     }
 
-    pub fn to_configmap_data(&self) -> (String, &str) {
-        let decoded = &self.source;
+    fn to_configmap_data(&self) -> Result<(String, String), String> {
+        let bytes = general_purpose::STANDARD
+            .decode(&self.source)
+            .map_err(|e| format!("unable to decode contract source: {}", e.to_string()))?;
+
+        let decoded = from_utf8(&bytes).map_err(|e| {
+            format!(
+                "invalid UTF-8 sequence when decoding contract source: {}",
+                e.to_string()
+            )
+        })?;
         let filename = format!("{}.clar", &self.name);
-        (filename, decoded)
+        Ok((filename, decoded.to_owned()))
     }
 }
 
