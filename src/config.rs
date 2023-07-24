@@ -49,7 +49,6 @@ pub struct StacksDevnetConfig {
     pub epoch_2_2: Option<u64>,
     pub pox_2_activation: Option<u64>,
     pub pox_2_unlock_height: Option<u32>, // todo (not currently used)
-    deployment_fee_rate: Option<u64>,
     project_manifest: ProjectManifestConfig,
     pub accounts: Vec<AccountConfig>,
     deployment_plan: DeploymentSpecificationFile,
@@ -113,15 +112,6 @@ impl StacksDevnetConfig {
                 name = 'devnet'
             "#,
         );
-
-        if let Some(deployment_fee_rate) = &self.deployment_fee_rate {
-            config.push_str(&format!(
-                r#"
-                    deployment_fee_rate = {}
-                "#,
-                deployment_fee_rate
-            ))
-        }
 
         config.push_str(
             &self
