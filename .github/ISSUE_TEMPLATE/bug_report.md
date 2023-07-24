@@ -9,11 +9,6 @@ labels: 'Bug'
 **Describe the bug**
 A clear and concise description of what the bug is.
 
-Transaction ID 
-Address 
-Block#  
-Time stamp
-
 **To Reproduce**
 Steps to reproduce the behavior:
 1. Go to '...'
