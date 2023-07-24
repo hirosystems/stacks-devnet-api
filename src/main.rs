@@ -1,14 +1,13 @@
 use hiro_system_kit::slog;
 use hyper::server::conn::AddrStream;
 use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Client, Method, Request, Response, Server, StatusCode, Uri};
-use stacks_devnet_api::config::StacksDevnetConfig;
-use stacks_devnet_api::resources::service::{
-    get_service_from_path_part, get_service_url, get_user_facing_port,
+use hyper::{Body, Method, Request, Response, Server, StatusCode};
+use stacks_devnet_api::routes::{
+    get_standardized_path_parts, handle_delete_devnet, handle_get_devnet, handle_new_devnet,
+    handle_try_proxy_service, API_PATH,
 };
 use stacks_devnet_api::{Context, StacksDevnetApiK8sManager};
 use std::net::IpAddr;
-use std::str::FromStr;
 use std::{convert::Infallible, net::SocketAddr};
 
 #[tokio::main]
@@ -46,86 +45,6 @@ async fn main() {
     }
 }
 
-fn mutate_request_for_proxy(
-    mut request: Request<Body>,
-    forward_url: &str,
-    path_to_forward: &str,
-) -> Request<Body> {
-    let query = match request.uri().query() {
-        Some(query) => format!("?{}", query),
-        None => String::new(),
-    };
-
-    *request.uri_mut() = {
-        let forward_uri = format!("http://{}/{}{}", forward_url, path_to_forward, query);
-        Uri::from_str(forward_uri.as_str())
-    }
-    .unwrap();
-    request
-}
-
-async fn proxy(request: Request<Body>, ctx: &Context) -> Result<Response<Body>, Infallible> {
-    let client = Client::new();
-
-    ctx.try_log(|logger| slog::info!(logger, "forwarding request to {}", request.uri()));
-    match client.request(request).await {
-        Ok(response) => Ok(response),
-        Err(e) => {
-            let msg = format!("error proxying request: {}", e.to_string());
-            ctx.try_log(|logger| slog::error!(logger, "{}", msg));
-            Ok(Response::builder()
-                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .body(Body::try_from(msg).unwrap())
-                .unwrap())
-        }
-    }
-}
-
-const API_PATH: &str = "/api/v1/";
-#[derive(Default, PartialEq, Debug)]
-struct PathParts {
-    route: String,
-    network: Option<String>,
-    subroute: Option<String>,
-    remainder: Option<String>,
-}
-fn get_standardized_path_parts(path: &str) -> PathParts {
-    let path = path.replace(API_PATH, "");
-    let path = path.trim_matches('/');
-    let parts: Vec<&str> = path.split("/").collect();
-
-    match parts.len() {
-        0 => PathParts {
-            route: String::new(),
-            ..Default::default()
-        },
-        1 => PathParts {
-            route: parts[0].into(),
-            ..Default::default()
-        },
-        2 => PathParts {
-            route: parts[0].into(),
-            network: Some(parts[1].into()),
-            ..Default::default()
-        },
-        3 => PathParts {
-            route: parts[0].into(),
-            network: Some(parts[1].into()),
-            subroute: Some(parts[2].into()),
-            ..Default::default()
-        },
-        _ => {
-            let remainder = parts[3..].join("/");
-            PathParts {
-                route: parts[0].into(),
-                network: Some(parts[1].into()),
-                subroute: Some(parts[2].into()),
-                remainder: Some(remainder),
-            }
-        }
-    }
-}
-
 async fn handle_request(
     _client_ip: IpAddr,
     request: Request<Body>,
@@ -146,47 +65,7 @@ async fn handle_request(
 
     if path == "/api/v1/networks" {
         return match method {
-            &Method::POST => {
-                let body = hyper::body::to_bytes(request.into_body()).await;
-                if body.is_err() {
-                    let msg = "failed to parse request body";
-                    ctx.try_log(|logger| slog::error!(logger, "{}", msg));
-                    return Ok(Response::builder()
-                        .status(StatusCode::INTERNAL_SERVER_ERROR)
-                        .body(Body::try_from(msg).unwrap())
-                        .unwrap());
-                }
-                let body = body.unwrap();
-                let config: Result<StacksDevnetConfig, _> = serde_json::from_slice(&body);
-                match config {
-                    Ok(config) => match config.to_validated_config(ctx) {
-                        Ok(config) => match k8s_manager.deploy_devnet(config).await {
-                            Ok(_) => Ok(Response::builder()
-                                .status(StatusCode::OK)
-                                .body(Body::empty())
-                                .unwrap()),
-                            Err(e) => Ok(Response::builder()
-                                .status(StatusCode::from_u16(e.code).unwrap())
-                                .body(Body::try_from(e.message).unwrap())
-                                .unwrap()),
-                        },
-                        Err(e) => Ok(Response::builder()
-                            .status(StatusCode::from_u16(e.code).unwrap())
-                            .body(Body::try_from(e.message).unwrap())
-                            .unwrap()),
-                    },
-                    Err(e) => Ok(Response::builder()
-                        .status(StatusCode::BAD_REQUEST)
-                        .body(
-                            Body::try_from(format!(
-                                "invalid configuration to create network: {}",
-                                e
-                            ))
-                            .unwrap(),
-                        )
-                        .unwrap()),
-                }
-            }
+            &Method::POST => handle_new_devnet(request, k8s_manager, ctx).await,
             _ => Ok(Response::builder()
                 .status(StatusCode::METHOD_NOT_ALLOWED)
                 .body(Body::try_from("network creation must be a POST request").unwrap())
@@ -233,50 +112,8 @@ async fn handle_request(
         // so it must be a request to DELETE a network or GET network info
         if path_parts.subroute.is_none() {
             return match method {
-                &Method::DELETE => match k8s_manager.delete_devnet(&network).await {
-                    Ok(_) => Ok(Response::builder()
-                        .status(StatusCode::OK)
-                        .body(Body::empty())
-                        .unwrap()),
-                    Err(e) => Ok(Response::builder()
-                        .status(StatusCode::INTERNAL_SERVER_ERROR)
-                        .body(
-                            Body::try_from(format!(
-                                "error deleting network {}: {}",
-                                &network,
-                                e.to_string()
-                            ))
-                            .unwrap(),
-                        )
-                        .unwrap()),
-                },
-                &Method::GET => match k8s_manager.get_devnet_info(&network).await {
-                    Ok(devnet_info) => match serde_json::to_vec(&devnet_info) {
-                        Ok(body) => Ok(Response::builder()
-                            .status(StatusCode::OK)
-                            .header("Content-Type", "application/json")
-                            .body(Body::from(body))
-                            .unwrap()),
-                        Err(e) => {
-                            let msg = format!(
-                                "failed to form response body: NAMESPACE: {}, ERROR: {}",
-                                &network,
-                                e.to_string()
-                            );
-                            ctx.try_log(|logger: &hiro_system_kit::Logger| {
-                                slog::error!(logger, "{}", msg)
-                            });
-                            Ok(Response::builder()
-                                .status(StatusCode::from_u16(500).unwrap())
-                                .body(Body::try_from(msg).unwrap())
-                                .unwrap())
-                        }
-                    },
-                    Err(e) => Ok(Response::builder()
-                        .status(StatusCode::from_u16(e.code).unwrap())
-                        .body(Body::try_from(e.message).unwrap())
-                        .unwrap()),
-                },
+                &Method::DELETE => handle_delete_devnet(k8s_manager, &network).await,
+                &Method::GET => handle_get_devnet(k8s_manager, &network, ctx).await,
                 _ => Ok(Response::builder()
                     .status(StatusCode::METHOD_NOT_ALLOWED)
                     .body(Body::empty())
@@ -291,22 +128,8 @@ async fn handle_request(
                 .unwrap());
         } else {
             let remaining_path = path_parts.remainder.unwrap_or(String::new());
-
-            let service = get_service_from_path_part(&subroute);
-            return match service {
-                Some(service) => {
-                    let base_url = get_service_url(&network, service.clone());
-                    let port = get_user_facing_port(service).unwrap();
-                    let forward_url = format!("{}:{}", base_url, port);
-                    let proxy_request =
-                        mutate_request_for_proxy(request, &forward_url, &remaining_path);
-                    proxy(proxy_request, &ctx).await
-                }
-                None => Ok(Response::builder()
-                    .status(StatusCode::BAD_REQUEST)
-                    .body(Body::try_from("invalid request path").unwrap())
-                    .unwrap()),
-            };
+            return handle_try_proxy_service(&remaining_path, &subroute, &network, request, &ctx)
+                .await;
         }
     }
 
@@ -321,8 +144,12 @@ mod tests {
     use super::*;
     use hyper::body;
     use k8s_openapi::api::core::v1::Namespace;
-    use stacks_devnet_api::resources::service::{
-        get_service_port, ServicePort, StacksDevnetService,
+    use stacks_devnet_api::{
+        resources::service::{
+            get_service_from_path_part, get_service_port, get_service_url, ServicePort,
+            StacksDevnetService,
+        },
+        routes::{get_standardized_path_parts, mutate_request_for_proxy, PathParts},
     };
     use tower_test::mock::{self, Handle};
 
