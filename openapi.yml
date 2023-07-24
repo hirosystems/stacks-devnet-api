@@ -33,9 +33,9 @@ paths:
       summary: Get devnet status
       parameters:
         - name: namespace
-          in: query
+          in: path
           description: namespace of the devnet to query
-          required: false
+          required: true
           explode: true
           schema:
             type: string
@@ -54,9 +54,9 @@ paths:
       summary: Deletes a devnet
       parameters:
         - name: namespace
-          in: query
+          in: path
           description: namespace of the devnet to delete
-          required: false
+          required: true
           explode: true
           schema:
             type: string
@@ -72,9 +72,9 @@ paths:
       summary: Forwards request headers, url parameters after "/bitcoin-node/", and request body to the Devnet's underlying bitcoin node.
       parameters:
         - name: namespace
-          in: query
+          in: path
           description: namespace of the devnet to delete
-          required: false
+          required: true
           explode: true
           schema:
             type: string
@@ -87,9 +87,9 @@ paths:
       summary: Forwards request headers, url parameters after "/bitcoin-node/", and request body to the Devnet's underlying bitcoin node.
       parameters:
         - name: namespace
-          in: query
+          in: path
           description: namespace of the devnet to delete
-          required: false
+          required: true
           explode: true
           schema:
             type: string
@@ -103,9 +103,9 @@ paths:
       summary: Forwards request headers, url parameters after "/stacks-node/", and request body to the Devnet's underlying stacks node.
       parameters:
         - name: namespace
-          in: query
+          in: path
           description: namespace of the devnet to delete
-          required: false
+          required: true
           explode: true
           schema:
             type: string
@@ -118,9 +118,9 @@ paths:
       summary: Forwards request headers, url parameters after "/stacks-node/", and request body to the Devnet's underlying stacks node.
       parameters:
         - name: namespace
-          in: query
+          in: path
           description: namespace of the devnet to delete
-          required: false
+          required: true
           explode: true
           schema:
             type: string
@@ -134,9 +134,9 @@ paths:
       summary: Forwards request headers, url parameters after "/stacks-api/", and request body to the Devnet's underlying stacks api.
       parameters:
         - name: namespace
-          in: query
+          in: path
           description: namespace of the devnet to delete
-          required: false
+          required: true
           explode: true
           schema:
             type: string
@@ -149,9 +149,9 @@ paths:
       summary: Forwards request headers, url parameters after "/stacks-api/", and request body to the Devnet's underlying stacks api.
       parameters:
         - name: namespace
-          in: query
+          in: path
           description: namespace of the devnet to delete
-          required: false
+          required: true
           explode: true
           schema:
             type: string
