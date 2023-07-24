@@ -2,10 +2,11 @@ use hiro_system_kit::slog;
 use hyper::server::conn::AddrStream;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Client, Method, Request, Response, Server, StatusCode, Uri};
+use stacks_devnet_api::config::StacksDevnetConfig;
 use stacks_devnet_api::resources::service::{
     get_service_from_path_part, get_service_url, get_user_facing_port,
 };
-use stacks_devnet_api::{Context, StacksDevnetApiK8sManager, StacksDevnetConfig};
+use stacks_devnet_api::{Context, StacksDevnetApiK8sManager};
 use std::net::IpAddr;
 use std::str::FromStr;
 use std::{convert::Infallible, net::SocketAddr};
@@ -157,21 +158,32 @@ async fn handle_request(
                 }
                 let body = body.unwrap();
                 let config: Result<StacksDevnetConfig, _> = serde_json::from_slice(&body);
-                if config.is_err() {
-                    return Ok(Response::builder()
-                        .status(StatusCode::BAD_REQUEST)
-                        .body(Body::try_from("invalid configuration to create network").unwrap())
-                        .unwrap());
-                }
-                let config = config.unwrap();
-                match k8s_manager.deploy_devnet(config).await {
-                    Ok(_) => Ok(Response::builder()
-                        .status(StatusCode::OK)
-                        .body(Body::empty())
-                        .unwrap()),
+                match config {
+                    Ok(config) => match config.to_validated_config(ctx) {
+                        Ok(config) => match k8s_manager.deploy_devnet(config).await {
+                            Ok(_) => Ok(Response::builder()
+                                .status(StatusCode::OK)
+                                .body(Body::empty())
+                                .unwrap()),
+                            Err(e) => Ok(Response::builder()
+                                .status(StatusCode::from_u16(e.code).unwrap())
+                                .body(Body::try_from(e.message).unwrap())
+                                .unwrap()),
+                        },
+                        Err(e) => Ok(Response::builder()
+                            .status(StatusCode::from_u16(e.code).unwrap())
+                            .body(Body::try_from(e.message).unwrap())
+                            .unwrap()),
+                    },
                     Err(e) => Ok(Response::builder()
-                        .status(StatusCode::from_u16(e.code).unwrap())
-                        .body(Body::try_from(e.message).unwrap())
+                        .status(StatusCode::BAD_REQUEST)
+                        .body(
+                            Body::try_from(format!(
+                                "invalid configuration to create network: {}",
+                                e
+                            ))
+                            .unwrap(),
+                        )
                         .unwrap()),
                 }
             }

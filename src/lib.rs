@@ -1,3 +1,8 @@
+use chainhook_types::StacksNetwork;
+use clarinet_files::{
+    compute_addresses, DEFAULT_DERIVATION_PATH, DEFAULT_EPOCH_2_0, DEFAULT_EPOCH_2_05,
+    DEFAULT_EPOCH_2_1, DEFAULT_POX2_ACTIVATION, DEFAULT_STACKS_MINER_MNEMONIC,
+};
 use futures::future::try_join4;
 use hiro_system_kit::{slog, Logger};
 use hyper::{body::Bytes, Body, Client as HttpClient, Request, Response, Uri};
@@ -20,6 +25,9 @@ use std::{collections::BTreeMap, str::FromStr, time::Duration};
 use strum::IntoEnumIterator;
 use tower::BoxError;
 
+pub mod config;
+use config::{StacksDevnetConfig, ValidatedStacksDevnetConfig};
+
 mod template_parser;
 use template_parser::get_yaml_from_resource;
 
@@ -27,43 +35,6 @@ pub mod resources;
 use crate::resources::configmap::StacksDevnetConfigmap;
 use crate::resources::pod::StacksDevnetPod;
 use crate::resources::service::{get_service_url, StacksDevnetService};
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct StacksDevnetConfig {
-    namespace: String,
-    label: String,
-    network_id: u32,
-    stacks_node_wait_time_for_microblocks: u32,
-    stacks_node_first_attempt_time_ms: u32,
-    stacks_node_subsequent_attempt_time_ms: u32,
-    bitcoin_node_username: String,
-    bitcoin_node_password: String,
-    miner_mnemonic: String,
-    miner_derivation_path: String,
-    miner_coinbase_recipient: String,
-    faucet_mnemonic: String,
-    faucet_derivation_path: String,
-    bitcoin_controller_block_time: u32,
-    bitcoin_controller_automining_disabled: bool,
-    disable_bitcoin_explorer: bool,
-    disable_stacks_explorer: bool,
-    disable_stacks_api: bool,
-    epoch_2_0: u32,
-    epoch_2_05: u32,
-    epoch_2_1: u32,
-    epoch_2_2: u32,
-    pox_2_activation: u32,
-    pox_2_unlock_height: u32,
-    accounts: Vec<(String, u64)>,
-    // needed for chain coordinator
-    project_manifest: String,
-    devnet_config: String,
-    deployment_plan: String,
-    contracts: Vec<(String, String)>,
-    // to remove and compute
-    stacks_miner_secret_key_hex: String,
-    miner_stx_address: String,
-}
 
 pub struct DevNetError {
     pub message: String,
@@ -152,8 +123,12 @@ impl StacksDevnetApiK8sManager {
         }
     }
 
-    pub async fn deploy_devnet(&self, config: StacksDevnetConfig) -> Result<(), DevNetError> {
-        let namespace = &config.namespace;
+    pub async fn deploy_devnet(
+        &self,
+        config: ValidatedStacksDevnetConfig,
+    ) -> Result<(), DevNetError> {
+        let user_config = config.user_config;
+        let namespace = &user_config.namespace;
 
         let namespace_exists = &self.check_namespace_exists(&namespace).await?;
         if !namespace_exists {
@@ -171,13 +146,21 @@ impl StacksDevnetApiK8sManager {
                 });
             }
         }
-        self.deploy_bitcoin_node_pod(&config).await?;
+
+        self.deploy_bitcoin_node_pod(
+            &user_config,
+            config.project_manifest_yaml_string,
+            config.network_manifest_yaml_string,
+            config.deployment_plan_yaml_string,
+            config.contract_configmap_data,
+        )
+        .await?;
 
         sleep(Duration::from_secs(5));
 
-        self.deploy_stacks_node_pod(&config).await?;
+        self.deploy_stacks_node_pod(&user_config).await?;
 
-        if !config.disable_stacks_api {
+        if !user_config.disable_stacks_api {
             self.deploy_stacks_api_pod(&namespace).await?;
         }
         Ok(())
@@ -517,7 +500,7 @@ impl StacksDevnetApiK8sManager {
         &self,
         configmap: StacksDevnetConfigmap,
         namespace: &str,
-        configmap_data: Option<Vec<(&str, &str)>>,
+        configmap_data: Option<Vec<(String, String)>>,
     ) -> Result<(), DevNetError> {
         let mut configmap: ConfigMap =
             self.get_resource_from_file(StacksDevnetResource::Configmap(configmap))?;
@@ -547,6 +530,10 @@ impl StacksDevnetApiK8sManager {
     async fn deploy_bitcoin_node_pod(
         &self,
         config: &StacksDevnetConfig,
+        project_mainfest: String,
+        network_manifest: String,
+        deployment_plan: String,
+        contracts: Vec<(String, String)>,
     ) -> Result<(), DevNetError> {
         let namespace = &config.namespace;
 
@@ -589,53 +576,38 @@ impl StacksDevnetApiK8sManager {
         self.deploy_configmap(
             StacksDevnetConfigmap::BitcoindNode,
             &namespace,
-            Some(vec![("bitcoin.conf", &bitcoind_conf)]),
+            Some(vec![("bitcoin.conf".into(), bitcoind_conf)]),
         )
         .await?;
 
         self.deploy_configmap(
             StacksDevnetConfigmap::Namespace,
             &namespace,
-            Some(vec![("NAMESPACE", &namespace)]),
+            Some(vec![("NAMESPACE".into(), namespace.clone())]),
         )
         .await?;
 
         self.deploy_configmap(
             StacksDevnetConfigmap::ProjectManifest,
             &namespace,
-            Some(vec![("Clarinet.toml", &config.project_manifest)]),
+            Some(vec![("Clarinet.toml".into(), project_mainfest)]),
         )
         .await?;
-
-        let mut devnet_config = config.devnet_config.clone();
-        //devnet_config.push_str("\n[devnet]");
-        devnet_config.push_str(&format!(
-            "\nbitcoin_node_username = \"{}\"",
-            &config.bitcoin_node_username
-        ));
-        devnet_config.push_str(&format!(
-            "\nbitcoin_node_password = \"{}\"",
-            &config.bitcoin_node_password
-        ));
 
         self.deploy_configmap(
             StacksDevnetConfigmap::Devnet,
             &namespace,
-            Some(vec![("Devnet.toml", &devnet_config)]),
+            Some(vec![("Devnet.toml".into(), network_manifest)]),
         )
         .await?;
 
         self.deploy_configmap(
             StacksDevnetConfigmap::DeploymentPlan,
             &namespace,
-            Some(vec![("default.devnet-plan.yaml", &config.deployment_plan)]),
+            Some(vec![("default.devnet-plan.yaml".into(), deployment_plan)]),
         )
         .await?;
 
-        let mut contracts: Vec<(&str, &str)> = vec![];
-        for (contract_name, contract_source) in &config.contracts {
-            contracts.push((contract_name, contract_source));
-        }
         self.deploy_configmap(
             StacksDevnetConfigmap::ProjectDir,
             &namespace,
@@ -657,6 +629,18 @@ impl StacksDevnetApiK8sManager {
 
         let chain_coordinator_ingestion_port =
             get_service_port(StacksDevnetService::BitcoindNode, ServicePort::Ingestion).unwrap();
+
+        let (miner_coinbase_recipient, _, stacks_miner_secret_key_hex) = compute_addresses(
+            &config
+                .miner_mnemonic
+                .clone()
+                .unwrap_or(DEFAULT_STACKS_MINER_MNEMONIC.into()),
+            &config
+                .miner_derivation_path
+                .clone()
+                .unwrap_or(DEFAULT_DERIVATION_PATH.into()),
+            &StacksNetwork::Devnet.get_networks(),
+        );
 
         let stacks_conf = {
             let mut stacks_conf = format!(
@@ -690,22 +674,33 @@ impl StacksDevnetApiK8sManager {
                 "#,
                 get_service_port(StacksDevnetService::StacksNode, ServicePort::RPC).unwrap(),
                 get_service_port(StacksDevnetService::StacksNode, ServicePort::P2P).unwrap(),
-                config.stacks_miner_secret_key_hex,
-                config.stacks_miner_secret_key_hex,
-                config.stacks_node_wait_time_for_microblocks,
-                config.stacks_node_first_attempt_time_ms,
-                config.stacks_node_subsequent_attempt_time_ms,
-                config.miner_coinbase_recipient
+                stacks_miner_secret_key_hex,
+                stacks_miner_secret_key_hex,
+                config.stacks_node_wait_time_for_microblocks.unwrap_or(50),
+                config.stacks_node_first_attempt_time_ms.unwrap_or(500),
+                config
+                    .stacks_node_subsequent_attempt_time_ms
+                    .unwrap_or(1_000),
+                miner_coinbase_recipient
             );
 
-            for (address, balance) in config.accounts.iter() {
+            for account in config.accounts.clone().iter() {
+                let derivation_path = account
+                    .derivation
+                    .clone()
+                    .unwrap_or(DEFAULT_DERIVATION_PATH.into());
+                let (stx_address, _, _) = compute_addresses(
+                    &account.mnemonic,
+                    &derivation_path,
+                    &StacksNetwork::Devnet.get_networks(),
+                );
                 stacks_conf.push_str(&format!(
                     r#"
                     [[ustx_balance]]
                     address = "{}"
                     amount = {}
                 "#,
-                    address, balance
+                    stx_address, account.balance
                 ));
             }
 
@@ -716,7 +711,7 @@ impl StacksDevnetApiK8sManager {
                 address = "{}"
                 amount = {}
                 "#,
-                config.miner_coinbase_recipient, balance
+                miner_coinbase_recipient, balance
             ));
 
             let bitcoind_chain_coordinator_host =
@@ -788,8 +783,16 @@ impl StacksDevnetApiK8sManager {
                 [[burnchain.epochs]]
                 epoch_name = "2.1"
                 start_height = {}
+
+                # [[burnchain.epochs]]
+                # epoch_name = "2.2"
+                # start_height = {}
                 "#,
-                config.pox_2_activation, config.epoch_2_0, config.epoch_2_05, config.epoch_2_1
+                config.pox_2_activation.unwrap_or(DEFAULT_POX2_ACTIVATION),
+                config.epoch_2_0.unwrap_or(DEFAULT_EPOCH_2_0),
+                config.epoch_2_05.unwrap_or(DEFAULT_EPOCH_2_05),
+                config.epoch_2_1.unwrap_or(DEFAULT_EPOCH_2_1),
+                config.epoch_2_2.unwrap_or(110) //todo - get default value and uncomment config once stacks image is updated
             ));
             stacks_conf
         };
@@ -797,7 +800,7 @@ impl StacksDevnetApiK8sManager {
         self.deploy_configmap(
             StacksDevnetConfigmap::StacksNode,
             &namespace,
-            Some(vec![("Stacks.toml", &stacks_conf)]),
+            Some(vec![("Stacks.toml".into(), stacks_conf)]),
         )
         .await?;
 
@@ -813,8 +816,8 @@ impl StacksDevnetApiK8sManager {
     async fn deploy_stacks_api_pod(&self, namespace: &str) -> Result<(), DevNetError> {
         // configmap env vars for pg conatainer
         let stacks_api_pg_env = Vec::from([
-            ("POSTGRES_PASSWORD", "postgres"),
-            ("POSTGRES_DB", "stacks_api"),
+            ("POSTGRES_PASSWORD".into(), "postgres".into()),
+            ("POSTGRES_DB".into(), "stacks_api".into()),
         ]);
         self.deploy_configmap(
             StacksDevnetConfigmap::StacksApiPostgres,
@@ -831,23 +834,23 @@ impl StacksDevnetApiK8sManager {
             get_service_port(StacksDevnetService::StacksApi, ServicePort::Event).unwrap();
         let db_port = get_service_port(StacksDevnetService::StacksApi, ServicePort::DB).unwrap();
         let stacks_api_env = Vec::from([
-            ("STACKS_CORE_RPC_HOST", &stacks_node_host[..]),
-            ("STACKS_BLOCKCHAIN_API_DB", "pg"),
-            ("STACKS_CORE_RPC_PORT", &rpc_port),
-            ("STACKS_BLOCKCHAIN_API_PORT", &api_port),
-            ("STACKS_BLOCKCHAIN_API_HOST", "0.0.0.0"),
-            ("STACKS_CORE_EVENT_PORT", &event_port),
-            ("STACKS_CORE_EVENT_HOST", "0.0.0.0"),
-            ("STACKS_API_ENABLE_FT_METADATA", "1"),
-            ("PG_HOST", "0.0.0.0"),
-            ("PG_PORT", &db_port),
-            ("PG_USER", "postgres"),
-            ("PG_PASSWORD", "postgres"),
-            ("PG_DATABASE", "stacks_api"),
-            ("STACKS_CHAIN_ID", "2147483648"),
-            ("V2_POX_MIN_AMOUNT_USTX", "90000000260"),
-            ("NODE_ENV", "production"),
-            ("STACKS_API_LOG_LEVEL", "debug"),
+            ("STACKS_CORE_RPC_HOST".into(), stacks_node_host),
+            ("STACKS_BLOCKCHAIN_API_DB".into(), "pg".into()),
+            ("STACKS_CORE_RPC_PORT".into(), rpc_port),
+            ("STACKS_BLOCKCHAIN_API_PORT".into(), api_port),
+            ("STACKS_BLOCKCHAIN_API_HOST".into(), "0.0.0.0".into()),
+            ("STACKS_CORE_EVENT_PORT".into(), event_port),
+            ("STACKS_CORE_EVENT_HOST".into(), "0.0.0.0".into()),
+            ("STACKS_API_ENABLE_FT_METADATA".into(), "1".into()),
+            ("PG_HOST".into(), "0.0.0.0".into()),
+            ("PG_PORT".into(), db_port),
+            ("PG_USER".into(), "postgres".into()),
+            ("PG_PASSWORD".into(), "postgres".into()),
+            ("PG_DATABASE".into(), "stacks_api".into()),
+            ("STACKS_CHAIN_ID".into(), "2147483648".into()),
+            ("V2_POX_MIN_AMOUNT_USTX".into(), "90000000260".into()),
+            ("NODE_ENV".into(), "production".into()),
+            ("STACKS_API_LOG_LEVEL".into(), "debug".into()),
         ]);
         self.deploy_configmap(
             StacksDevnetConfigmap::StacksApi,
