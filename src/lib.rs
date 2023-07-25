@@ -136,7 +136,7 @@ impl StacksDevnetApiK8sManager {
         let user_config = config.user_config;
         let namespace = &user_config.namespace;
 
-        let namespace_exists = &self.check_namespace_exists(&namespace).await?;
+        let namespace_exists = self.check_namespace_exists(&namespace).await?;
         if !namespace_exists {
             if cfg!(debug_assertions) {
                 self.deploy_namespace(&namespace).await?;
@@ -152,6 +152,19 @@ impl StacksDevnetApiK8sManager {
                 });
             }
         }
+
+        let any_assets_exist = self.check_any_devnet_assets_exist(&namespace).await?;
+        if any_assets_exist {
+            let msg = format!(
+                "cannot create devnet because assets already exist for namespace {}",
+                namespace
+            );
+            self.ctx.try_log(|logger| slog::warn!(logger, "{}", msg));
+            return Err(DevNetError {
+                message: msg.into(),
+                code: 409,
+            });
+        };
 
         self.deploy_bitcoin_node_pod(
             &user_config,
@@ -325,7 +338,7 @@ impl StacksDevnetApiK8sManager {
                     Ok(r) => Ok(r),
                     Err((msg, code)) => {
                         let msg = format!("failed to get pod status {}, ERROR: {}", context, msg);
-                self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                        self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
                         Err(DevNetError { message: msg, code })
                     }
                 }
