@@ -447,6 +447,81 @@ impl StacksDevnetApiK8sManager {
         }
     }
 
+    async fn get_resource<K: kube::Resource<Scope = NamespaceResourceScope>>(
+        &self,
+        namespace: &str,
+        name: &str,
+    ) -> Result<Option<K>, DevNetError>
+    where
+        <K as kube::Resource>::DynamicType: Default,
+        K: Clone,
+        K: DeserializeOwned,
+        K: std::fmt::Debug,
+        K: Serialize,
+    {
+        let resource_api: Api<K> = Api::namespaced(self.client.to_owned(), &namespace);
+
+        let resource_details = format!(
+            "RESOURCE: {}, NAME: {}, NAMESPACE: {}",
+            std::any::type_name::<K>(),
+            name,
+            namespace
+        );
+        self.ctx
+            .try_log(|logger| slog::info!(logger, "fetching {}", resource_details));
+
+        match resource_api.get(&name).await {
+            Ok(r) => {
+                self.ctx.try_log(|logger| {
+                    slog::info!(logger, "successfully fetched {}", resource_details)
+                });
+                Ok(Some(r))
+            }
+            Err(e) => {
+                let e = match e {
+                    kube::Error::Api(api_error) => {
+                        let code = api_error.code;
+                        if code == 404 {
+                            None
+                        } else {
+                            Some((api_error.message, api_error.code))
+                        }
+                    }
+                    e => Some((e.to_string(), 500)),
+                };
+                match e {
+                    None => Ok(None),
+                    Some((msg, code)) => {
+                        let msg = format!("failed to fetch {}, ERROR: {}", resource_details, msg);
+                        self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                        Err(DevNetError {
+                            message: msg,
+                            code: code,
+                        })
+                    }
+                }
+            }
+        }
+    }
+
+    async fn check_resource_exists<K: kube::Resource<Scope = NamespaceResourceScope>>(
+        &self,
+        namespace: &str,
+        name: &str,
+    ) -> Result<bool, DevNetError>
+    where
+        <K as kube::Resource>::DynamicType: Default,
+        K: Clone,
+        K: DeserializeOwned,
+        K: std::fmt::Debug,
+        K: Serialize,
+    {
+        match self.get_resource::<K>(namespace, name).await? {
+            Some(_) => Ok(true),
+            None => Ok(false),
+        }
+    }
+
     async fn deploy_resource<K: kube::Resource<Scope = NamespaceResourceScope>>(
         &self,
         namespace: &str,
