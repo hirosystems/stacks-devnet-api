@@ -82,7 +82,12 @@ pub struct StacksDevnetInfoResponse {
     bitcoin_chain_tip: u64,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
+struct PodStatusResponse {
+    status: Option<String>,
+    start_time: Option<String>,
+}
+#[derive(Serialize, Deserialize, Debug, Default)]
 struct StacksV2InfoResponse {
     burn_block_height: u64,
     stacks_tip_height: u64,
@@ -234,7 +239,7 @@ impl StacksDevnetApiK8sManager {
         &self,
         namespace: &str,
         pod: StacksDevnetPod,
-    ) -> Result<(Option<String>, Option<String>), DevNetError> {
+    ) -> Result<PodStatusResponse, DevNetError> {
         let context = format!("NAMESPACE: {}, POD: {}", namespace, pod);
         self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
             slog::info!(logger, "getting pod status {}", context)
@@ -251,21 +256,36 @@ impl StacksDevnetApiK8sManager {
                         Some(st) => Some(st.0.to_string()),
                         None => None,
                     };
-                    Ok((status.phase, start_time))
+                    Ok(PodStatusResponse {
+                        status: status.phase,
+                        start_time,
+                    })
                 }
-                None => Ok((None, None)),
+                None => Ok(PodStatusResponse::default()),
             },
             Err(e) => {
-                let e = match e {
-                    kube::Error::Api(api_error) => (api_error.message, api_error.code),
-                    e => (e.to_string(), 500),
+                let result = match e {
+                    kube::Error::Api(api_error) => {
+                        let code = api_error.code;
+                        if code == 404 {
+                            Ok(PodStatusResponse {
+                                status: Some("Not found".into()),
+                                ..Default::default()
+                            })
+                        } else {
+                            Err((api_error.message, code))
+                        }
+                    }
+                    e => Err((e.to_string(), 500)),
                 };
-                let msg = format!("failed to get pod status {}, ERROR: {}", context, e.0);
+                match result {
+                    Ok(r) => Ok(r),
+                    Err((msg, code)) => {
+                        let msg = format!("failed to get pod status {}, ERROR: {}", context, msg);
                 self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
-                Err(DevNetError {
-                    message: msg,
-                    code: e.1,
-                })
+                        Err(DevNetError { message: msg, code })
+                    }
+                }
             }
         }
     }
@@ -334,11 +354,8 @@ impl StacksDevnetApiK8sManager {
                         context,
                         e.to_string()
                     );
-                    self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
-                    Err(DevNetError {
-                        message: msg,
-                        code: 500,
-                    })
+                    self.ctx.try_log(|logger| slog::warn!(logger, "{}", msg));
+                    Ok(StacksV2InfoResponse::default())
                 }
             },
             Err(e) => {
@@ -361,9 +378,18 @@ impl StacksDevnetApiK8sManager {
         });
 
         let (
-            (bitcoind_node_status, bitcoind_node_started_at),
-            (stacks_node_status, stacks_node_started_at),
-            (stacks_api_status, stacks_api_started_at),
+            PodStatusResponse {
+                status: bitcoind_node_status,
+                start_time: bitcoind_node_started_at,
+            },
+            PodStatusResponse {
+                status: stacks_node_status,
+                start_time: stacks_node_started_at,
+            },
+            PodStatusResponse {
+                status: stacks_api_status,
+                start_time: stacks_api_started_at,
+            },
             chain_info,
         ) = try_join4(
             self.get_pod_status_info(&namespace, StacksDevnetPod::BitcoindNode),
