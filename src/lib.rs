@@ -235,6 +235,49 @@ impl StacksDevnetApiK8sManager {
         }
     }
 
+    pub async fn check_any_devnet_assets_exist(
+        &self,
+        namespace: &str,
+    ) -> Result<bool, DevNetError> {
+        for pod in StacksDevnetPod::iter() {
+            if self
+                .check_resource_exists::<Pod>(namespace, &pod.to_string())
+                .await?
+            {
+                return Ok(true);
+            }
+        }
+
+        for configmap in StacksDevnetConfigmap::iter() {
+            if self
+                .check_resource_exists::<ConfigMap>(namespace, &configmap.to_string())
+                .await?
+            {
+                return Ok(true);
+            }
+        }
+
+        for service in StacksDevnetService::iter() {
+            if self
+                .check_resource_exists::<Service>(namespace, &service.to_string())
+                .await?
+            {
+                return Ok(true);
+            }
+        }
+
+        for pvc in StacksDevnetPvc::iter() {
+            if self
+                .check_resource_exists::<PersistentVolumeClaim>(namespace, &pvc.to_string())
+                .await?
+            {
+                return Ok(true);
+            }
+        }
+
+        Ok(false)
+    }
+
     async fn get_pod_status_info(
         &self,
         namespace: &str,
