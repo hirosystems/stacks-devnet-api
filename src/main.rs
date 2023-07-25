@@ -1,7 +1,8 @@
 use hiro_system_kit::slog;
 use hyper::server::conn::AddrStream;
 use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Method, Request, Response, Server, StatusCode};
+use hyper::{Body, Method, Request, Response, Server};
+use stacks_devnet_api::responder::Responder;
 use stacks_devnet_api::routes::{
     get_standardized_path_parts, handle_delete_devnet, handle_get_devnet, handle_new_devnet,
     handle_try_proxy_service, API_PATH,
@@ -13,7 +14,7 @@ use std::{convert::Infallible, net::SocketAddr};
 #[tokio::main]
 async fn main() {
     const HOST: &str = "0.0.0.0";
-    const PORT: &str = "8477";
+    const PORT: &str = "8478";
     let endpoint: String = HOST.to_owned() + ":" + PORT;
     let addr: SocketAddr = endpoint.parse().expect("Could not parse ip:port.");
 
@@ -63,29 +64,25 @@ async fn handle_request(
         )
     });
 
+    let responder = Responder {
+        headers: request.headers().clone(),
+        ..Default::default()
+    };
+
     if path == "/api/v1/networks" {
         return match method {
-            &Method::POST => handle_new_devnet(request, k8s_manager, ctx).await,
-            _ => Ok(Response::builder()
-                .status(StatusCode::METHOD_NOT_ALLOWED)
-                .body(Body::try_from("network creation must be a POST request").unwrap())
-                .unwrap()),
+            &Method::POST => handle_new_devnet(request, k8s_manager, responder, ctx).await,
+            _ => responder.err_method_not_allowed("network creation must be a POST request".into()),
         };
     } else if path.starts_with(API_PATH) {
         let path_parts = get_standardized_path_parts(uri.path());
 
         if path_parts.route != "network" {
-            return Ok(Response::builder()
-                .status(StatusCode::BAD_REQUEST)
-                .body(Body::try_from("invalid request path").unwrap())
-                .unwrap());
+            return responder.err_bad_request("invalid request path".into());
         }
         // the api path must be followed by a network id
         if path_parts.network.is_none() {
-            return Ok(Response::builder()
-                .status(StatusCode::BAD_REQUEST)
-                .body(Body::try_from("no network id provided").unwrap())
-                .unwrap());
+            return responder.err_bad_request("no network id provided".into());
         }
         let network = path_parts.network.unwrap();
 
@@ -93,56 +90,50 @@ async fn handle_request(
         let exists = match k8s_manager.check_namespace_exists(&network).await {
             Ok(exists) => exists,
             Err(e) => {
-                return Ok(Response::builder()
-                    .status(StatusCode::from_u16(e.code).unwrap())
-                    .body(Body::try_from(e.message).unwrap())
-                    .unwrap());
+                return responder.respond(e.code, e.message);
             }
         };
         if !exists {
             let msg = format!("network {} does not exist", &network);
             ctx.try_log(|logger| slog::warn!(logger, "{}", msg));
-            return Ok(Response::builder()
-                .status(StatusCode::from_u16(404).unwrap())
-                .body(Body::try_from(msg).unwrap())
-                .unwrap());
+            return responder.err_not_found(msg);
         }
 
         // the path only contained the network path and network id,
         // so it must be a request to DELETE a network or GET network info
         if path_parts.subroute.is_none() {
             return match method {
-                &Method::DELETE => handle_delete_devnet(k8s_manager, &network).await,
-                &Method::GET => handle_get_devnet(k8s_manager, &network, ctx).await,
-                _ => Ok(Response::builder()
-                    .status(StatusCode::METHOD_NOT_ALLOWED)
-                    .body(Body::empty())
-                    .unwrap()),
+                &Method::DELETE => handle_delete_devnet(k8s_manager, &network, responder).await,
+                &Method::GET => handle_get_devnet(k8s_manager, &network, responder, ctx).await,
+                _ => {
+                    responder.err_method_not_allowed("can only GET/DELETE at provided route".into())
+                }
             };
         }
         let subroute = path_parts.subroute.unwrap();
         if subroute == "commands" {
-            return Ok(Response::builder()
-                .status(StatusCode::NOT_IMPLEMENTED)
-                .body(Body::empty())
-                .unwrap());
+            return responder.err_not_implemented("commands route in progress".into());
         } else {
             let remaining_path = path_parts.remainder.unwrap_or(String::new());
-            return handle_try_proxy_service(&remaining_path, &subroute, &network, request, &ctx)
-                .await;
+            return handle_try_proxy_service(
+                &remaining_path,
+                &subroute,
+                &network,
+                request,
+                responder,
+                &ctx,
+            )
+            .await;
         }
     }
 
-    Ok(Response::builder()
-        .status(StatusCode::BAD_REQUEST)
-        .body(Body::try_from("invalid request path").unwrap())
-        .unwrap())
+    responder.err_bad_request("invalid request path".into())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use hyper::body;
+    use hyper::{body, StatusCode};
     use k8s_openapi::api::core::v1::Namespace;
     use stacks_devnet_api::{
         resources::service::{
