@@ -60,12 +60,11 @@ pub async fn handle_delete_devnet(
             .body(Body::empty())
             .unwrap()),
         Err(e) => Ok(Response::builder()
-            .status(StatusCode::INTERNAL_SERVER_ERROR)
+            .status(e.code)
             .body(
                 Body::try_from(format!(
                     "error deleting network {}: {}",
-                    &network,
-                    e.to_string()
+                    &network, e.message
                 ))
                 .unwrap(),
             )

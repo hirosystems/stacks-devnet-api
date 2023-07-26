@@ -186,33 +186,76 @@ impl StacksDevnetApiK8sManager {
         Ok(())
     }
 
-    pub async fn delete_devnet(&self, namespace: &str) -> Result<(), Box<dyn std::error::Error>> {
+    pub async fn delete_devnet(&self, namespace: &str) -> Result<(), DevNetError> {
+        match self.check_any_devnet_assets_exist(&namespace).await? {
+            true => {
+                let mut errors = vec![];
         let pods: Vec<String> = StacksDevnetPod::iter().map(|p| p.to_string()).collect();
         for pod in pods {
-            let _ = self.delete_resource::<Pod>(namespace, &pod).await;
+                    if let Err(e) = self.delete_resource::<Pod>(namespace, &pod).await {
+                        errors.push(e);
+                    }
         }
 
         let configmaps: Vec<String> = StacksDevnetConfigmap::iter()
             .map(|c| c.to_string())
             .collect();
         for configmap in configmaps {
-            let _ = self
+                    if let Err(e) = self
                 .delete_resource::<ConfigMap>(namespace, &configmap)
-                .await;
+                        .await
+                    {
+                        errors.push(e);
+                    }
         }
 
-        let services: Vec<String> = StacksDevnetService::iter().map(|s| s.to_string()).collect();
+                let services: Vec<String> =
+                    StacksDevnetService::iter().map(|s| s.to_string()).collect();
         for service in services {
-            let _ = self.delete_resource::<Service>(namespace, &service).await;
+                    if let Err(e) = self.delete_resource::<Service>(namespace, &service).await {
+                        errors.push(e);
+                    }
         }
 
         let pvcs: Vec<String> = StacksDevnetPvc::iter().map(|s| s.to_string()).collect();
         for pvc in pvcs {
-            let _ = self
+                    if let Err(e) = self
                 .delete_resource::<PersistentVolumeClaim>(namespace, &pvc)
-                .await;
+                        .await
+                    {
+                        errors.push(e);
         }
+                }
+                if errors.is_empty() {
         Ok(())
+                } else if errors.len() == 1 {
+                    match errors.get(0) {
+                        Some(e) => Err(e.clone()),
+                        None => unreachable!(),
+                    }
+                } else {
+                    let mut msg = format!("multipple errors occurred while deleting devnet: ");
+                    for e in errors {
+                        msg = format!("{} \n- {}", msg, e.message);
+                    }
+                    Err(DevNetError {
+                        message: msg,
+                        code: 500,
+                    })
+                }
+            }
+            false => {
+                let msg = format!(
+                    "cannot delete devnet because assets do not exist NAMESPACE: {}",
+                    &namespace
+                );
+                self.ctx.try_log(|logger| slog::warn!(logger, "{}", msg));
+                return Err(DevNetError {
+                    message: msg.into(),
+                    code: 409,
+                });
+            }
+        }
     }
 
     pub async fn check_namespace_exists(&self, namespace_str: &str) -> Result<bool, DevNetError> {
