@@ -136,6 +136,7 @@ impl StacksDevnetApiK8sManager {
         let user_config = config.user_config;
         let namespace = &user_config.namespace;
 
+        let context = format!("NAMESPACE: {}", &namespace);
         let namespace_exists = self.check_namespace_exists(&namespace).await?;
         if !namespace_exists {
             if cfg!(debug_assertions) {
@@ -156,8 +157,8 @@ impl StacksDevnetApiK8sManager {
         let any_assets_exist = self.check_any_devnet_assets_exist(&namespace).await?;
         if any_assets_exist {
             let msg = format!(
-                "cannot create devnet because assets already exist for namespace {}",
-                namespace
+                "cannot create devnet because assets already exist {}",
+                context
             );
             self.ctx.try_log(|logger| slog::warn!(logger, "{}", msg));
             return Err(DevNetError {
@@ -215,6 +216,13 @@ impl StacksDevnetApiK8sManager {
     }
 
     pub async fn check_namespace_exists(&self, namespace_str: &str) -> Result<bool, DevNetError> {
+        self.ctx.try_log(|logger| {
+            slog::warn!(
+                logger,
+                "checking if namespace NAMESPACE: {}",
+                &namespace_str
+            )
+        });
         let namespace_api: Api<Namespace> = kube::Api::all(self.client.to_owned());
         match namespace_api.get(namespace_str).await {
             Ok(_) => Ok(true),
@@ -252,6 +260,13 @@ impl StacksDevnetApiK8sManager {
         &self,
         namespace: &str,
     ) -> Result<bool, DevNetError> {
+        self.ctx.try_log(|logger| {
+            slog::warn!(
+                logger,
+                "checking if any devnet assets exist for devnet NAMESPACE: {}",
+                &namespace
+            )
+        });
         for pod in StacksDevnetPod::iter() {
             if self
                 .check_resource_exists::<Pod>(namespace, &pod.to_string())
@@ -297,6 +312,7 @@ impl StacksDevnetApiK8sManager {
         pod: StacksDevnetPod,
     ) -> Result<PodStatusResponse, DevNetError> {
         let context = format!("NAMESPACE: {}, POD: {}", namespace, pod);
+
         self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
             slog::info!(logger, "getting pod status {}", context)
         });
