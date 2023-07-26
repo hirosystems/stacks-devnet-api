@@ -131,22 +131,42 @@ pub async fn handle_try_proxy_service(
     subroute: &str,
     network: &str,
     request: Request<Body>,
+    k8s_manager: StacksDevnetApiK8sManager,
     ctx: &Context,
 ) -> Result<Response<Body>, Infallible> {
-    let service = get_service_from_path_part(subroute);
-    return match service {
-        Some(service) => {
-            let base_url = get_service_url(&network, service.clone());
-            let port = get_user_facing_port(service).unwrap();
-            let forward_url = format!("{}:{}", base_url, port);
-            let proxy_request = mutate_request_for_proxy(request, &forward_url, &remaining_path);
-            proxy(proxy_request, &ctx).await
-        }
-        None => Ok(Response::builder()
-            .status(StatusCode::BAD_REQUEST)
-            .body(Body::try_from("invalid request path").unwrap())
+    match k8s_manager.check_all_devnet_assets_exist(&network).await {
+        Ok(exists) => match exists {
+            true => {
+                let service = get_service_from_path_part(subroute);
+                match service {
+                    Some(service) => {
+                        let base_url = get_service_url(&network, service.clone());
+                        let port = get_user_facing_port(service).unwrap();
+                        let forward_url = format!("{}:{}", base_url, port);
+                        let proxy_request =
+                            mutate_request_for_proxy(request, &forward_url, &remaining_path);
+                        proxy(proxy_request, &ctx).await
+                    }
+                    None => Ok(Response::builder()
+                        .status(StatusCode::BAD_REQUEST)
+                        .body(Body::try_from("invalid request path").unwrap())
+                        .unwrap()),
+                }
+            }
+            false => {
+                let msg = format!("not all devnet assets exist NAMESPACE: {}", &network);
+                ctx.try_log(|logger: &hiro_system_kit::Logger| slog::info!(logger, "{}", msg));
+                Ok(Response::builder()
+                    .status(404)
+                    .body(Body::try_from(msg).unwrap())
+                    .unwrap())
+            }
+        },
+        Err(e) => Ok(Response::builder()
+            .status(StatusCode::from_u16(e.code).unwrap())
+            .body(Body::try_from(e.message).unwrap())
             .unwrap()),
-    };
+    }
 }
 
 pub fn mutate_request_for_proxy(

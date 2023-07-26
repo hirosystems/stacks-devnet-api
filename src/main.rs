@@ -129,8 +129,15 @@ async fn handle_request(
                 .unwrap());
         } else {
             let remaining_path = path_parts.remainder.unwrap_or(String::new());
-            return handle_try_proxy_service(&remaining_path, &subroute, &network, request, &ctx)
-                .await;
+            return handle_try_proxy_service(
+                &remaining_path,
+                &subroute,
+                &network,
+                request,
+                k8s_manager,
+                &ctx,
+            )
+            .await;
         }
     }
 
