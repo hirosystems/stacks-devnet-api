@@ -430,28 +430,13 @@ impl StacksDevnetApiK8sManager {
                 None => Ok(PodStatusResponse::default()),
             },
             Err(e) => {
-                let result = match e {
-                    kube::Error::Api(api_error) => {
-                        let code = api_error.code;
-                        if code == 404 {
-                            Ok(PodStatusResponse {
-                                status: Some("Not found".into()),
-                                ..Default::default()
-                            })
-                        } else {
-                            Err((api_error.message, code))
-                        }
-                    }
-                    e => Err((e.to_string(), 500)),
+                let (msg, code) = match e {
+                    kube::Error::Api(api_error) => (api_error.message, api_error.code),
+                    e => (e.to_string(), 500),
                 };
-                match result {
-                    Ok(r) => Ok(r),
-                    Err((msg, code)) => {
-                        let msg = format!("failed to get pod status {}, ERROR: {}", context, msg);
-                        self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
-                        Err(DevNetError { message: msg, code })
-                    }
-                }
+                let msg = format!("failed to get pod status {}, ERROR: {}", context, msg);
+                self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                Err(DevNetError { message: msg, code })
             }
         }
     }
