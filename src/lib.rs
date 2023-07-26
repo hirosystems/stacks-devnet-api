@@ -526,36 +526,32 @@ impl StacksDevnetApiK8sManager {
         self.ctx
             .try_log(|logger| slog::info!(logger, "fetching {}", resource_details));
 
-        match resource_api.get(&name).await {
-            Ok(r) => {
-                self.ctx.try_log(|logger| {
-                    slog::info!(logger, "successfully fetched {}", resource_details)
-                });
-                Ok(Some(r))
-            }
-            Err(e) => {
-                let e = match e {
-                    kube::Error::Api(api_error) => {
-                        let code = api_error.code;
-                        if code == 404 {
-                            None
-                        } else {
-                            Some((api_error.message, api_error.code))
-                        }
-                    }
-                    e => Some((e.to_string(), 500)),
-                };
-                match e {
-                    None => Ok(None),
-                    Some((msg, code)) => {
-                        let msg = format!("failed to fetch {}, ERROR: {}", resource_details, msg);
-                        self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
-                        Err(DevNetError {
-                            message: msg,
-                            code: code,
-                        })
-                    }
+        match resource_api.get_opt(&name).await {
+            Ok(r) => match r {
+                Some(r) => {
+                    self.ctx.try_log(|logger| {
+                        slog::info!(logger, "successfully fetched {}", resource_details)
+                    });
+                    Ok(Some(r))
                 }
+                None => {
+                    self.ctx.try_log(|logger| {
+                        slog::info!(logger, "resource not found {}", resource_details)
+                    });
+                    Ok(None)
+                }
+            },
+            Err(e) => {
+                let (msg, code) = match e {
+                    kube::Error::Api(api_error) => (api_error.message, api_error.code),
+                    e => (e.to_string(), 500),
+                };
+                let msg = format!("failed to fetch {}, ERROR: {}", resource_details, msg);
+                self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                Err(DevNetError {
+                    message: msg,
+                    code: code,
+                })
             }
         }
     }
