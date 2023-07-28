@@ -31,6 +31,7 @@ clarity-repl = "1.6.4"
 clarinet-files = "1.0.0"
 chainhook-types = "1.0.1"
 clarinet-deployments = "1.0.1"
+toml = "0.5.9"
 
 [dev-dependencies]
 tower-test = "0.4.0"

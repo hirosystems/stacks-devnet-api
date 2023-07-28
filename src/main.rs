@@ -14,7 +14,7 @@ use std::{convert::Infallible, net::SocketAddr};
 #[tokio::main]
 async fn main() {
     const HOST: &str = "0.0.0.0";
-    const PORT: &str = "8478";
+    const PORT: &str = "8477";
     let endpoint: String = HOST.to_owned() + ":" + PORT;
     let addr: SocketAddr = endpoint.parse().expect("Could not parse ip:port.");
 
@@ -64,11 +64,10 @@ async fn handle_request(
         )
     });
 
-    let responder = Responder {
-        headers: request.headers().clone(),
-        ..Default::default()
-    };
-
+    let responder = Responder::new("./Config.toml", request.headers().clone()).unwrap();
+    if method == &Method::OPTIONS {
+        return responder.ok();
+    }
     if path == "/api/v1/networks" {
         return match method {
             &Method::POST => handle_new_devnet(request, k8s_manager, responder, ctx).await,
