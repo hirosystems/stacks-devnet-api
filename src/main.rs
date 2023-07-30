@@ -64,7 +64,12 @@ async fn handle_request(
         )
     });
 
-    let responder = Responder::new("./Config.toml", request.headers().clone()).unwrap();
+    let config_path = if cfg!(debug_assertions) {
+        "./Config.toml"
+    } else {
+        "/etc/config/Config.toml"
+    };
+    let responder = Responder::new(config_path, request.headers().clone()).unwrap();
     if method == &Method::OPTIONS {
         return responder.ok();
     }
