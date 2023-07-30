@@ -2,7 +2,7 @@ use hiro_system_kit::slog;
 use hyper::server::conn::AddrStream;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, Server};
-use stacks_devnet_api::responder::Responder;
+use stacks_devnet_api::responder::{Responder, ResponderConfig};
 use stacks_devnet_api::routes::{
     get_standardized_path_parts, handle_delete_devnet, handle_get_devnet, handle_new_devnet,
     handle_try_proxy_service, API_PATH,
@@ -25,14 +25,27 @@ async fn main() {
         tracer: false,
     };
     let k8s_manager = StacksDevnetApiK8sManager::default(&ctx).await;
+    let config_path = if cfg!(debug_assertions) {
+        "./Config.toml"
+    } else {
+        "/etc/config/Config.toml"
+    };
+    let config = ResponderConfig::from_path(config_path);
 
     let make_svc = make_service_fn(|conn: &AddrStream| {
         let k8s_manager = k8s_manager.clone();
         let ctx = ctx.clone();
         let remote_addr = conn.remote_addr().ip();
+        let config = config.clone();
         async move {
             Ok::<_, Infallible>(service_fn(move |req| {
-                handle_request(remote_addr, req, k8s_manager.clone(), ctx.clone())
+                handle_request(
+                    remote_addr,
+                    req,
+                    k8s_manager.clone(),
+                    config.clone(),
+                    ctx.clone(),
+                )
             }))
         }
     });
@@ -50,6 +63,7 @@ async fn handle_request(
     _client_ip: IpAddr,
     request: Request<Body>,
     k8s_manager: StacksDevnetApiK8sManager,
+    config: ResponderConfig,
     ctx: Context,
 ) -> Result<Response<Body>, Infallible> {
     let uri = request.uri();
@@ -64,12 +78,7 @@ async fn handle_request(
         )
     });
 
-    let config_path = if cfg!(debug_assertions) {
-        "./Config.toml"
-    } else {
-        "/etc/config/Config.toml"
-    };
-    let responder = Responder::new(config_path, request.headers().clone()).unwrap();
+    let responder = Responder::new(config, request.headers().clone()).unwrap();
     if method == &Method::OPTIONS {
         return responder.ok();
     }
@@ -206,9 +215,15 @@ mod tests {
         for path in invalid_paths {
             let request_builder = Request::builder().uri(path).method("GET");
             let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
-            let mut response = handle_request(client_ip, request, k8s_manager.clone(), ctx.clone())
-                .await
-                .unwrap();
+            let mut response = handle_request(
+                client_ip,
+                request,
+                k8s_manager.clone(),
+                ResponderConfig::default(),
+                ctx.clone(),
+            )
+            .await
+            .unwrap();
             assert_eq!(response.status(), StatusCode::BAD_REQUEST);
             let body = response.body_mut();
             let bytes = body::to_bytes(body).await.unwrap().to_vec();
@@ -236,9 +251,15 @@ mod tests {
 
         let request_builder = Request::builder().uri(path).method("GET");
         let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
-        let mut response = handle_request(client_ip, request, k8s_manager.clone(), ctx)
-            .await
-            .unwrap();
+        let mut response = handle_request(
+            client_ip,
+            request,
+            k8s_manager.clone(),
+            ResponderConfig::default(),
+            ctx,
+        )
+        .await
+        .unwrap();
         assert_eq!(response.status(), StatusCode::NOT_FOUND);
         let body = response.body_mut();
         let bytes = body::to_bytes(body).await.unwrap().to_vec();
@@ -265,9 +286,15 @@ mod tests {
 
         let request_builder = Request::builder().uri(path).method("GET");
         let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
-        let mut response = handle_request(client_ip, request, k8s_manager.clone(), ctx)
-            .await
-            .unwrap();
+        let mut response = handle_request(
+            client_ip,
+            request,
+            k8s_manager.clone(),
+            ResponderConfig::default(),
+            ctx,
+        )
+        .await
+        .unwrap();
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
         let body = response.body_mut();
         let bytes = body::to_bytes(body).await.unwrap().to_vec();
@@ -296,9 +323,15 @@ mod tests {
         for method in methods {
             let request_builder = Request::builder().uri(path).method(method);
             let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
-            let mut response = handle_request(client_ip, request, k8s_manager.clone(), ctx.clone())
-                .await
-                .unwrap();
+            let mut response = handle_request(
+                client_ip,
+                request,
+                k8s_manager.clone(),
+                ResponderConfig::default(),
+                ctx.clone(),
+            )
+            .await
+            .unwrap();
             assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
             let body = response.body_mut();
             let bytes = body::to_bytes(body).await.unwrap().to_vec();
@@ -325,9 +358,15 @@ mod tests {
 
         let request_builder = Request::builder().uri(path).method("POST");
         let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
-        let mut response = handle_request(client_ip, request, k8s_manager.clone(), ctx)
-            .await
-            .unwrap();
+        let mut response = handle_request(
+            client_ip,
+            request,
+            k8s_manager.clone(),
+            ResponderConfig::default(),
+            ctx,
+        )
+        .await
+        .unwrap();
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
         let body = response.body_mut();
         let bytes = body::to_bytes(body).await.unwrap().to_vec();

@@ -13,39 +13,45 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Default)]
 pub struct Responder {
-    pub allowed_origins: Vec<String>,
+    allowed_origins: Vec<String>,
     allowed_methods: Vec<String>,
-    pub headers: HeaderMap<HeaderValue>,
+    headers: HeaderMap<HeaderValue>,
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct StacksDevnetStartupConfig {
+#[derive(Serialize, Deserialize, Clone, Default)]
+pub struct ResponderConfig {
     allowed_origins: Option<Vec<String>>,
     allowed_methods: Option<Vec<String>>,
 }
 
-impl Responder {
-    pub fn new(
-        config_location: &str,
-        headers: HeaderMap<HeaderValue>,
-    ) -> Result<Responder, String> {
-        let file = File::open(config_location)
-            .map_err(|e| format!("unable to read file {}\n{:?}", config_location, e))?;
+impl ResponderConfig {
+    pub fn from_path(config_path: &str) -> ResponderConfig {
+        let file = File::open(config_path)
+            .unwrap_or_else(|e| panic!("unable to read file {}\n{:?}", config_path, e));
         let mut file_reader = BufReader::new(file);
         let mut file_buffer = vec![];
         file_reader
             .read_to_end(&mut file_buffer)
-            .map_err(|e| format!("unable to read file {}\n{:?}", config_location, e))?;
+            .unwrap_or_else(|e| panic!("unable to read file {}\n{:?}", config_path, e));
 
-        let config_file: StacksDevnetStartupConfig = match toml::from_slice(&file_buffer) {
+        let config_file: ResponderConfig = match toml::from_slice(&file_buffer) {
             Ok(s) => s,
             Err(e) => {
-                return Err(format!("Config file malformatted {}", e.to_string()));
+                panic!("Config file malformatted {}", e.to_string());
             }
         };
+        config_file
+    }
+}
+
+impl Responder {
+    pub fn new(
+        config: ResponderConfig,
+        headers: HeaderMap<HeaderValue>,
+    ) -> Result<Responder, String> {
         Ok(Responder {
-            allowed_origins: config_file.allowed_origins.unwrap_or_default(),
-            allowed_methods: config_file.allowed_methods.unwrap_or_default(),
+            allowed_origins: config.allowed_origins.unwrap_or_default(),
+            allowed_methods: config.allowed_methods.unwrap_or_default(),
             headers,
         })
     }
