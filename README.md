@@ -17,10 +17,15 @@ brew install kind
 
 You should now be ready to deploy this service to your local Kubernetes cluster!
 
+## Configuration
+The `Config.toml` at the root directory of the project can be used to control some settings. This same file can be used to update both the stable and development build. The following settings are supported:
+ - `allowed_origins` - this setting is an array of strings and is used to set what origins are allowed in cross-origin requests. For example, `allowed_origins = ["*"]` allows any origins to make requests to this service, while `allowed_origins = ["localhost:3002", "dev.platform.so"]` will only allow requests from the two specified hosts.
+ - `allowed_methods` - this setting is an array of strings that sets what HTTP methods can be made to this server.
+
 ## Deploying the Stable Version
-In your terminal, rum 
+In your terminal, run
 ```
-kubectl --context kind-kind apply -f ./templates/stacks-devnet-api.template.yaml
+./scripts/deploy-api.sh
 ```
 to install the [latest version of this service](https://quay.io/repository/hirosystems/stacks-devnet-api?tab=history) that has been deployed to docker (or, to quay for now). This service should now be fully running on your Kubernetes cluster. See the [usage](#usage) sections for steps on how to use the service.
 
@@ -52,14 +57,9 @@ spec:
 +    imagePullPolicy: Never
 ```
 
-If a version of this tool has already been deployed to your local cluster, you'll need to delete the existing pod. You'll need to do this every time you redeploy the service:
-```
-kubectl --context kind-kind delete pod stacks-devnet-api --namespace devnet
-```
-
 Finally, run 
 ```
-kubectl --context kind-kind apply -f ./templates/stacks-devnet-api.template.yaml
+./scripts/redeploy-api.sh
 ```
 to deploy to your local cluster.
 
