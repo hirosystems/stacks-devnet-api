@@ -66,9 +66,10 @@ to deploy to your local cluster.
 ## Usage
 
 When the service has been deployed to your Kubernetes cluster, it should be reachable at `localhost:8477`. The following routes are currently exposed:
- - `POST localhost:8477/api/v1/networks` - Creates a new devnet from the configuration provided in request body. See [this example](./examples/new-network.example.json) object for the required parameters. **Note: If the namespace for this devnet has not already been created for the cluster, this will fail, unless running a development build (via `cargo run`). A production build expects the namespace to already exist (because the platform should have already created the namespace before creating a devnet). This devnet service should not have permissions to create a namespace. To manually create a namespace, run `kubectl create namespace <namespace>`**
- - `DELETE localhost:8477/api/v1/network/<network-id>` - Deletes all k8s assets deployed under the given namespace.
- - `GET localhost:8477/api/v1/network/<network-id>` - Gets the pod and chaintip status for the specified devnet. For example:
+ - `POST localhost:8477/api/v1/networks` - Creates a new devnet from the configuration provided in request body. See [this example](./examples/new-network.example.json) object for the required parameters If any devnet assets exist when this method is used, no devnet assets will be created, and a 409 error will be returned. **Note: If the namespace for this devnet has not already been created for the cluster, this will fail, unless running a development build (via `cargo run`). A production build expects the namespace to already exist (because the platform should have already created the namespace before creating a devnet). This devnet service should not have permissions to create a namespace. To manually create a namespace, run `kubectl create namespace <namespace>`**
+ - `DELETE localhost:8477/api/v1/network/<network-id>` - Deletes all k8s assets deployed under the given namespace. If no devnet assets exist for the given namespace, a 404 error will be returned.
+ - `HEAD localhost:8477/api/v1/network/<network-id>` - Checks if any devnet assets exist for the given namespace. If any assets exist, this route responds with 200; if no devnet assets exist, this route responds with 404.
+ - `GET localhost:8477/api/v1/network/<network-id>` - Gets the pod and chaintip status for the specified devnet. If not all devnet assets exist for the given namespace, a 404 error will be returned. For example:
 ```JSON
 {
     "bitcoind_node_status": "Running",
@@ -81,9 +82,9 @@ When the service has been deployed to your Kubernetes cluster, it should be reac
     "bitcoin_chain_tip": 116
 }
 ```
- - `GET/POST localhost:8477/api/v1/network/<network-id>/stacks-node/*` - Forwards `*` to the underlying stacks node pod of the devnet.
- - `GET/POST localhost:8477/api/v1/network/<network-id>/bitcoin-node/*` - Forwards `*` to the underlying bitcoin node pod of the devnet.
-- `GET/POST localhost:8477/api/v1/network/<network-id>/stacks-api/*` - Forwards `*` to the underlying stacks api pod of the devnet.
+ - `GET/POST localhost:8477/api/v1/network/<network-id>/stacks-node/*` - Forwards `*` to the underlying stacks node pod of the devnet. If not all devnet assets exist for the given namespace, a 404 error will be returned.
+ - `GET/POST localhost:8477/api/v1/network/<network-id>/bitcoin-node/*` - Forwards `*` to the underlying bitcoin node pod of the devnet. If not all devnet assets exist for the given namespace, a 404 error will be returned.
+- `GET/POST localhost:8477/api/v1/network/<network-id>/stacks-api/*` - Forwards `*` to the underlying stacks api pod of the devnet. If not all devnet assets exist for the given namespace, a 404 error will be returned.
 
 ## Bugs and feature requests
 
