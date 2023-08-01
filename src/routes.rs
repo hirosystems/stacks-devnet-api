@@ -5,81 +5,62 @@ use std::{convert::Infallible, str::FromStr};
 use crate::{
     config::StacksDevnetConfig,
     resources::service::{get_service_from_path_part, get_service_url, get_user_facing_port},
+    responder::Responder,
     Context, StacksDevnetApiK8sManager,
 };
 
 pub async fn handle_new_devnet(
     request: Request<Body>,
     k8s_manager: StacksDevnetApiK8sManager,
+    responder: Responder,
     ctx: Context,
 ) -> Result<Response<Body>, Infallible> {
     let body = hyper::body::to_bytes(request.into_body()).await;
     if body.is_err() {
         let msg = "failed to parse request body";
         ctx.try_log(|logger| slog::error!(logger, "{}", msg));
-        return Ok(Response::builder()
-            .status(StatusCode::INTERNAL_SERVER_ERROR)
-            .body(Body::try_from(msg).unwrap())
-            .unwrap());
+        return responder.err_internal(msg.into());
     }
     let body = body.unwrap();
     let config: Result<StacksDevnetConfig, _> = serde_json::from_slice(&body);
     match config {
         Ok(config) => match config.to_validated_config(ctx) {
             Ok(config) => match k8s_manager.deploy_devnet(config).await {
-                Ok(_) => Ok(Response::builder()
-                    .status(StatusCode::OK)
-                    .body(Body::empty())
-                    .unwrap()),
-                Err(e) => Ok(Response::builder()
-                    .status(StatusCode::from_u16(e.code).unwrap())
-                    .body(Body::try_from(e.message).unwrap())
-                    .unwrap()),
+                Ok(_) => responder.ok(),
+                Err(e) => responder.respond(e.code, e.message),
             },
-            Err(e) => Ok(Response::builder()
-                .status(StatusCode::from_u16(e.code).unwrap())
-                .body(Body::try_from(e.message).unwrap())
-                .unwrap()),
+            Err(e) => responder.respond(e.code, e.message),
         },
-        Err(e) => Ok(Response::builder()
-            .status(StatusCode::BAD_REQUEST)
-            .body(
-                Body::try_from(format!("invalid configuration to create network: {}", e)).unwrap(),
-            )
-            .unwrap()),
+        Err(e) => {
+            responder.err_bad_request(format!("invalid configuration to create network: {}", e))
+        }
     }
 }
 
 pub async fn handle_delete_devnet(
     k8s_manager: StacksDevnetApiK8sManager,
     network: &str,
+    responder: Responder,
 ) -> Result<Response<Body>, Infallible> {
     match k8s_manager.delete_devnet(network).await {
-        Ok(_) => Ok(Response::builder()
-            .status(StatusCode::OK)
-            .body(Body::empty())
-            .unwrap()),
-        Err(e) => Ok(Response::builder()
-            .status(e.code)
-            .body(
-                Body::try_from(format!(
-                    "error deleting network {}: {}",
-                    &network, e.message
-                ))
-                .unwrap(),
-            )
-            .unwrap()),
+        Ok(_) => responder.ok(),
+        Err(e) => {
+            let msg = format!("error deleting network {}: {}", &network, e.message);
+            responder.respond(e.code, msg)
+        }
     }
 }
 
 pub async fn handle_get_devnet(
     k8s_manager: StacksDevnetApiK8sManager,
     network: &str,
+    responder: Responder,
     ctx: Context,
 ) -> Result<Response<Body>, Infallible> {
     match k8s_manager.get_devnet_info(&network).await {
         Ok(devnet_info) => match serde_json::to_vec(&devnet_info) {
-            Ok(body) => Ok(Response::builder()
+            Ok(body) => Ok(responder
+                .response_builder()
                 .status(StatusCode::OK)
                 .header("Content-Type", "application/json")
                 .body(Body::from(body))
@@ -91,16 +72,10 @@ pub async fn handle_get_devnet(
                     e.to_string()
                 );
                 ctx.try_log(|logger: &hiro_system_kit::Logger| slog::error!(logger, "{}", msg));
-                Ok(Response::builder()
-                    .status(StatusCode::from_u16(500).unwrap())
-                    .body(Body::try_from(msg).unwrap())
-                    .unwrap())
+                responder.err_internal(msg)
             }
         },
-        Err(e) => Ok(Response::builder()
-            .status(StatusCode::from_u16(e.code).unwrap())
-            .body(Body::try_from(e.message).unwrap())
-            .unwrap()),
+        Err(e) => responder.respond(e.code, e.message),
     }
 }
 
@@ -132,6 +107,7 @@ pub async fn handle_try_proxy_service(
     network: &str,
     request: Request<Body>,
     k8s_manager: StacksDevnetApiK8sManager,
+    responder: Responder,
     ctx: &Context,
 ) -> Result<Response<Body>, Infallible> {
     match k8s_manager.check_all_devnet_assets_exist(&network).await {
@@ -145,27 +121,18 @@ pub async fn handle_try_proxy_service(
                         let forward_url = format!("{}:{}", base_url, port);
                         let proxy_request =
                             mutate_request_for_proxy(request, &forward_url, &remaining_path);
-                        proxy(proxy_request, &ctx).await
+                        proxy(proxy_request, responder, &ctx).await
                     }
-                    None => Ok(Response::builder()
-                        .status(StatusCode::BAD_REQUEST)
-                        .body(Body::try_from("invalid request path").unwrap())
-                        .unwrap()),
+                    None => responder.err_bad_request("invalid request path".into()),
                 }
             }
             false => {
                 let msg = format!("not all devnet assets exist NAMESPACE: {}", &network);
                 ctx.try_log(|logger: &hiro_system_kit::Logger| slog::info!(logger, "{}", msg));
-                Ok(Response::builder()
-                    .status(404)
-                    .body(Body::try_from(msg).unwrap())
-                    .unwrap())
+                responder.err_not_found(msg)
             }
         },
-        Err(e) => Ok(Response::builder()
-            .status(StatusCode::from_u16(e.code).unwrap())
-            .body(Body::try_from(e.message).unwrap())
-            .unwrap()),
+        Err(e) => responder.respond(e.code, e.message),
     }
 }
 
@@ -187,7 +154,11 @@ pub fn mutate_request_for_proxy(
     request
 }
 
-async fn proxy(request: Request<Body>, ctx: &Context) -> Result<Response<Body>, Infallible> {
+async fn proxy(
+    request: Request<Body>,
+    responder: Responder,
+    ctx: &Context,
+) -> Result<Response<Body>, Infallible> {
     let client = Client::new();
 
     ctx.try_log(|logger| slog::info!(logger, "forwarding request to {}", request.uri()));
@@ -196,10 +167,7 @@ async fn proxy(request: Request<Body>, ctx: &Context) -> Result<Response<Body>, 
         Err(e) => {
             let msg = format!("error proxying request: {}", e.to_string());
             ctx.try_log(|logger| slog::error!(logger, "{}", msg));
-            Ok(Response::builder()
-                .status(StatusCode::INTERNAL_SERVER_ERROR)
-                .body(Body::try_from(msg).unwrap())
-                .unwrap())
+            responder.err_internal(msg)
         }
     }
 }

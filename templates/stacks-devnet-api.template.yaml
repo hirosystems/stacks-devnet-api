@@ -58,6 +58,13 @@ spec:
     - containerPort: 8477
       name: api
       protocol: TCP
+    volumeMounts:
+    - name: config-volume
+      mountPath: /etc/config
+  volumes:
+    - name: config-volume
+      configMap:
+        name: stacks-devnet-api-conf
 
 ---
 apiVersion: v1

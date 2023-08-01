@@ -32,6 +32,7 @@ mod template_parser;
 use template_parser::get_yaml_from_resource;
 
 pub mod resources;
+pub mod responder;
 pub mod routes;
 use crate::resources::configmap::StacksDevnetConfigmap;
 use crate::resources::pod::StacksDevnetPod;
