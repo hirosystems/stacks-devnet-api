@@ -82,22 +82,14 @@ pub async fn handle_get_devnet(
 pub async fn handle_check_devnet(
     k8s_manager: StacksDevnetApiK8sManager,
     network: &str,
+    responder: Responder,
 ) -> Result<Response<Body>, Infallible> {
     match k8s_manager.check_any_devnet_assets_exist(&network).await {
         Ok(assets_exist) => match assets_exist {
-            true => Ok(Response::builder()
-                .status(StatusCode::OK)
-                .body(Body::empty())
-                .unwrap()),
-            false => Ok(Response::builder()
-                .status(StatusCode::from_u16(404).unwrap())
-                .body(Body::empty())
-                .unwrap()),
+            true => responder.ok(),
+            false => responder.err_not_found("not found".to_string()),
         },
-        Err(e) => Ok(Response::builder()
-            .status(StatusCode::from_u16(e.code).unwrap())
-            .body(Body::try_from(e.message).unwrap())
-            .unwrap()),
+        Err(e) => responder.respond(e.code, e.message),
     }
 }
 
