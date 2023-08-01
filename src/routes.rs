@@ -45,8 +45,8 @@ pub async fn handle_delete_devnet(
     match k8s_manager.delete_devnet(network).await {
         Ok(_) => responder.ok(),
         Err(e) => {
-            let msg = format!("error deleting network {}: {}", &network, e.to_string());
-            responder.err_internal(msg)
+            let msg = format!("error deleting network {}: {}", &network, e.message);
+            responder.respond(e.code, msg)
         }
     }
 }
@@ -79,25 +79,53 @@ pub async fn handle_get_devnet(
     }
 }
 
+pub async fn handle_check_devnet(
+    k8s_manager: StacksDevnetApiK8sManager,
+    network: &str,
+    responder: Responder,
+) -> Result<Response<Body>, Infallible> {
+    match k8s_manager.check_any_devnet_assets_exist(&network).await {
+        Ok(assets_exist) => match assets_exist {
+            true => responder.ok(),
+            false => responder.err_not_found("not found".to_string()),
+        },
+        Err(e) => responder.respond(e.code, e.message),
+    }
+}
+
 pub async fn handle_try_proxy_service(
     remaining_path: &str,
     subroute: &str,
     network: &str,
     request: Request<Body>,
+    k8s_manager: StacksDevnetApiK8sManager,
     responder: Responder,
     ctx: &Context,
 ) -> Result<Response<Body>, Infallible> {
-    let service = get_service_from_path_part(subroute);
-    return match service {
-        Some(service) => {
-            let base_url = get_service_url(&network, service.clone());
-            let port = get_user_facing_port(service).unwrap();
-            let forward_url = format!("{}:{}", base_url, port);
-            let proxy_request = mutate_request_for_proxy(request, &forward_url, &remaining_path);
-            proxy(proxy_request, responder, &ctx).await
-        }
-        None => responder.err_bad_request("invalid request path".into()),
-    };
+    match k8s_manager.check_all_devnet_assets_exist(&network).await {
+        Ok(exists) => match exists {
+            true => {
+                let service = get_service_from_path_part(subroute);
+                match service {
+                    Some(service) => {
+                        let base_url = get_service_url(&network, service.clone());
+                        let port = get_user_facing_port(service).unwrap();
+                        let forward_url = format!("{}:{}", base_url, port);
+                        let proxy_request =
+                            mutate_request_for_proxy(request, &forward_url, &remaining_path);
+                        proxy(proxy_request, responder, &ctx).await
+                    }
+                    None => responder.err_bad_request("invalid request path".into()),
+                }
+            }
+            false => {
+                let msg = format!("not all devnet assets exist NAMESPACE: {}", &network);
+                ctx.try_log(|logger: &hiro_system_kit::Logger| slog::info!(logger, "{}", msg));
+                responder.err_not_found(msg)
+            }
+        },
+        Err(e) => responder.respond(e.code, e.message),
+    }
 }
 
 pub fn mutate_request_for_proxy(

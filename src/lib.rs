@@ -38,6 +38,7 @@ use crate::resources::configmap::StacksDevnetConfigmap;
 use crate::resources::pod::StacksDevnetPod;
 use crate::resources::service::{get_service_url, StacksDevnetService};
 
+#[derive(Clone)]
 pub struct DevNetError {
     pub message: String,
     pub code: u16,
@@ -83,7 +84,12 @@ pub struct StacksDevnetInfoResponse {
     bitcoin_chain_tip: u64,
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Default)]
+struct PodStatusResponse {
+    status: Option<String>,
+    start_time: Option<String>,
+}
+#[derive(Serialize, Deserialize, Debug, Default)]
 struct StacksV2InfoResponse {
     burn_block_height: u64,
     stacks_tip_height: u64,
@@ -132,7 +138,8 @@ impl StacksDevnetApiK8sManager {
         let user_config = config.user_config;
         let namespace = &user_config.namespace;
 
-        let namespace_exists = &self.check_namespace_exists(&namespace).await?;
+        let context = format!("NAMESPACE: {}", &namespace);
+        let namespace_exists = self.check_namespace_exists(&namespace).await?;
         if !namespace_exists {
             if cfg!(debug_assertions) {
                 self.deploy_namespace(&namespace).await?;
@@ -148,6 +155,19 @@ impl StacksDevnetApiK8sManager {
                 });
             }
         }
+
+        let any_assets_exist = self.check_any_devnet_assets_exist(&namespace).await?;
+        if any_assets_exist {
+            let msg = format!(
+                "cannot create devnet because assets already exist {}",
+                context
+            );
+            self.ctx.try_log(|logger| slog::warn!(logger, "{}", msg));
+            return Err(DevNetError {
+                message: msg.into(),
+                code: 409,
+            });
+        };
 
         self.deploy_bitcoin_node_pod(
             &user_config,
@@ -168,36 +188,86 @@ impl StacksDevnetApiK8sManager {
         Ok(())
     }
 
-    pub async fn delete_devnet(&self, namespace: &str) -> Result<(), Box<dyn std::error::Error>> {
-        let pods: Vec<String> = StacksDevnetPod::iter().map(|p| p.to_string()).collect();
-        for pod in pods {
-            let _ = self.delete_resource::<Pod>(namespace, &pod).await;
-        }
+    pub async fn delete_devnet(&self, namespace: &str) -> Result<(), DevNetError> {
+        match self.check_any_devnet_assets_exist(&namespace).await? {
+            true => {
+                let mut errors = vec![];
+                let pods: Vec<String> = StacksDevnetPod::iter().map(|p| p.to_string()).collect();
+                for pod in pods {
+                    if let Err(e) = self.delete_resource::<Pod>(namespace, &pod).await {
+                        errors.push(e);
+                    }
+                }
 
-        let configmaps: Vec<String> = StacksDevnetConfigmap::iter()
-            .map(|c| c.to_string())
-            .collect();
-        for configmap in configmaps {
-            let _ = self
-                .delete_resource::<ConfigMap>(namespace, &configmap)
-                .await;
-        }
+                let configmaps: Vec<String> = StacksDevnetConfigmap::iter()
+                    .map(|c| c.to_string())
+                    .collect();
+                for configmap in configmaps {
+                    if let Err(e) = self
+                        .delete_resource::<ConfigMap>(namespace, &configmap)
+                        .await
+                    {
+                        errors.push(e);
+                    }
+                }
 
-        let services: Vec<String> = StacksDevnetService::iter().map(|s| s.to_string()).collect();
-        for service in services {
-            let _ = self.delete_resource::<Service>(namespace, &service).await;
-        }
+                let services: Vec<String> =
+                    StacksDevnetService::iter().map(|s| s.to_string()).collect();
+                for service in services {
+                    if let Err(e) = self.delete_resource::<Service>(namespace, &service).await {
+                        errors.push(e);
+                    }
+                }
 
-        let pvcs: Vec<String> = StacksDevnetPvc::iter().map(|s| s.to_string()).collect();
-        for pvc in pvcs {
-            let _ = self
-                .delete_resource::<PersistentVolumeClaim>(namespace, &pvc)
-                .await;
+                let pvcs: Vec<String> = StacksDevnetPvc::iter().map(|s| s.to_string()).collect();
+                for pvc in pvcs {
+                    if let Err(e) = self
+                        .delete_resource::<PersistentVolumeClaim>(namespace, &pvc)
+                        .await
+                    {
+                        errors.push(e);
+                    }
+                }
+                if errors.is_empty() {
+                    Ok(())
+                } else if errors.len() == 1 {
+                    match errors.get(0) {
+                        Some(e) => Err(e.clone()),
+                        None => unreachable!(),
+                    }
+                } else {
+                    let mut msg = format!("multipple errors occurred while deleting devnet: ");
+                    for e in errors {
+                        msg = format!("{} \n- {}", msg, e.message);
+                    }
+                    Err(DevNetError {
+                        message: msg,
+                        code: 500,
+                    })
+                }
+            }
+            false => {
+                let msg = format!(
+                    "cannot delete devnet because assets do not exist NAMESPACE: {}",
+                    &namespace
+                );
+                self.ctx.try_log(|logger| slog::warn!(logger, "{}", msg));
+                return Err(DevNetError {
+                    message: msg.into(),
+                    code: 409,
+                });
+            }
         }
-        Ok(())
     }
 
     pub async fn check_namespace_exists(&self, namespace_str: &str) -> Result<bool, DevNetError> {
+        self.ctx.try_log(|logger| {
+            slog::warn!(
+                logger,
+                "checking if namespace NAMESPACE: {}",
+                &namespace_str
+            )
+        });
         let namespace_api: Api<Namespace> = kube::Api::all(self.client.to_owned());
         match namespace_api.get(namespace_str).await {
             Ok(_) => Ok(true),
@@ -231,12 +301,113 @@ impl StacksDevnetApiK8sManager {
         }
     }
 
+    pub async fn check_any_devnet_assets_exist(
+        &self,
+        namespace: &str,
+    ) -> Result<bool, DevNetError> {
+        self.ctx.try_log(|logger| {
+            slog::warn!(
+                logger,
+                "checking if any devnet assets exist for devnet NAMESPACE: {}",
+                &namespace
+            )
+        });
+        for pod in StacksDevnetPod::iter() {
+            if self
+                .check_resource_exists::<Pod>(namespace, &pod.to_string())
+                .await?
+            {
+                return Ok(true);
+            }
+        }
+
+        for configmap in StacksDevnetConfigmap::iter() {
+            if self
+                .check_resource_exists::<ConfigMap>(namespace, &configmap.to_string())
+                .await?
+            {
+                return Ok(true);
+            }
+        }
+
+        for service in StacksDevnetService::iter() {
+            if self
+                .check_resource_exists::<Service>(namespace, &service.to_string())
+                .await?
+            {
+                return Ok(true);
+            }
+        }
+
+        for pvc in StacksDevnetPvc::iter() {
+            if self
+                .check_resource_exists::<PersistentVolumeClaim>(namespace, &pvc.to_string())
+                .await?
+            {
+                return Ok(true);
+            }
+        }
+
+        Ok(false)
+    }
+
+    pub async fn check_all_devnet_assets_exist(
+        &self,
+        namespace: &str,
+    ) -> Result<bool, DevNetError> {
+        self.ctx.try_log(|logger| {
+            slog::warn!(
+                logger,
+                "checking if all devnet assets exist for devnet NAMESPACE: {}",
+                &namespace
+            )
+        });
+        for pod in StacksDevnetPod::iter() {
+            if !self
+                .check_resource_exists::<Pod>(namespace, &pod.to_string())
+                .await?
+            {
+                return Ok(false);
+            }
+        }
+
+        for configmap in StacksDevnetConfigmap::iter() {
+            if !self
+                .check_resource_exists::<ConfigMap>(namespace, &configmap.to_string())
+                .await?
+            {
+                return Ok(false);
+            }
+        }
+
+        for service in StacksDevnetService::iter() {
+            if !self
+                .check_resource_exists::<Service>(namespace, &service.to_string())
+                .await?
+            {
+                return Ok(false);
+            }
+        }
+
+        for pvc in StacksDevnetPvc::iter() {
+            if !self
+                .check_resource_exists::<PersistentVolumeClaim>(namespace, &pvc.to_string())
+                .await?
+            {
+                return Ok(false);
+            }
+        }
+
+        Ok(true)
+    }
+
     async fn get_pod_status_info(
         &self,
         namespace: &str,
         pod: StacksDevnetPod,
-    ) -> Result<(Option<String>, Option<String>), DevNetError> {
+    ) -> Result<PodStatusResponse, DevNetError> {
         let context = format!("NAMESPACE: {}, POD: {}", namespace, pod);
+
         self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
             slog::info!(logger, "getting pod status {}", context)
         });
@@ -252,21 +423,21 @@ impl StacksDevnetApiK8sManager {
                         Some(st) => Some(st.0.to_string()),
                         None => None,
                     };
-                    Ok((status.phase, start_time))
+                    Ok(PodStatusResponse {
+                        status: status.phase,
+                        start_time,
+                    })
                 }
-                None => Ok((None, None)),
+                None => Ok(PodStatusResponse::default()),
             },
             Err(e) => {
-                let e = match e {
+                let (msg, code) = match e {
                     kube::Error::Api(api_error) => (api_error.message, api_error.code),
                     e => (e.to_string(), 500),
                 };
-                let msg = format!("failed to get pod status {}, ERROR: {}", context, e.0);
+                let msg = format!("failed to get pod status {}, ERROR: {}", context, msg);
                 self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
-                Err(DevNetError {
-                    message: msg,
-                    code: e.1,
-                })
+                Err(DevNetError { message: msg, code })
             }
         }
     }
@@ -335,11 +506,8 @@ impl StacksDevnetApiK8sManager {
                         context,
                         e.to_string()
                     );
-                    self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
-                    Err(DevNetError {
-                        message: msg,
-                        code: 500,
-                    })
+                    self.ctx.try_log(|logger| slog::warn!(logger, "{}", msg));
+                    Ok(StacksV2InfoResponse::default())
                 }
             },
             Err(e) => {
@@ -357,33 +525,57 @@ impl StacksDevnetApiK8sManager {
         &self,
         namespace: &str,
     ) -> Result<StacksDevnetInfoResponse, DevNetError> {
-        self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
-            slog::info!(logger, "getting devnet info NAMESPACE: {}", namespace)
-        });
+        let context = format!("NAMESPACE: {}", namespace);
 
-        let (
-            (bitcoind_node_status, bitcoind_node_started_at),
-            (stacks_node_status, stacks_node_started_at),
-            (stacks_api_status, stacks_api_started_at),
-            chain_info,
-        ) = try_join4(
-            self.get_pod_status_info(&namespace, StacksDevnetPod::BitcoindNode),
-            self.get_pod_status_info(&namespace, StacksDevnetPod::StacksNode),
-            self.get_pod_status_info(&namespace, StacksDevnetPod::StacksApi),
-            self.get_stacks_v2_info(&namespace),
-        )
-        .await?;
+        match self.check_all_devnet_assets_exist(&namespace).await? {
+            false => {
+                let msg = format!("not all devnet assets exist {}", context);
+                self.ctx
+                    .try_log(|logger: &hiro_system_kit::Logger| slog::info!(logger, "{}", msg));
+                Err(DevNetError {
+                    message: msg,
+                    code: 404,
+                })
+            }
+            true => {
+                self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
+                    slog::info!(logger, "getting devnet info {}", context)
+                });
 
-        Ok(StacksDevnetInfoResponse {
-            bitcoind_node_status,
-            stacks_node_status,
-            stacks_api_status,
-            bitcoind_node_started_at,
-            stacks_node_started_at,
-            stacks_api_started_at,
-            stacks_chain_tip: chain_info.stacks_tip_height,
-            bitcoin_chain_tip: chain_info.burn_block_height,
-        })
+                let (
+                    PodStatusResponse {
+                        status: bitcoind_node_status,
+                        start_time: bitcoind_node_started_at,
+                    },
+                    PodStatusResponse {
+                        status: stacks_node_status,
+                        start_time: stacks_node_started_at,
+                    },
+                    PodStatusResponse {
+                        status: stacks_api_status,
+                        start_time: stacks_api_started_at,
+                    },
+                    chain_info,
+                ) = try_join4(
+                    self.get_pod_status_info(&namespace, StacksDevnetPod::BitcoindNode),
+                    self.get_pod_status_info(&namespace, StacksDevnetPod::StacksNode),
+                    self.get_pod_status_info(&namespace, StacksDevnetPod::StacksApi),
+                    self.get_stacks_v2_info(&namespace),
+                )
+                .await?;
+
+                Ok(StacksDevnetInfoResponse {
+                    bitcoind_node_status,
+                    stacks_node_status,
+                    stacks_api_status,
+                    bitcoind_node_started_at,
+                    stacks_node_started_at,
+                    stacks_api_started_at,
+                    stacks_chain_tip: chain_info.stacks_tip_height,
+                    bitcoin_chain_tip: chain_info.burn_block_height,
+                })
+            }
+        }
     }
 
     async fn deploy_namespace(&self, namespace_str: &str) -> Result<(), DevNetError> {
@@ -419,6 +611,77 @@ impl StacksDevnetApiK8sManager {
                     code: e.1,
                 })
             }
+        }
+    }
+
+    async fn get_resource<K: kube::Resource<Scope = NamespaceResourceScope>>(
+        &self,
+        namespace: &str,
+        name: &str,
+    ) -> Result<Option<K>, DevNetError>
+    where
+        <K as kube::Resource>::DynamicType: Default,
+        K: Clone,
+        K: DeserializeOwned,
+        K: std::fmt::Debug,
+        K: Serialize,
+    {
+        let resource_api: Api<K> = Api::namespaced(self.client.to_owned(), &namespace);
+
+        let resource_details = format!(
+            "RESOURCE: {}, NAME: {}, NAMESPACE: {}",
+            std::any::type_name::<K>(),
+            name,
+            namespace
+        );
+        self.ctx
+            .try_log(|logger| slog::info!(logger, "fetching {}", resource_details));
+
+        match resource_api.get_opt(&name).await {
+            Ok(r) => match r {
+                Some(r) => {
+                    self.ctx.try_log(|logger| {
+                        slog::info!(logger, "successfully fetched {}", resource_details)
+                    });
+                    Ok(Some(r))
+                }
+                None => {
+                    self.ctx.try_log(|logger| {
+                        slog::info!(logger, "resource not found {}", resource_details)
+                    });
+                    Ok(None)
+                }
+            },
+            Err(e) => {
+                let (msg, code) = match e {
+                    kube::Error::Api(api_error) => (api_error.message, api_error.code),
+                    e => (e.to_string(), 500),
+                };
+                let msg = format!("failed to fetch {}, ERROR: {}", resource_details, msg);
+                self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                Err(DevNetError {
+                    message: msg,
+                    code: code,
+                })
+            }
+        }
+    }
+
+    async fn check_resource_exists<K: kube::Resource<Scope = NamespaceResourceScope>>(
+        &self,
+        namespace: &str,
+        name: &str,
+    ) -> Result<bool, DevNetError>
+    where
+        <K as kube::Resource>::DynamicType: Default,
+        K: Clone,
+        K: DeserializeOwned,
+        K: std::fmt::Debug,
+        K: Serialize,
+    {
+        match self.get_resource::<K>(namespace, name).await? {
+            Some(_) => Ok(true),
+            None => Ok(false),
         }
     }
 

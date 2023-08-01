@@ -4,8 +4,8 @@ use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, Server};
 use stacks_devnet_api::responder::{Responder, ResponderConfig};
 use stacks_devnet_api::routes::{
-    get_standardized_path_parts, handle_delete_devnet, handle_get_devnet, handle_new_devnet,
-    handle_try_proxy_service, API_PATH,
+    get_standardized_path_parts, handle_check_devnet, handle_delete_devnet, handle_get_devnet,
+    handle_new_devnet, handle_try_proxy_service, API_PATH,
 };
 use stacks_devnet_api::{Context, StacksDevnetApiK8sManager};
 use std::net::IpAddr;
@@ -118,6 +118,7 @@ async fn handle_request(
             return match method {
                 &Method::DELETE => handle_delete_devnet(k8s_manager, &network, responder).await,
                 &Method::GET => handle_get_devnet(k8s_manager, &network, responder, ctx).await,
+                &Method::HEAD => handle_check_devnet(k8s_manager, &network, responder).await,
                 _ => {
                     responder.err_method_not_allowed("can only GET/DELETE at provided route".into())
                 }
@@ -133,6 +134,7 @@ async fn handle_request(
                 &subroute,
                 &network,
                 request,
+                k8s_manager,
                 responder,
                 &ctx,
             )
