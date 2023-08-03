@@ -1,7 +1,7 @@
 use std::fmt;
 use strum_macros::EnumIter;
 
-#[derive(EnumIter, Debug, Clone)]
+#[derive(EnumIter, Debug, Clone, PartialEq)]
 pub enum StacksDevnetService {
     BitcoindNode,
     StacksNode,
