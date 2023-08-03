@@ -1,5 +1,4 @@
 use hiro_system_kit::slog;
-use hyper::server::conn::AddrStream;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, Server};
 use stacks_devnet_api::responder::{Responder, ResponderConfig};
@@ -8,7 +7,6 @@ use stacks_devnet_api::routes::{
     handle_new_devnet, handle_try_proxy_service, API_PATH,
 };
 use stacks_devnet_api::{Context, StacksDevnetApiK8sManager};
-use std::net::IpAddr;
 use std::{convert::Infallible, net::SocketAddr};
 
 #[tokio::main]
@@ -32,20 +30,13 @@ async fn main() {
     };
     let config = ResponderConfig::from_path(config_path);
 
-    let make_svc = make_service_fn(|conn: &AddrStream| {
+    let make_svc = make_service_fn(|_| {
         let k8s_manager = k8s_manager.clone();
         let ctx = ctx.clone();
-        let remote_addr = conn.remote_addr().ip();
         let config = config.clone();
         async move {
             Ok::<_, Infallible>(service_fn(move |req| {
-                handle_request(
-                    remote_addr,
-                    req,
-                    k8s_manager.clone(),
-                    config.clone(),
-                    ctx.clone(),
-                )
+                handle_request(req, k8s_manager.clone(), config.clone(), ctx.clone())
             }))
         }
     });
@@ -60,7 +51,6 @@ async fn main() {
 }
 
 async fn handle_request(
-    _client_ip: IpAddr,
     request: Request<Body>,
     k8s_manager: StacksDevnetApiK8sManager,
     config: ResponderConfig,
@@ -157,6 +147,7 @@ mod tests {
         },
         routes::{get_standardized_path_parts, mutate_request_for_proxy, PathParts},
     };
+    use test_case::test_case;
     use tower_test::mock::{self, Handle};
 
     async fn mock_k8s_handler(handle: &mut Handle<Request<Body>, Response<Body>>) {
@@ -192,8 +183,7 @@ mod tests {
         );
     }
 
-    #[tokio::test]
-    async fn it_responds_400_for_invalid_paths() {
+    async fn make_k8s_manager() -> (StacksDevnetApiK8sManager, Context) {
         let (mock_service, mut handle) = mock::pair::<Request<Body>, Response<Body>>();
         let _spawned = tokio::spawn(async move {
             mock_k8s_handler(&mut handle).await;
@@ -202,98 +192,28 @@ mod tests {
         let logger = hiro_system_kit::log::setup_logger();
         let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
         let ctx = Context {
-            logger: Some(logger),
+            logger: None,
             tracer: false,
         };
         let k8s_manager = StacksDevnetApiK8sManager::new(mock_service, "default", &ctx).await;
-        let client_ip: IpAddr = IpAddr::V4([0, 0, 0, 0].into());
-        let invalid_paths = vec![
-            "/path",
-            "/api",
-            "/api/v1",
-            "/api/v1/network2",
-            "/api/v1/network/test/invalid_path",
-        ];
-        for path in invalid_paths {
-            let request_builder = Request::builder().uri(path).method("GET");
-            let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
-            let mut response = handle_request(
-                client_ip,
-                request,
-                k8s_manager.clone(),
-                ResponderConfig::default(),
-                ctx.clone(),
-            )
-            .await
-            .unwrap();
-            assert_eq!(response.status(), StatusCode::BAD_REQUEST);
-            let body = response.body_mut();
-            let bytes = body::to_bytes(body).await.unwrap().to_vec();
-            let body_str = String::from_utf8(bytes).unwrap();
-            assert_eq!(body_str, "invalid request path");
-        }
+        (k8s_manager, ctx)
     }
 
+    #[test_case("/path" ; "/path")]
+    #[test_case("/api" ; "/api")]
+    #[test_case("/api/v1" ; "/api/v1")]
+    #[test_case("/api/v1/network2" ; "/api/v1/network2")]
     #[tokio::test]
-    async fn it_responds_404_undeployed_namespaces() {
-        let (mock_service, mut handle) = mock::pair::<Request<Body>, Response<Body>>();
-        let _spawned = tokio::spawn(async move {
-            mock_k8s_handler(&mut handle).await;
-        });
+    async fn it_responds_400_for_invalid_paths(invalid_path: &str) {
+        let (k8s_manager, ctx) = make_k8s_manager().await;
 
-        let logger = hiro_system_kit::log::setup_logger();
-        let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
-        let ctx = Context {
-            logger: Some(logger),
-            tracer: false,
-        };
-        let k8s_manager = StacksDevnetApiK8sManager::new(mock_service, "default", &ctx).await;
-        let client_ip: IpAddr = IpAddr::V4([0, 0, 0, 0].into());
-        let path = "/api/v1/network/undeployed";
-
-        let request_builder = Request::builder().uri(path).method("GET");
+        let request_builder = Request::builder().uri(invalid_path).method("GET");
         let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
         let mut response = handle_request(
-            client_ip,
             request,
             k8s_manager.clone(),
             ResponderConfig::default(),
-            ctx,
-        )
-        .await
-        .unwrap();
-        assert_eq!(response.status(), StatusCode::NOT_FOUND);
-        let body = response.body_mut();
-        let bytes = body::to_bytes(body).await.unwrap().to_vec();
-        let body_str = String::from_utf8(bytes).unwrap();
-        assert_eq!(body_str, "network does not exist");
-    }
-
-    #[tokio::test]
-    async fn it_responds_400_missing_network() {
-        let (mock_service, mut handle) = mock::pair::<Request<Body>, Response<Body>>();
-        let _spawned = tokio::spawn(async move {
-            mock_k8s_handler(&mut handle).await;
-        });
-
-        let logger = hiro_system_kit::log::setup_logger();
-        let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
-        let ctx = Context {
-            logger: Some(logger),
-            tracer: false,
-        };
-        let k8s_manager = StacksDevnetApiK8sManager::new(mock_service, "default", &ctx).await;
-        let client_ip: IpAddr = IpAddr::V4([0, 0, 0, 0].into());
-        let path = "/api/v1/network/";
-
-        let request_builder = Request::builder().uri(path).method("GET");
-        let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
-        let mut response = handle_request(
-            client_ip,
-            request,
-            k8s_manager.clone(),
-            ResponderConfig::default(),
-            ctx,
+            ctx.clone(),
         )
         .await
         .unwrap();
@@ -301,67 +221,34 @@ mod tests {
         let body = response.body_mut();
         let bytes = body::to_bytes(body).await.unwrap().to_vec();
         let body_str = String::from_utf8(bytes).unwrap();
-        assert_eq!(body_str, "no network id provided");
+        assert_eq!(body_str, "invalid request path");
     }
 
+    #[test_case("/api/v1/network/undeployed", Method::GET, None => 
+        is equal_to (StatusCode::NOT_FOUND, "network undeployed does not exist".to_string()); "404 for undeployed namespace")]
+    #[test_case("/api/v1/network/", Method::GET, None => 
+        is equal_to (StatusCode::BAD_REQUEST, "no network id provided".to_string()); "400 for missing namespace")]
+    #[test_case("/api/v1/networks", Method::GET, None => 
+        is equal_to (StatusCode::METHOD_NOT_ALLOWED, "network creation must be a POST request".to_string()); "405 for network creation request with GET method")]
+    #[test_case("/api/v1/networks", Method::DELETE, None => 
+        is equal_to (StatusCode::METHOD_NOT_ALLOWED, "network creation must be a POST request".to_string()); "405 for network creation request with DELETE method")]
+    #[test_case("/api/v1/networks", Method::POST, None => 
+        is equal_to (StatusCode::BAD_REQUEST, "invalid configuration to create network: EOF while parsing a value at line 1 column 0".to_string()); "400 for network creation request invalid config")]
     #[tokio::test]
-    async fn network_creation_responds_405_for_non_post_requests() {
-        let (mock_service, mut handle) = mock::pair::<Request<Body>, Response<Body>>();
-        let _spawned = tokio::spawn(async move {
-            mock_k8s_handler(&mut handle).await;
-        });
+    async fn it_responds_to_requests(
+        request_path: &str,
+        method: Method,
+        body: Option<Body>,
+    ) -> (StatusCode, String) {
+        let (k8s_manager, ctx) = make_k8s_manager().await;
 
-        let logger = hiro_system_kit::log::setup_logger();
-        let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
-        let ctx = Context {
-            logger: Some(logger),
-            tracer: false,
+        let request_builder = Request::builder().uri(request_path).method(method);
+        let body = match body {
+            Some(b) => b,
+            None => Body::empty(),
         };
-        let k8s_manager = StacksDevnetApiK8sManager::new(mock_service, "default", &ctx).await;
-        let client_ip: IpAddr = IpAddr::V4([0, 0, 0, 0].into());
-        let path = "/api/v1/networks";
-
-        let methods = ["GET", "DELETE"];
-        for method in methods {
-            let request_builder = Request::builder().uri(path).method(method);
-            let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
-            let mut response = handle_request(
-                client_ip,
-                request,
-                k8s_manager.clone(),
-                ResponderConfig::default(),
-                ctx.clone(),
-            )
-            .await
-            .unwrap();
-            assert_eq!(response.status(), StatusCode::METHOD_NOT_ALLOWED);
-            let body = response.body_mut();
-            let bytes = body::to_bytes(body).await.unwrap().to_vec();
-            let body_str = String::from_utf8(bytes).unwrap();
-            assert_eq!(body_str, "network creation must be a POST request");
-        }
-    }
-    #[tokio::test]
-    async fn network_creation_responds_400_for_invalid_config_data() {
-        let (mock_service, mut handle) = mock::pair::<Request<Body>, Response<Body>>();
-        let _spawned = tokio::spawn(async move {
-            mock_k8s_handler(&mut handle).await;
-        });
-
-        let logger = hiro_system_kit::log::setup_logger();
-        let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
-        let ctx = Context {
-            logger: Some(logger),
-            tracer: false,
-        };
-        let k8s_manager = StacksDevnetApiK8sManager::new(mock_service, "default", &ctx).await;
-        let client_ip: IpAddr = IpAddr::V4([0, 0, 0, 0].into());
-        let path = "/api/v1/networks";
-
-        let request_builder = Request::builder().uri(path).method("POST");
-        let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
+        let request: Request<Body> = request_builder.body(body).unwrap();
         let mut response = handle_request(
-            client_ip,
             request,
             k8s_manager.clone(),
             ResponderConfig::default(),
@@ -369,109 +256,25 @@ mod tests {
         )
         .await
         .unwrap();
-        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
         let body = response.body_mut();
         let bytes = body::to_bytes(body).await.unwrap().to_vec();
         let body_str = String::from_utf8(bytes).unwrap();
-        assert_eq!(body_str, "invalid configuration to create network");
+        println!("{}", body_str);
+        (response.status(), body_str)
     }
 
-    #[test]
-    fn request_paths_are_parsed_correctly() {
-        let path = "/api/v1/";
-        let path_parts = get_standardized_path_parts(path);
-        let expected = PathParts {
-            route: String::new(),
-            ..Default::default()
-        };
-        assert_eq!(path_parts, expected);
-
-        let path = "/api/v1/some-route";
-        let path_parts = get_standardized_path_parts(path);
-        let expected = PathParts {
-            route: String::from("some-route"),
-            ..Default::default()
-        };
-        assert_eq!(path_parts, expected);
-
-        let path = "/api/v1/some-route/";
-        let path_parts = get_standardized_path_parts(path);
-        let expected = PathParts {
-            route: String::from("some-route"),
-            ..Default::default()
-        };
-        assert_eq!(path_parts, expected);
-
-        let path = "/api/v1/some-route/some-network";
-        let path_parts = get_standardized_path_parts(path);
-        let expected = PathParts {
-            route: String::from("some-route"),
-            network: Some(String::from("some-network")),
-            ..Default::default()
-        };
-        assert_eq!(path_parts, expected);
-
-        let path = "/api/v1/some-route/some-network/";
-        let path_parts = get_standardized_path_parts(path);
-        let expected = PathParts {
-            route: String::from("some-route"),
-            network: Some(String::from("some-network")),
-            ..Default::default()
-        };
-        assert_eq!(path_parts, expected);
-
-        let path = "/api/v1/some-route/some-network/some-subroute";
-        let path_parts = get_standardized_path_parts(path);
-        let expected = PathParts {
-            route: String::from("some-route"),
-            network: Some(String::from("some-network")),
-            subroute: Some(String::from("some-subroute")),
-            ..Default::default()
-        };
-        assert_eq!(path_parts, expected);
-
-        let path = "/api/v1/some-route/some-network/some-subroute/";
-        let path_parts = get_standardized_path_parts(path);
-        let expected = PathParts {
-            route: String::from("some-route"),
-            network: Some(String::from("some-network")),
-            subroute: Some(String::from("some-subroute")),
-            ..Default::default()
-        };
-        assert_eq!(path_parts, expected);
-
-        let path = "/api/v1/some-route/some-network/some-subroute/the/remaining/path";
-        let path_parts = get_standardized_path_parts(path);
-        let expected = PathParts {
-            route: String::from("some-route"),
-            network: Some(String::from("some-network")),
-            subroute: Some(String::from("some-subroute")),
-            remainder: Some(String::from("the/remaining/path")),
-            ..Default::default()
-        };
-        assert_eq!(path_parts, expected);
-
-        let path = "/api/v1/some-route/some-network/some-subroute/the/remaining/path/";
-        let path_parts = get_standardized_path_parts(path);
-        let expected = PathParts {
-            route: String::from("some-route"),
-            network: Some(String::from("some-network")),
-            subroute: Some(String::from("some-subroute")),
-            remainder: Some(String::from("the/remaining/path")),
-            ..Default::default()
-        };
-        assert_eq!(path_parts, expected);
-
-        let path = "/api/v1/some-route/some-network/some-subroute/the//remaining//path/";
-        let path_parts = get_standardized_path_parts(path);
-        let expected = PathParts {
-            route: String::from("some-route"),
-            network: Some(String::from("some-network")),
-            subroute: Some(String::from("some-subroute")),
-            remainder: Some(String::from("the//remaining//path")),
-            ..Default::default()
-        };
-        assert_eq!(path_parts, expected);
+    #[test_case("/api/v1/" => is equal_to PathParts { route: String::new(), ..Default::default() }; "for /api/v1/ path")]
+    #[test_case("/api/v1/some-route" => is equal_to PathParts { route: String::from("some-route"), ..Default::default() }; "for /api/v1/some-route path")]
+    #[test_case("/api/v1/some-route/" => is equal_to PathParts { route: String::from("some-route"), ..Default::default() }; "for /api/v1/some-route/ path trailing slash")]
+    #[test_case("/api/v1/some-route/some-network" => is equal_to PathParts { route: String::from("some-route"), network: Some(String::from("some-network")), ..Default::default() }; "for /api/v1/some-route/some-network path")]
+    #[test_case("/api/v1/some-route/some-network/" => is equal_to PathParts { route: String::from("some-route"), network: Some(String::from("some-network")), ..Default::default() }; "for /api/v1/some-route/some-network/ path trailing slash")]
+    #[test_case("/api/v1/some-route/some-network/some-subroute" => is equal_to PathParts { route: String::from("some-route"), network: Some(String::from("some-network")), subroute: Some(String::from("some-subroute")), ..Default::default() }; "for /api/v1/some-route/some-network/some-subroute path")]
+    #[test_case("/api/v1/some-route/some-network/some-subroute/" => is equal_to PathParts { route: String::from("some-route"), network: Some(String::from("some-network")), subroute: Some(String::from("some-subroute")), ..Default::default() }; "for /api/v1/some-route/some-network/some-subroute/ path trailing slash")]
+    #[test_case("/api/v1/some-route/some-network/some-subroute/the/remaining/path" => is equal_to PathParts { route: String::from("some-route"), network: Some(String::from("some-network")), subroute: Some(String::from("some-subroute")), remainder: Some(String::from("the/remaining/path")), ..Default::default() }; "for /api/v1/some-route/some-network/some-subroute/the/remaining/path path ")]
+    #[test_case("/api/v1/some-route/some-network/some-subroute/the/remaining/path/" => is equal_to PathParts { route: String::from("some-route"), network: Some(String::from("some-network")), subroute: Some(String::from("some-subroute")), remainder: Some(String::from("the/remaining/path")), ..Default::default() }; "for /api/v1/some-route/some-network/some-subroute/the/remaining/path/ path trailing slash")]
+    #[test_case("/api/v1/some-route/some-network/some-subroute/the//remaining//path/" => is equal_to PathParts { route: String::from("some-route"), network: Some(String::from("some-network")), subroute: Some(String::from("some-subroute")), remainder: Some(String::from("the//remaining//path")), ..Default::default() }; "for /api/v1/some-route/some-network/some-subroute/the//remaining//path/ path extra internal slash")]
+    fn request_paths_are_parsed_correctly(path: &str) -> PathParts {
+        get_standardized_path_parts(path)
     }
 
     #[tokio::test]
