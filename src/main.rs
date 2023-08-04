@@ -109,9 +109,8 @@ async fn handle_request(
                 &Method::DELETE => handle_delete_devnet(k8s_manager, &network, responder).await,
                 &Method::GET => handle_get_devnet(k8s_manager, &network, responder, ctx).await,
                 &Method::HEAD => handle_check_devnet(k8s_manager, &network, responder).await,
-                _ => {
-                    responder.err_method_not_allowed("can only GET/DELETE at provided route".into())
-                }
+                _ => responder
+                    .err_method_not_allowed("can only GET/DELETE/HEAD at provided route".into()),
             };
         }
         let subroute = path_parts.subroute.unwrap();
