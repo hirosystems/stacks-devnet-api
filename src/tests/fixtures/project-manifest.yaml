@@ -1,0 +1,10 @@
+[project]
+name = "px"
+description = "my description"
+authors = ['test1','test2']
+requirements = ['test1','test2']
+
+[contracts.px]
+path = "contracts/px.clar"
+clarity_version = 2
+epoch = "2.1"
