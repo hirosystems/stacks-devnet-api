@@ -38,7 +38,7 @@ use crate::resources::configmap::StacksDevnetConfigmap;
 use crate::resources::pod::StacksDevnetPod;
 use crate::resources::service::{get_service_url, StacksDevnetService};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DevNetError {
     pub message: String,
     pub code: u16,
