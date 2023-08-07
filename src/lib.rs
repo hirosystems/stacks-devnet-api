@@ -1179,6 +1179,36 @@ impl StacksDevnetApiK8sManager {
             }
         }
     }
+    pub async fn delete_namespace(&self, namespace_str: &str) -> Result<(), DevNetError> {
+        if cfg!(debug_assertions) {
+            use kube::ResourceExt;
+            let api: Api<Namespace> = kube::Api::all(self.client.to_owned());
+
+            let dp = DeleteParams::default();
+            match api.delete(namespace_str, &dp).await {
+                Ok(namespace) => {
+                    namespace.map_left(|del| {
+                        assert_eq!(del.name_any(), namespace_str);
+                        println!("Deleting namespace started");
+                    });
+                    Ok(())
+                }
+                Err(kube::Error::Api(api_error)) => Err(DevNetError {
+                    message: format!("unable to delete namespace: {}", api_error.message),
+                    code: api_error.code,
+                }),
+                Err(e) => Err(DevNetError {
+                    message: format!("unable to delete namespace: {}", e.to_string()),
+                    code: 500,
+                }),
+            }
+        } else {
+            Err(DevNetError {
+                message: format!("namespace deletion can only occur in debug mode"),
+                code: 403,
+            })
+        }
+    }
 
     fn get_resource_from_file<K>(&self, template: StacksDevnetResource) -> Result<K, DevNetError>
     where
