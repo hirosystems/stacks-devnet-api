@@ -23,8 +23,8 @@ pub struct Responder {
 
 #[derive(Serialize, Deserialize, Clone, Default)]
 pub struct ResponderConfig {
-    allowed_origins: Option<Vec<String>>,
-    allowed_methods: Option<Vec<String>>,
+    pub allowed_origins: Option<Vec<String>>,
+    pub allowed_methods: Option<Vec<String>>,
 }
 
 impl ResponderConfig {
