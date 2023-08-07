@@ -74,14 +74,14 @@ impl Context {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct StacksDevnetInfoResponse {
-    bitcoind_node_status: Option<String>,
-    stacks_node_status: Option<String>,
-    stacks_api_status: Option<String>,
-    bitcoind_node_started_at: Option<String>,
-    stacks_node_started_at: Option<String>,
-    stacks_api_started_at: Option<String>,
-    stacks_chain_tip: u64,
-    bitcoin_chain_tip: u64,
+    pub bitcoind_node_status: Option<String>,
+    pub stacks_node_status: Option<String>,
+    pub stacks_api_status: Option<String>,
+    pub bitcoind_node_started_at: Option<String>,
+    pub stacks_node_started_at: Option<String>,
+    pub stacks_api_started_at: Option<String>,
+    pub stacks_chain_tip: u64,
+    pub bitcoin_chain_tip: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
