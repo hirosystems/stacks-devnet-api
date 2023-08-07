@@ -236,7 +236,7 @@ impl StacksDevnetApiK8sManager {
                         None => unreachable!(),
                     }
                 } else {
-                    let mut msg = format!("multipple errors occurred while deleting devnet: ");
+                    let mut msg = format!("multiple errors occurred while deleting devnet: ");
                     for e in errors {
                         msg = format!("{} \n- {}", msg, e.message);
                     }
