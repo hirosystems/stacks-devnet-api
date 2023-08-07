@@ -578,7 +578,7 @@ impl StacksDevnetApiK8sManager {
         }
     }
 
-    async fn deploy_namespace(&self, namespace_str: &str) -> Result<(), DevNetError> {
+    pub async fn deploy_namespace(&self, namespace_str: &str) -> Result<(), DevNetError> {
         let mut namespace: Namespace =
             self.get_resource_from_file(StacksDevnetResource::Namespace)?;
 
