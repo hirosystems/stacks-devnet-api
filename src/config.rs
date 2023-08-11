@@ -171,7 +171,7 @@ impl StacksDevnetConfig {
             &self.epoch_2_05.unwrap_or(DEFAULT_EPOCH_2_05),
             &self.epoch_2_1.unwrap_or(DEFAULT_EPOCH_2_1),
             &self.epoch_2_2.unwrap_or(122), // todo: should be DEFAULT_EPOCH_2_2 when clarinet_files is updated
-            &self.bitcoin_controller_block_time.unwrap_or(50),
+            &self.bitcoin_controller_block_time.unwrap_or(60_000),
             &self.bitcoin_controller_automining_disabled.unwrap_or(false)
         ));
 
