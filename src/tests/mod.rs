@@ -10,7 +10,7 @@ use hyper::{
     body,
     header::{ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN},
     http::HeaderValue,
-    HeaderMap, Method, StatusCode,
+    Client, HeaderMap, Method, StatusCode,
 };
 use k8s_openapi::api::core::v1::Namespace;
 use stacks_devnet_api::{
@@ -387,4 +387,20 @@ fn responder_config_reads_from_file() {
     let config = ResponderConfig::from_path("Config.toml");
     assert!(config.allowed_methods.is_some());
     assert!(config.allowed_origins.is_some());
+}
+
+#[tokio::test]
+async fn main_starts_server() {
+    let _handle = std::thread::spawn(move || {
+        main();
+    });
+    sleep(Duration::new(1, 0));
+    let client = Client::new();
+    let request_builder = Request::builder()
+        .uri("http://localhost:8477")
+        .method(Method::OPTIONS)
+        .body(Body::empty())
+        .unwrap();
+    let response = client.request(request_builder).await;
+    assert_eq!(response.unwrap().status(), 200);
 }
