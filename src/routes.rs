@@ -11,6 +11,7 @@ use crate::{
 
 pub async fn handle_new_devnet(
     request: Request<Body>,
+    user_id: &str,
     k8s_manager: StacksDevnetApiK8sManager,
     responder: Responder,
     ctx: Context,
@@ -24,7 +25,7 @@ pub async fn handle_new_devnet(
     let body = body.unwrap();
     let config: Result<StacksDevnetConfig, _> = serde_json::from_slice(&body);
     match config {
-        Ok(config) => match config.to_validated_config(ctx) {
+        Ok(config) => match config.to_validated_config(user_id, ctx) {
             Ok(config) => match k8s_manager.deploy_devnet(config).await {
                 Ok(_) => responder.ok(),
                 Err(e) => responder.respond(e.code, e.message),

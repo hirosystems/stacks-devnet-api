@@ -137,7 +137,7 @@ async fn it_responds_to_valid_requests_with_deploy(
 
     let mut config = get_template_config();
     config.namespace = namespace.to_owned();
-    let validated_config = config.to_validated_config(ctx.clone()).unwrap();
+    let validated_config = config.to_validated_config(&namespace, ctx.clone()).unwrap();
     let _ = k8s_manager.deploy_devnet(validated_config).await.unwrap();
     // short delay to allow assets to start
     sleep(Duration::new(5, 0));

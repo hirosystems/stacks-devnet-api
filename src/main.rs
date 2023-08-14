@@ -74,12 +74,27 @@ async fn handle_request(
     let headers = request.headers().clone();
     let responder = Responder::new(http_response_config, headers.clone()).unwrap();
 
+    let auth_header = auth_config
+        .auth_header
+        .unwrap_or("x-auth-request-user".to_string());
+    let user_id = match headers.get(auth_header) {
+        Some(user_id) => match user_id.to_str() {
+            Ok(user_id) => user_id,
+            Err(e) => {
+                let msg = format!("unable to parse auth header: {}", &e);
+                ctx.try_log(|logger| slog::warn!(logger, "{}", msg));
+                return responder.err_bad_request(msg);
+            }
+        },
+        None => return responder.err_bad_request("missing required auth header".into()),
+    };
+
     if method == &Method::OPTIONS {
         return responder.ok();
     }
     if path == "/api/v1/networks" {
         return match method {
-            &Method::POST => handle_new_devnet(request, k8s_manager, responder, ctx).await,
+            &Method::POST => handle_new_devnet(request, user_id, k8s_manager, responder, ctx).await,
             _ => responder.err_method_not_allowed("network creation must be a POST request".into()),
         };
     } else if path.starts_with(API_PATH) {
@@ -93,6 +108,9 @@ async fn handle_request(
             return responder.err_bad_request("no network id provided".into());
         }
         let network = path_parts.network.unwrap();
+        if network != user_id {
+            return responder.err_bad_request("must match authenticated user id".into());
+        }
 
         // verify that we have a valid namespace and the network actually exists
         let exists = match k8s_manager.check_namespace_exists(&network).await {

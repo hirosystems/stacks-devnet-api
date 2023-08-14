@@ -57,12 +57,22 @@ pub struct StacksDevnetConfig {
 impl StacksDevnetConfig {
     pub fn to_validated_config(
         self,
+        user_id: &str,
         ctx: Context,
     ) -> Result<ValidatedStacksDevnetConfig, DevNetError> {
         let context = format!(
             "failed to validate config for NAMESPACE: {}",
             self.namespace
         );
+        if user_id != self.namespace {
+            let msg =
+                format!("{context}, ERROR: devnet namespace must match authenticated user id");
+            ctx.try_log(|logger| slog::warn!(logger, "{}", msg));
+            return Err(DevNetError {
+                message: msg.into(),
+                code: 400,
+            });
+        }
         let project_manifest_yaml_string = self.get_project_manifest_yaml_string();
         let network_manifest_yaml_string = self.get_network_manifest_yaml_string();
         let deployment_plan_yaml_string = match self.get_deployment_plan_yaml_string() {
@@ -329,6 +339,7 @@ mod tests {
     #[should_panic]
     fn it_rejects_config_with_none_base64_source_code() {
         let mut template = get_template_config("src/tests/fixtures/stacks-devnet-config.json");
+        let user_id = &template.namespace.clone();
         let logger = hiro_system_kit::log::setup_logger();
         let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
         let ctx = Context {
@@ -337,13 +348,14 @@ mod tests {
         };
         template.contracts[0].source = "invalid base64 string".to_string();
         template
-            .to_validated_config(ctx)
+            .to_validated_config(user_id, ctx)
             .unwrap_or_else(|e| panic!("config validation test failed: {}", e.message));
     }
 
     #[test]
     fn it_converts_config_to_yaml() {
         let template = get_template_config("src/tests/fixtures/stacks-devnet-config.json");
+        let user_id = &template.namespace.clone();
         let logger = hiro_system_kit::log::setup_logger();
         let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
         let ctx = Context {
@@ -351,7 +363,7 @@ mod tests {
             tracer: false,
         };
         let validated_config = template
-            .to_validated_config(ctx)
+            .to_validated_config(user_id, ctx)
             .unwrap_or_else(|e| panic!("config validation test failed: {}", e.message));
 
         let expected_project_manifest = read_file("src/tests/fixtures/project-manifest.yaml");
