@@ -31,6 +31,7 @@ use config::{StacksDevnetConfig, ValidatedStacksDevnetConfig};
 mod template_parser;
 use template_parser::get_yaml_from_resource;
 
+pub mod api_config;
 pub mod resources;
 pub mod responder;
 pub mod routes;

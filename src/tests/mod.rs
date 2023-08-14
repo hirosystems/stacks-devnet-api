@@ -14,6 +14,7 @@ use hyper::{
 };
 use k8s_openapi::api::core::v1::Namespace;
 use stacks_devnet_api::{
+    api_config::ResponderConfig,
     config::StacksDevnetConfig,
     resources::service::{
         get_service_from_path_part, get_service_port, get_service_url, ServicePort,
@@ -151,14 +152,9 @@ async fn it_responds_to_valid_requests_with_deploy(
     };
 
     let request: Request<Body> = request_builder.body(body).unwrap();
-    let mut response = handle_request(
-        request,
-        k8s_manager.clone(),
-        ResponderConfig::default(),
-        ctx,
-    )
-    .await
-    .unwrap();
+    let mut response = handle_request(request, k8s_manager.clone(), ApiConfig::default(), ctx)
+        .await
+        .unwrap();
 
     let body = response.body_mut();
     let bytes = body::to_bytes(body).await.unwrap().to_vec();
@@ -206,14 +202,9 @@ async fn it_responds_to_valid_requests(
     }
 
     let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
-    let mut response = handle_request(
-        request,
-        k8s_manager.clone(),
-        ResponderConfig::default(),
-        ctx,
-    )
-    .await
-    .unwrap();
+    let mut response = handle_request(request, k8s_manager.clone(), ApiConfig::default(), ctx)
+        .await
+        .unwrap();
 
     let body = response.body_mut();
     let bytes = body::to_bytes(body).await.unwrap().to_vec();
@@ -305,14 +296,9 @@ async fn it_responds_to_invalid_requests(
 
     let request_builder = Request::builder().uri(request_path).method(method);
     let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
-    let mut response = handle_request(
-        request,
-        k8s_manager.clone(),
-        ResponderConfig::default(),
-        ctx,
-    )
-    .await
-    .unwrap();
+    let mut response = handle_request(request, k8s_manager.clone(), ApiConfig::default(), ctx)
+        .await
+        .unwrap();
     let body = response.body_mut();
     let bytes = body::to_bytes(body).await.unwrap().to_vec();
     let body_str = String::from_utf8(bytes).unwrap();
@@ -381,10 +367,11 @@ fn responder_allows_configuring_allowed_origins() {
 }
 
 #[test]
-fn responder_config_reads_from_file() {
-    let config = ResponderConfig::from_path("Config.toml");
-    assert!(config.allowed_methods.is_some());
-    assert!(config.allowed_origins.is_some());
+fn config_reads_from_file() {
+    let config = ApiConfig::from_path("Config.toml");
+    assert!(config.http_response_config.allowed_methods.is_some());
+    assert!(config.http_response_config.allowed_origins.is_some());
+    assert!(config.auth_config.auth_header.is_some());
 }
 
 #[tokio::test]

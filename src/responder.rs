@@ -1,9 +1,3 @@
-use std::{
-    convert::Infallible,
-    fs::File,
-    io::{BufReader, Read},
-};
-
 use hyper::{
     header::{
         ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_ALLOW_METHODS,
@@ -12,39 +6,15 @@ use hyper::{
     http::{response::Builder, HeaderValue},
     Body, HeaderMap, Response, StatusCode,
 };
-use serde::{Deserialize, Serialize};
+use std::convert::Infallible;
+
+use crate::api_config::ResponderConfig;
 
 #[derive(Default)]
 pub struct Responder {
     allowed_origins: Vec<String>,
     allowed_methods: Vec<String>,
     headers: HeaderMap<HeaderValue>,
-}
-
-#[derive(Serialize, Deserialize, Clone, Default)]
-pub struct ResponderConfig {
-    pub allowed_origins: Option<Vec<String>>,
-    pub allowed_methods: Option<Vec<String>>,
-}
-
-impl ResponderConfig {
-    pub fn from_path(config_path: &str) -> ResponderConfig {
-        let file = File::open(config_path)
-            .unwrap_or_else(|e| panic!("unable to read file {}\n{:?}", config_path, e));
-        let mut file_reader = BufReader::new(file);
-        let mut file_buffer = vec![];
-        file_reader
-            .read_to_end(&mut file_buffer)
-            .unwrap_or_else(|e| panic!("unable to read file {}\n{:?}", config_path, e));
-
-        let config_file: ResponderConfig = match toml::from_slice(&file_buffer) {
-            Ok(s) => s,
-            Err(e) => {
-                panic!("Config file malformatted {}", e.to_string());
-            }
-        };
-        config_file
-    }
 }
 
 impl Responder {
