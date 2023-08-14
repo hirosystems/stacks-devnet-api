@@ -5,7 +5,10 @@ use std::{
 };
 
 use hyper::{
-    header::{ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN, ORIGIN},
+    header::{
+        ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_ALLOW_METHODS,
+        ACCESS_CONTROL_ALLOW_ORIGIN, ORIGIN,
+    },
     http::{response::Builder, HeaderValue},
     Body, HeaderMap, Response, StatusCode,
 };
@@ -57,7 +60,7 @@ impl Responder {
     }
 
     pub fn response_builder(&self) -> Builder {
-        let mut builder = Response::builder();
+        let mut builder = Response::builder().header(ACCESS_CONTROL_ALLOW_CREDENTIALS, "true");
 
         for method in &self.allowed_methods {
             builder = builder.header(ACCESS_CONTROL_ALLOW_METHODS, method);
