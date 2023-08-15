@@ -301,7 +301,7 @@ mod tests {
 
     use crate::Context;
 
-    use super::StacksDevnetConfig;
+    use super::{ProjectManifestConfig, StacksDevnetConfig};
 
     fn read_file(file_path: &str) -> Vec<u8> {
         let file = File::open(file_path)
@@ -386,5 +386,26 @@ mod tests {
             expected_contract_source,
             validated_config.contract_configmap_data[0].1
         );
+    }
+
+    #[test]
+    fn project_manifest_allows_omitted_values() {
+        let project_manifest = ProjectManifestConfig {
+            name: "Test".to_string(),
+            description: None,
+            authors: None,
+            requirements: None,
+        };
+        let mut template = get_template_config("src/tests/fixtures/stacks-devnet-config.json");
+        template.contracts = vec![];
+        let yaml = project_manifest.to_yaml_string(&template);
+        let expected = r#"[project]
+name = "Test"
+description = ""
+authors = []
+requirements = []
+
+"#;
+        assert_eq!(expected.to_string(), yaml);
     }
 }
