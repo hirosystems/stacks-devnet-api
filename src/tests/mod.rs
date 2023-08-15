@@ -175,7 +175,6 @@ async fn it_responds_to_valid_requests_with_deploy(
         }
     }
     let _ = k8s_manager.delete_namespace(&namespace).await.unwrap();
-    println!("{}, {}", status, body_str);
     (status, body_str)
 }
 
@@ -224,7 +223,6 @@ async fn it_responds_to_valid_requests(
         let _ = k8s_manager.delete_namespace(&namespace).await.unwrap();
     }
 
-    println!("{}, {}", response.status(), body_str);
     (response.status(), body_str)
 }
 

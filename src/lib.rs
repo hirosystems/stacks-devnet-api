@@ -1189,7 +1189,8 @@ impl StacksDevnetApiK8sManager {
                 Ok(namespace) => {
                     namespace.map_left(|del| {
                         assert_eq!(del.name_any(), namespace_str);
-                        println!("Deleting namespace started");
+                        self.ctx
+                            .try_log(|logger| slog::error!(logger, "Deleting namespace started"));
                     });
                     Ok(())
                 }
