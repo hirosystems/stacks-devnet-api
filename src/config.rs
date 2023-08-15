@@ -356,12 +356,19 @@ mod tests {
 
         let expected_project_manifest = read_file("src/tests/fixtures/project-manifest.yaml");
         let expected_project_mainfest = from_utf8(&expected_project_manifest).unwrap();
+
         let expected_network_mainfest = read_file("src/tests/fixtures/network-manifest.yaml");
         let expected_network_mainfest = from_utf8(&expected_network_mainfest).unwrap();
+
         let expected_deployment_plan = read_file("src/tests/fixtures/deployment-plan.yaml");
         let expected_deployment_plan = from_utf8(&expected_deployment_plan).unwrap();
-        // let expected_contract_source = read_file("src/tests/fixtures/contract-source.clar");
-        // let expected_contract_source = from_utf8(&expected_contract_source).unwrap();
+
+        let expected_contract_source = read_file("src/tests/fixtures/contract-source.clar");
+        let escaped = expected_contract_source
+            .iter()
+            .flat_map(|b| std::ascii::escape_default(*b))
+            .collect::<Vec<u8>>();
+        let expected_contract_source = from_utf8(&escaped).unwrap();
 
         assert_eq!(
             expected_project_mainfest,
@@ -375,9 +382,9 @@ mod tests {
             expected_deployment_plan,
             validated_config.deployment_plan_yaml_string
         );
-        // assert_eq!(
-        //     expected_contract_source,
-        //     validated_config.contract_configmap_data[0].1
-        // );
+        assert_eq!(
+            expected_contract_source,
+            validated_config.contract_configmap_data[0].1
+        );
     }
 }
