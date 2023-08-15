@@ -1,0 +1,31 @@
+[network]
+name = 'devnet'
+
+[accounts.deployer]
+mnemonic = "twice kind fence tip hidden tilt action fragile skin nothing glory cousin green tomorrow spring wrist shed math olympic multiply hip blue scout claw"
+balance = "100000000000000"
+
+
+[accounts.wallet_1]
+mnemonic = "sell invite acquire kitten bamboo drastic jelly vivid peace spawn twice guilt pave pen trash pretty park cube fragile unaware remain midnight betray rebuild"
+balance = "100000000000000"
+
+[devnet]
+miner_mnemonic = "sell invite acquire kitten bamboo drastic jelly vivid peace spawn twice guilt pave pen trash pretty park cube fragile unaware remain midnight betray rebuild"
+miner_derivation_path = "m/44'/5757'/0'/0/0"
+bitcoin_node_username = "test-username"
+bitcoin_node_password = "test-password"
+faucet_mnemonic = "shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform"
+faucet_derivation_path = "m/44'/5757'/0'/0/0"
+orchestrator_ingestion_port = 20445
+orchestrator_control_port = 20446
+bitcoin_node_rpc_port = 18443
+stacks_node_rpc_port = 20443
+stacks_api_port = 3999
+epoch_2_0 = 100
+epoch_2_05 = 102
+epoch_2_1 = 106
+epoch_2_2 = 120
+working_dir = "/devnet"
+bitcoin_controller_block_time = 0
+bitcoin_controller_automining_disabled = true

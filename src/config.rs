@@ -107,10 +107,9 @@ impl StacksDevnetConfig {
 
     fn get_network_manifest_yaml_string(&self) -> String {
         let mut config = format!(
-            r#"
-                [network]
-                name = 'devnet'
-            "#,
+            r#"[network]
+name = 'devnet'
+"#,
         );
 
         config.push_str(
@@ -124,26 +123,25 @@ impl StacksDevnetConfig {
         );
         config.push_str(&format!(
             r#"
-                [devnet]
-                miner_mnemonic = "{}"
-                miner_derivation_path = "{}"
-                bitcoin_node_username = "{}"
-                bitcoin_node_password = "{}"
-                faucet_mnemonic = "{}"
-                faucet_derivation_path = "{}"
-                orchestrator_ingestion_port = {}
-                orchestrator_control_port = {}
-                bitcoin_node_rpc_port = {}
-                stacks_node_rpc_port = {}
-                stacks_api_port = {}
-                epoch_2_0 = {}
-                epoch_2_05 = {}
-                epoch_2_1 = {}
-                epoch_2_2 = {}
-                working_dir = "/devnet"
-                bitcoin_controller_block_time = {}
-                bitcoin_controller_automining_disabled = {}
-            "#,
+[devnet]
+miner_mnemonic = "{}"
+miner_derivation_path = "{}"
+bitcoin_node_username = "{}"
+bitcoin_node_password = "{}"
+faucet_mnemonic = "{}"
+faucet_derivation_path = "{}"
+orchestrator_ingestion_port = {}
+orchestrator_control_port = {}
+bitcoin_node_rpc_port = {}
+stacks_node_rpc_port = {}
+stacks_api_port = {}
+epoch_2_0 = {}
+epoch_2_05 = {}
+epoch_2_1 = {}
+epoch_2_2 = {}
+working_dir = "/devnet"
+bitcoin_controller_block_time = {}
+bitcoin_controller_automining_disabled = {}"#,
             &self
                 .miner_mnemonic
                 .clone()
@@ -207,15 +205,13 @@ impl ProjectManifestConfig {
             None => String::from("[]"),
         };
         format!(
-            r#"
-                [project]
-                name = "{}"
-                description = "{}"
-                authors = {}
-                requirements = {}
+            r#"[project]
+name = "{}"
+description = "{}"
+authors = {}
+requirements = {}
 
-                {}
-            "#,
+{}"#,
             &self.name,
             description,
             authors,
@@ -243,21 +239,14 @@ pub struct ContractConfig {
 impl ContractConfig {
     fn to_project_manifest_yaml_string(&self) -> String {
         let mut config = format!(
-            r#"
-                [contracts.{}]
-                path = "contracts/{}.clar"
-                clarity_version = {}
-                epoch = "{}"
-            "#,
+            r#"[contracts.{}]
+path = "contracts/{}.clar"
+clarity_version = {}
+epoch = "{}""#,
             &self.name, &self.name, self.clarity_version, self.epoch,
         );
         if let Some(deployer) = &self.deployer {
-            config.push_str(&format!(
-                r#"
-                    deployer = {}
-                "#,
-                deployer,
-            ));
+            config.push_str(&format!(r#"deployer = {}"#, deployer,));
         }
         config
     }
@@ -289,20 +278,134 @@ impl AccountConfig {
     pub fn to_yaml_string(&self) -> String {
         let mut config = format!(
             r#"
-                [accounts.{}]
-                mnemonic = "{}"
-                balance = "{}"
-            "#,
+[accounts.{}]
+mnemonic = "{}"
+balance = "{}"
+"#,
             &self.name, &self.mnemonic, &self.balance
         );
         if let Some(derivation) = &self.derivation {
-            config.push_str(&format!(
-                r#"
-                    derivation = "{}"
-                "#,
-                derivation
-            ));
+            config.push_str(&format!(r#"derivation = "{}""#, derivation));
         }
         config
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        fs::File,
+        io::{BufReader, Read},
+        str::from_utf8,
+    };
+
+    use crate::Context;
+
+    use super::{ProjectManifestConfig, StacksDevnetConfig};
+
+    fn read_file(file_path: &str) -> Vec<u8> {
+        let file = File::open(file_path)
+            .unwrap_or_else(|e| panic!("unable to read file {}\n{:?}", file_path, e));
+        let mut file_reader = BufReader::new(file);
+        let mut file_buffer = vec![];
+        file_reader
+            .read_to_end(&mut file_buffer)
+            .unwrap_or_else(|e| panic!("unable to read file {}\n{:?}", file_path, e));
+        file_buffer
+    }
+
+    fn get_template_config(file_path: &str) -> StacksDevnetConfig {
+        let file_buffer = read_file(file_path);
+
+        let config_file: StacksDevnetConfig = match serde_json::from_slice(&file_buffer) {
+            Ok(s) => s,
+            Err(e) => {
+                panic!("Config file malformatted {}", e.to_string());
+            }
+        };
+        config_file
+    }
+    #[test]
+    #[should_panic]
+    fn it_rejects_config_with_none_base64_source_code() {
+        let mut template = get_template_config("src/tests/fixtures/stacks-devnet-config.json");
+        let logger = hiro_system_kit::log::setup_logger();
+        let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
+        let ctx = Context {
+            logger: None,
+            tracer: false,
+        };
+        template.contracts[0].source = "invalid base64 string".to_string();
+        template
+            .to_validated_config(ctx)
+            .unwrap_or_else(|e| panic!("config validation test failed: {}", e.message));
+    }
+
+    #[test]
+    fn it_converts_config_to_yaml() {
+        let template = get_template_config("src/tests/fixtures/stacks-devnet-config.json");
+        let logger = hiro_system_kit::log::setup_logger();
+        let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
+        let ctx = Context {
+            logger: None,
+            tracer: false,
+        };
+        let validated_config = template
+            .to_validated_config(ctx)
+            .unwrap_or_else(|e| panic!("config validation test failed: {}", e.message));
+
+        let expected_project_manifest = read_file("src/tests/fixtures/project-manifest.yaml");
+        let expected_project_mainfest = from_utf8(&expected_project_manifest).unwrap();
+
+        let expected_network_mainfest = read_file("src/tests/fixtures/network-manifest.yaml");
+        let expected_network_mainfest = from_utf8(&expected_network_mainfest).unwrap();
+
+        let expected_deployment_plan = read_file("src/tests/fixtures/deployment-plan.yaml");
+        let expected_deployment_plan = from_utf8(&expected_deployment_plan).unwrap();
+
+        let expected_contract_source = read_file("src/tests/fixtures/contract-source.clar");
+        let escaped = expected_contract_source
+            .iter()
+            .flat_map(|b| std::ascii::escape_default(*b))
+            .collect::<Vec<u8>>();
+        let expected_contract_source = from_utf8(&escaped).unwrap();
+
+        assert_eq!(
+            expected_project_mainfest,
+            validated_config.project_manifest_yaml_string
+        );
+        assert_eq!(
+            expected_network_mainfest,
+            validated_config.network_manifest_yaml_string
+        );
+        assert_eq!(
+            expected_deployment_plan,
+            validated_config.deployment_plan_yaml_string
+        );
+        assert_eq!(
+            expected_contract_source,
+            validated_config.contract_configmap_data[0].1
+        );
+    }
+
+    #[test]
+    fn project_manifest_allows_omitted_values() {
+        let project_manifest = ProjectManifestConfig {
+            name: "Test".to_string(),
+            description: None,
+            authors: None,
+            requirements: None,
+        };
+        let mut template = get_template_config("src/tests/fixtures/stacks-devnet-config.json");
+        template.contracts = vec![];
+        let yaml = project_manifest.to_yaml_string(&template);
+        let expected = r#"[project]
+name = "Test"
+description = ""
+authors = []
+requirements = []
+
+"#;
+        assert_eq!(expected.to_string(), yaml);
     }
 }

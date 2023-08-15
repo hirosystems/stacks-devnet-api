@@ -38,7 +38,7 @@ use crate::resources::configmap::StacksDevnetConfigmap;
 use crate::resources::pod::StacksDevnetPod;
 use crate::resources::service::{get_service_url, StacksDevnetService};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct DevNetError {
     pub message: String,
     pub code: u16,
@@ -74,14 +74,14 @@ impl Context {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct StacksDevnetInfoResponse {
-    bitcoind_node_status: Option<String>,
-    stacks_node_status: Option<String>,
-    stacks_api_status: Option<String>,
-    bitcoind_node_started_at: Option<String>,
-    stacks_node_started_at: Option<String>,
-    stacks_api_started_at: Option<String>,
-    stacks_chain_tip: u64,
-    bitcoin_chain_tip: u64,
+    pub bitcoind_node_status: Option<String>,
+    pub stacks_node_status: Option<String>,
+    pub stacks_api_status: Option<String>,
+    pub bitcoind_node_started_at: Option<String>,
+    pub stacks_node_started_at: Option<String>,
+    pub stacks_api_started_at: Option<String>,
+    pub stacks_chain_tip: u64,
+    pub bitcoin_chain_tip: u64,
 }
 
 #[derive(Serialize, Deserialize, Debug, Default)]
@@ -236,7 +236,7 @@ impl StacksDevnetApiK8sManager {
                         None => unreachable!(),
                     }
                 } else {
-                    let mut msg = format!("multipple errors occurred while deleting devnet: ");
+                    let mut msg = format!("multiple errors occurred while deleting devnet: ");
                     for e in errors {
                         msg = format!("{} \n- {}", msg, e.message);
                     }
@@ -578,7 +578,7 @@ impl StacksDevnetApiK8sManager {
         }
     }
 
-    async fn deploy_namespace(&self, namespace_str: &str) -> Result<(), DevNetError> {
+    pub async fn deploy_namespace(&self, namespace_str: &str) -> Result<(), DevNetError> {
         let mut namespace: Namespace =
             self.get_resource_from_file(StacksDevnetResource::Namespace)?;
 
@@ -1177,6 +1177,37 @@ impl StacksDevnetApiK8sManager {
                     code: e.1,
                 })
             }
+        }
+    }
+    pub async fn delete_namespace(&self, namespace_str: &str) -> Result<(), DevNetError> {
+        if cfg!(debug_assertions) {
+            use kube::ResourceExt;
+            let api: Api<Namespace> = kube::Api::all(self.client.to_owned());
+
+            let dp = DeleteParams::default();
+            match api.delete(namespace_str, &dp).await {
+                Ok(namespace) => {
+                    namespace.map_left(|del| {
+                        assert_eq!(del.name_any(), namespace_str);
+                        self.ctx
+                            .try_log(|logger| slog::error!(logger, "Deleting namespace started"));
+                    });
+                    Ok(())
+                }
+                Err(kube::Error::Api(api_error)) => Err(DevNetError {
+                    message: format!("unable to delete namespace: {}", api_error.message),
+                    code: api_error.code,
+                }),
+                Err(e) => Err(DevNetError {
+                    message: format!("unable to delete namespace: {}", e.to_string()),
+                    code: 500,
+                }),
+            }
+        } else {
+            Err(DevNetError {
+                message: format!("namespace deletion can only occur in debug mode"),
+                code: 403,
+            })
         }
     }
 

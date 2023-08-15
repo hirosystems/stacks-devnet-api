@@ -35,3 +35,6 @@ toml = "0.5.9"
 
 [dev-dependencies]
 tower-test = "0.4.0"
+test-case = "3.1.0"
+rand = "0.8.5"
+serial_test = "2.0.0"

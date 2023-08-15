@@ -15,3 +15,6 @@ pub enum StacksDevnetResource {
     Service(StacksDevnetService),
     Namespace,
 }
+
+#[cfg(test)]
+pub mod tests;
