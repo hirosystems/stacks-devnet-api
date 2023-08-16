@@ -109,7 +109,7 @@ async fn handle_request(
         }
         let network = path_parts.network.unwrap();
         if network != user_id {
-            return responder.err_bad_request("must match authenticated user id".into());
+            return responder.err_bad_request("network id must match authenticated user id".into());
         }
 
         // verify that we have a valid namespace and the network actually exists
