@@ -420,4 +420,20 @@ requirements = []
 "#;
         assert_eq!(expected.to_string(), yaml);
     }
+
+    #[test]
+    fn it_rejects_config_with_namespace_user_id_mismatch() {
+        let template = get_template_config("src/tests/fixtures/stacks-devnet-config.json");
+        let namespace = template.namespace.clone();
+        let user_id = "wrong";
+        match template.to_validated_config(user_id, Context::empty()) {
+            Ok(_) => {
+                panic!("config validation with non-matching user_id should have been rejected")
+            }
+            Err(e) => {
+                assert_eq!(e.code, 400);
+                assert_eq!(e.message, format!("failed to validate config for NAMESPACE: {}, ERROR: devnet namespace must match authenticated user id", namespace));
+            }
+        }
+    }
 }
