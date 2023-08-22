@@ -399,7 +399,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-deployments"
-version = "1.0.2-alpha.0"
+version = "1.0.2"
 dependencies = [
  "base58 0.2.0",
  "bitcoin",
@@ -407,13 +407,12 @@ dependencies = [
  "bitcoincore-rpc-json",
  "clarinet-files",
  "clarinet-utils",
- "clarity-repl 1.7.2-alpha.0",
+ "clarity-repl 1.7.2",
  "libsecp256k1 0.7.1",
  "reqwest",
  "serde",
  "serde_derive",
  "serde_json",
- "serde_with",
  "serde_yaml 0.8.26",
  "stacks-rpc-client",
  "tiny-hderive",
@@ -421,13 +420,13 @@ dependencies = [
 
 [[package]]
 name = "clarinet-files"
-version = "1.0.2-alpha.1"
+version = "1.0.2"
 dependencies = [
  "bip39",
  "bitcoin",
  "chainhook-types",
  "clarinet-utils",
- "clarity-repl 1.7.2-alpha.0",
+ "clarity-repl 1.7.2",
  "libsecp256k1 0.7.1",
  "serde",
  "serde_derive",
@@ -483,7 +482,7 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "1.7.2-alpha.0"
+version = "1.7.2"
 dependencies = [
  "ansi_term",
  "atty",
@@ -667,41 +666,6 @@ dependencies = [
  "serde",
  "subtle 2.5.0",
  "zeroize",
-]
-
-[[package]]
-name = "darling"
-version = "0.20.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0209d94da627ab5605dcccf08bb18afa5009cfbef48d8a8b7d7bdbc79be25c5e"
-dependencies = [
- "darling_core",
- "darling_macro",
-]
-
-[[package]]
-name = "darling_core"
-version = "0.20.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "177e3443818124b357d8e76f53be906d60937f0d3a90773a664fa63fa253e621"
-dependencies = [
- "fnv",
- "ident_case",
- "proc-macro2",
- "quote",
- "strsim",
- "syn 2.0.26",
-]
-
-[[package]]
-name = "darling_macro"
-version = "0.20.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "836a9bbc7ad63342d6d6e7b815ccab164bc77a2d95d84bc3117a8c0d5c98e2d5"
-dependencies = [
- "darling_core",
- "quote",
- "syn 2.0.26",
 ]
 
 [[package]]
@@ -1372,12 +1336,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ident_case"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
-
-[[package]]
 name = "idna"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1395,7 +1353,6 @@ checksum = "bd070e393353796e801d209ad339e89596eb4c8d430d18ede6a1cced8fafbd99"
 dependencies = [
  "autocfg",
  "hashbrown 0.12.3",
- "serde",
 ]
 
 [[package]]
@@ -1406,7 +1363,6 @@ checksum = "d5477fe2230a79769d8dc68e0eabf5437907c0457a5614a9e8dddb67f65eb65d"
 dependencies = [
  "equivalent",
  "hashbrown 0.14.0",
- "serde",
 ]
 
 [[package]]
@@ -2642,35 +2598,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde_with"
-version = "3.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1402f54f9a3b9e2efe71c1cea24e648acce55887983553eeb858cf3115acfd49"
-dependencies = [
- "base64 0.21.2",
- "chrono",
- "hex",
- "indexmap 1.9.3",
- "indexmap 2.0.0",
- "serde",
- "serde_json",
- "serde_with_macros",
- "time 0.3.23",
-]
-
-[[package]]
-name = "serde_with_macros"
-version = "3.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9197f1ad0e3c173a0222d3c4404fb04c3afe87e962bcb327af73e8301fa203c7"
-dependencies = [
- "darling",
- "proc-macro2",
- "quote",
- "syn 2.0.26",
-]
-
-[[package]]
 name = "serde_yaml"
 version = "0.8.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2977,9 +2904,9 @@ dependencies = [
 
 [[package]]
 name = "stacks-rpc-client"
-version = "1.0.8-alpha.0"
+version = "1.0.9"
 dependencies = [
- "clarity-repl 1.7.2-alpha.0",
+ "clarity-repl 1.7.2",
  "hmac 0.12.1",
  "libsecp256k1 0.7.1",
  "pbkdf2",
@@ -3054,12 +2981,6 @@ name = "str-buf"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e08d8363704e6c71fc928674353e6b7c23dcea9d82d7012c8faf2a3a025f8d0"
-
-[[package]]
-name = "strsim"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "strum"
