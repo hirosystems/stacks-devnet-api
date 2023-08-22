@@ -39,31 +39,17 @@ impl StacksDevnetConfig {
             "failed to validate config for NAMESPACE: {}",
             self.namespace
         );
-        let project_manifest_yaml_string = self.get_project_manifest_yaml_string();
-        let (network_manifest_yaml_string, devnet_config) =
-            match self.get_network_manifest_string_and_devnet_config() {
-                Ok(result) => Ok(result),
-                Err(e) => {
-                    let msg = format!("{context}, ERROR: {e}");
-                    ctx.try_log(|logger| slog::warn!(logger, "{}", msg));
-                    Err(DevNetError {
-                        message: msg.into(),
-                        code: 400,
-                    })
-                }
-            }?;
+        let project_manifest_yaml_string = self
+            .get_project_manifest_yaml_string()
+            .map_err(|e| log_and_return_err(e, &context, &ctx))?;
 
-        let deployment_plan_yaml_string = match self.get_deployment_plan_yaml_string() {
-            Ok(s) => Ok(s),
-            Err(e) => {
-                let msg = format!("{context}, ERROR: {e}");
-                ctx.try_log(|logger| slog::warn!(logger, "{}", msg));
-                Err(DevNetError {
-                    message: msg.into(),
-                    code: 400,
-                })
-            }
-        }?;
+        let (network_manifest_yaml_string, devnet_config) = self
+            .get_network_manifest_string_and_devnet_config()
+            .map_err(|e| log_and_return_err(e, &context, &ctx))?;
+
+        let deployment_plan_yaml_string = self
+            .get_deployment_plan_yaml_string()
+            .map_err(|e| log_and_return_err(e, &context, &ctx))?;
 
         let mut contracts: Vec<(String, String)> = vec![];
         for (contract_identifier, (src, _)) in self.deployment_plan.contracts {
@@ -180,6 +166,14 @@ impl StacksDevnetConfig {
     }
 }
 
+fn log_and_return_err(e: String, context: &str, ctx: &Context) -> DevNetError {
+    let msg = format!("{context}, ERROR: {e}");
+    ctx.try_log(|logger: &hiro_system_kit::Logger| slog::warn!(logger, "{}", msg));
+    DevNetError {
+        message: msg.into(),
+        code: 400,
+    }
+}
 #[cfg(test)]
 mod tests {
     use std::{
