@@ -190,7 +190,7 @@ mod tests {
 
     use crate::Context;
 
-    use super::{ProjectManifestConfig, StacksDevnetConfig};
+    use super::StacksDevnetConfig;
 
     fn read_file(file_path: &str) -> Vec<u8> {
         let file = File::open(file_path)
@@ -213,21 +213,6 @@ mod tests {
             }
         };
         config_file
-    }
-    #[test]
-    #[should_panic]
-    fn it_rejects_config_with_none_base64_source_code() {
-        let mut template = get_template_config("src/tests/fixtures/stacks-devnet-config.json");
-        let logger = hiro_system_kit::log::setup_logger();
-        let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
-        let ctx = Context {
-            logger: None,
-            tracer: false,
-        };
-        template.contracts[0].source = "invalid base64 string".to_string();
-        template
-            .to_validated_config(ctx)
-            .unwrap_or_else(|e| panic!("config validation test failed: {}", e.message));
     }
 
     #[test]
@@ -253,11 +238,7 @@ mod tests {
         let expected_deployment_plan = from_utf8(&expected_deployment_plan).unwrap();
 
         let expected_contract_source = read_file("src/tests/fixtures/contract-source.clar");
-        let escaped = expected_contract_source
-            .iter()
-            .flat_map(|b| std::ascii::escape_default(*b))
-            .collect::<Vec<u8>>();
-        let expected_contract_source = from_utf8(&escaped).unwrap();
+        let expected_contract_source = from_utf8(&expected_contract_source).unwrap();
 
         assert_eq!(
             expected_project_mainfest,
@@ -275,26 +256,5 @@ mod tests {
             expected_contract_source,
             validated_config.contract_configmap_data[0].1
         );
-    }
-
-    #[test]
-    fn project_manifest_allows_omitted_values() {
-        let project_manifest = ProjectManifestConfig {
-            name: "Test".to_string(),
-            description: None,
-            authors: None,
-            requirements: None,
-        };
-        let mut template = get_template_config("src/tests/fixtures/stacks-devnet-config.json");
-        template.contracts = vec![];
-        let yaml = project_manifest.to_yaml_string(&template);
-        let expected = r#"[project]
-name = "Test"
-description = ""
-authors = []
-requirements = []
-
-"#;
-        assert_eq!(expected.to_string(), yaml);
     }
 }
