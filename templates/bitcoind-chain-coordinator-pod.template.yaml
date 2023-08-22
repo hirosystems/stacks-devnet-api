@@ -30,6 +30,7 @@ spec:
     - ./stacks-network
     - --namespace=$(NAMESPACE)
     - --manifest-path=/etc/stacks-network/project/Clarinet.toml
+    - --network-manifest-path=/etc/stacks-network/project/settings/Devnet.toml
     - --deployment-plan-path=/etc/stacks-network/project/deployments/default.devnet-plan.yaml
     - --project-root-path=/etc/stacks-network/project/
     env:
