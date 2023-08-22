@@ -249,4 +249,20 @@ mod tests {
             validated_config.contract_configmap_data[0].1
         );
     }
+
+    #[test]
+    #[should_panic]
+    fn it_requires_devnet_config() {
+        let mut template = get_template_config("src/tests/fixtures/stacks-devnet-config.json");
+        let logger = hiro_system_kit::log::setup_logger();
+        let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
+        let ctx = Context {
+            logger: None,
+            tracer: false,
+        };
+        template.network_manifest.devnet = None;
+        template
+            .to_validated_config(ctx)
+            .unwrap_or_else(|e| panic!("config validation test failed: {}", e.message));
+    }
 }
