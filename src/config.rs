@@ -2,13 +2,15 @@ use clarinet_deployments::types::{DeploymentSpecification, TransactionSpecificat
 use clarinet_files::{AccountConfig, DevnetConfig, FileLocation, NetworkManifest, ProjectManifest};
 use hiro_system_kit::slog;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, path::PathBuf};
 
 use crate::{
     resources::service::{get_service_port, ServicePort, StacksDevnetService},
     Context, DevNetError,
 };
 
+const PROJECT_ROOT: &str = "/etc/stacks-network/project";
+const CONTRACT_DIR: &str = "/etc/stacks-network/project/contracts";
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ValidatedStacksDevnetConfig {
     pub namespace: String,
@@ -75,7 +77,7 @@ impl StacksDevnetConfig {
 
         let devnet_config = match &self.network_manifest.devnet {
             Some(devnet_config) => Ok(devnet_config),
-            None => Err("config is missing devnet config"),
+            None => Err("network manifest is missing required devnet config"),
         }?;
         let mut devnet_config = devnet_config.clone();
         devnet_config.orchestrator_ingestion_port =
@@ -132,19 +134,18 @@ impl StacksDevnetConfig {
         Ok((yaml_str, devnet_config))
     }
 
-    fn get_project_manifest_yaml_string(&self) -> String {
+    fn get_project_manifest_yaml_string(&self) -> Result<String, String> {
         let mut project_manifest = self.project_manifest.clone();
-        project_manifest.location =
-            FileLocation::from_path_string("/etc/stacks-network/project").unwrap();
+        project_manifest.location = FileLocation::from_path(PathBuf::from(PROJECT_ROOT));
         project_manifest.project.cache_location =
-            FileLocation::from_path_string("/etc/stacks-network/project/contracts").unwrap();
-        serde_yaml::to_string(&project_manifest).unwrap()
+            FileLocation::from_path(PathBuf::from(CONTRACT_DIR));
+        serde_yaml::to_string(&project_manifest)
+            .map_err(|e| format!("failed to parse project manifest: {}", e))
     }
 
     pub fn get_deployment_plan_yaml_string(&self) -> Result<String, String> {
         let deployment = self.deployment_plan.clone();
-        let contracts_loc =
-            FileLocation::from_path_string("/etc/stacks-network/project/contracts").unwrap();
+        let contracts_loc = FileLocation::from_path(PathBuf::from(CONTRACT_DIR));
         for b in deployment.plan.batches {
             for t in b.transactions {
                 match t {
