@@ -399,9 +399,7 @@ dependencies = [
 
 [[package]]
 name = "clarinet-deployments"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d559d56b906d2af1a6f4552607e059d9383f5961f062c62e8df743755b59a86f"
+version = "1.0.2-alpha.0"
 dependencies = [
  "base58 0.2.0",
  "bitcoin",
@@ -409,12 +407,13 @@ dependencies = [
  "bitcoincore-rpc-json",
  "clarinet-files",
  "clarinet-utils",
- "clarity-repl",
+ "clarity-repl 1.7.2-alpha.0",
  "libsecp256k1 0.7.1",
  "reqwest",
  "serde",
  "serde_derive",
  "serde_json",
+ "serde_with",
  "serde_yaml 0.8.26",
  "stacks-rpc-client",
  "tiny-hderive",
@@ -422,18 +421,17 @@ dependencies = [
 
 [[package]]
 name = "clarinet-files"
-version = "1.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1464355d97840afd89fcc04c4361a4d06200de1ddf4a311b649744c7e67d0155"
+version = "1.0.2-alpha.1"
 dependencies = [
  "bip39",
  "bitcoin",
  "chainhook-types",
  "clarinet-utils",
- "clarity-repl",
+ "clarity-repl 1.7.2-alpha.0",
  "libsecp256k1 0.7.1",
  "serde",
  "serde_derive",
+ "serde_json",
  "tiny-hderive",
  "toml",
  "url",
@@ -442,20 +440,17 @@ dependencies = [
 [[package]]
 name = "clarinet-utils"
 version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f19b3340d53afe73fb175052ab09aec54b6e3076afd30d6b907b401cb6eecf3c"
 dependencies = [
  "hmac 0.12.1",
  "pbkdf2",
- "serde",
  "sha2 0.10.7",
 ]
 
 [[package]]
 name = "clarity-repl"
-version = "1.7.0"
+version = "1.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f2d096ff86def33801c5ad13dc222befa42118326a80cfc1cf34d9ee1abc70b"
+checksum = "6fbc2179431d853889075f92b984a56c3c988b944ca6682ff840b2792bb155bf"
 dependencies = [
  "ansi_term",
  "atty",
@@ -465,7 +460,40 @@ dependencies = [
  "debug_types",
  "futures",
  "getrandom 0.2.10",
- "hiro-system-kit",
+ "hiro-system-kit 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "httparse",
+ "integer-sqrt",
+ "lazy_static",
+ "log",
+ "memchr",
+ "pico-args",
+ "prettytable-rs",
+ "rand 0.7.3",
+ "regex",
+ "reqwest",
+ "rustyline",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "sha2 0.10.7",
+ "sha3 0.9.1",
+ "tokio",
+ "tokio-util",
+]
+
+[[package]]
+name = "clarity-repl"
+version = "1.7.2-alpha.0"
+dependencies = [
+ "ansi_term",
+ "atty",
+ "bytes",
+ "chrono",
+ "clarity-vm",
+ "debug_types",
+ "futures",
+ "getrandom 0.2.10",
+ "hiro-system-kit 0.1.0",
  "httparse",
  "integer-sqrt",
  "lazy_static",
@@ -639,6 +667,41 @@ dependencies = [
  "serde",
  "subtle 2.5.0",
  "zeroize",
+]
+
+[[package]]
+name = "darling"
+version = "0.20.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0209d94da627ab5605dcccf08bb18afa5009cfbef48d8a8b7d7bdbc79be25c5e"
+dependencies = [
+ "darling_core",
+ "darling_macro",
+]
+
+[[package]]
+name = "darling_core"
+version = "0.20.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "177e3443818124b357d8e76f53be906d60937f0d3a90773a664fa63fa253e621"
+dependencies = [
+ "fnv",
+ "ident_case",
+ "proc-macro2",
+ "quote",
+ "strsim",
+ "syn 2.0.26",
+]
+
+[[package]]
+name = "darling_macro"
+version = "0.20.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "836a9bbc7ad63342d6d6e7b815ccab164bc77a2d95d84bc3117a8c0d5c98e2d5"
+dependencies = [
+ "darling_core",
+ "quote",
+ "syn 2.0.26",
 ]
 
 [[package]]
@@ -1100,6 +1163,16 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 [[package]]
 name = "hiro-system-kit"
 version = "0.1.0"
+dependencies = [
+ "ansi_term",
+ "atty",
+ "lazy_static",
+ "tokio",
+]
+
+[[package]]
+name = "hiro-system-kit"
+version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a69a7ca4bddaacbc8180886d378ad8c2b9f74217503002346719b57adbd83124"
 dependencies = [
@@ -1299,6 +1372,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "ident_case"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b9e0384b61958566e926dc50660321d12159025e767c18e043daf26b70104c39"
+
+[[package]]
 name = "idna"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1316,6 +1395,7 @@ checksum = "bd070e393353796e801d209ad339e89596eb4c8d430d18ede6a1cced8fafbd99"
 dependencies = [
  "autocfg",
  "hashbrown 0.12.3",
+ "serde",
 ]
 
 [[package]]
@@ -1326,6 +1406,7 @@ checksum = "d5477fe2230a79769d8dc68e0eabf5437907c0457a5614a9e8dddb67f65eb65d"
 dependencies = [
  "equivalent",
  "hashbrown 0.14.0",
+ "serde",
 ]
 
 [[package]]
@@ -2528,9 +2609,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.103"
+version = "1.0.105"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d03b412469450d4404fe8499a268edd7f8b79fecb074b0d812ad64ca21f4031b"
+checksum = "693151e1ac27563d6dbcec9dee9fbd5da8539b20fa14ad3752b2e6d363ace360"
 dependencies = [
  "indexmap 2.0.0",
  "itoa",
@@ -2558,6 +2639,35 @@ dependencies = [
  "itoa",
  "ryu",
  "serde",
+]
+
+[[package]]
+name = "serde_with"
+version = "3.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1402f54f9a3b9e2efe71c1cea24e648acce55887983553eeb858cf3115acfd49"
+dependencies = [
+ "base64 0.21.2",
+ "chrono",
+ "hex",
+ "indexmap 1.9.3",
+ "indexmap 2.0.0",
+ "serde",
+ "serde_json",
+ "serde_with_macros",
+ "time 0.3.23",
+]
+
+[[package]]
+name = "serde_with_macros"
+version = "3.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9197f1ad0e3c173a0222d3c4404fb04c3afe87e962bcb327af73e8301fa203c7"
+dependencies = [
+ "darling",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.26",
 ]
 
 [[package]]
@@ -2840,14 +2950,13 @@ dependencies = [
 name = "stacks-devnet-api"
 version = "0.1.0"
 dependencies = [
- "base64 0.21.2",
  "chainhook-types",
  "clarinet-deployments",
  "clarinet-files",
- "clarity-repl",
+ "clarity-repl 1.7.1",
  "clarity-vm",
  "futures",
- "hiro-system-kit",
+ "hiro-system-kit 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "http-body",
  "hyper",
  "k8s-openapi",
@@ -2868,11 +2977,9 @@ dependencies = [
 
 [[package]]
 name = "stacks-rpc-client"
-version = "1.0.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "417254594e89666f68c76267a620d3751ae6604e39c97f3abb57a845390bc1a0"
+version = "1.0.8-alpha.0"
 dependencies = [
- "clarity-repl",
+ "clarity-repl 1.7.2-alpha.0",
  "hmac 0.12.1",
  "libsecp256k1 0.7.1",
  "pbkdf2",
@@ -2947,6 +3054,12 @@ name = "str-buf"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e08d8363704e6c71fc928674353e6b7c23dcea9d82d7012c8faf2a3a025f8d0"
+
+[[package]]
+name = "strsim"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "strum"
