@@ -44,7 +44,7 @@ spec:
   - command:
     - ./stacks-devnet-api
     name: stacks-devnet-api-container
-    image: quay.io/hirosystems/stacks-devnet-api:latest
+    image: quay.io/hirosystems/stacks-devnet-api:develop
     imagePullPolicy: Always
     ports:
     - containerPort: 8477
