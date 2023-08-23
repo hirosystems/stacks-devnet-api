@@ -399,7 +399,9 @@ dependencies = [
 
 [[package]]
 name = "clarinet-deployments"
-version = "1.0.2-alpha.0"
+version = "1.0.2-alpha.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "22c4b5ef51c5e3b357f73c6d6e46821a148da2de235ce0d28e1d0b1e3dae0b3d"
 dependencies = [
  "base58 0.2.0",
  "bitcoin",
@@ -407,7 +409,7 @@ dependencies = [
  "bitcoincore-rpc-json",
  "clarinet-files",
  "clarinet-utils",
- "clarity-repl 1.7.2-alpha.0",
+ "clarity-repl",
  "libsecp256k1 0.7.1",
  "reqwest",
  "serde",
@@ -421,13 +423,15 @@ dependencies = [
 
 [[package]]
 name = "clarinet-files"
-version = "1.0.2-alpha.1"
+version = "1.0.2-alpha.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c753ef311ad59d86b4d4cd66cdff739b9fbb944ab306b8794776f1b368fba2d8"
 dependencies = [
  "bip39",
  "bitcoin",
  "chainhook-types",
  "clarinet-utils",
- "clarity-repl 1.7.2-alpha.0",
+ "clarity-repl",
  "libsecp256k1 0.7.1",
  "serde",
  "serde_derive",
@@ -440,50 +444,20 @@ dependencies = [
 [[package]]
 name = "clarinet-utils"
 version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f19b3340d53afe73fb175052ab09aec54b6e3076afd30d6b907b401cb6eecf3c"
 dependencies = [
  "hmac 0.12.1",
  "pbkdf2",
- "sha2 0.10.7",
-]
-
-[[package]]
-name = "clarity-repl"
-version = "1.7.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6fbc2179431d853889075f92b984a56c3c988b944ca6682ff840b2792bb155bf"
-dependencies = [
- "ansi_term",
- "atty",
- "bytes",
- "chrono",
- "clarity-vm",
- "debug_types",
- "futures",
- "getrandom 0.2.10",
- "hiro-system-kit 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "httparse",
- "integer-sqrt",
- "lazy_static",
- "log",
- "memchr",
- "pico-args",
- "prettytable-rs",
- "rand 0.7.3",
- "regex",
- "reqwest",
- "rustyline",
  "serde",
- "serde_derive",
- "serde_json",
  "sha2 0.10.7",
- "sha3 0.9.1",
- "tokio",
- "tokio-util",
 ]
 
 [[package]]
 name = "clarity-repl"
-version = "1.7.2-alpha.0"
+version = "1.7.2-alpha.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f69d590b770f3bbff6316452f7499873870dbcaf06f7a7c25d7c95c1666c4d47"
 dependencies = [
  "ansi_term",
  "atty",
@@ -493,7 +467,7 @@ dependencies = [
  "debug_types",
  "futures",
  "getrandom 0.2.10",
- "hiro-system-kit 0.1.0",
+ "hiro-system-kit",
  "httparse",
  "integer-sqrt",
  "lazy_static",
@@ -1159,16 +1133,6 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
-
-[[package]]
-name = "hiro-system-kit"
-version = "0.1.0"
-dependencies = [
- "ansi_term",
- "atty",
- "lazy_static",
- "tokio",
-]
 
 [[package]]
 name = "hiro-system-kit"
@@ -2953,10 +2917,10 @@ dependencies = [
  "chainhook-types",
  "clarinet-deployments",
  "clarinet-files",
- "clarity-repl 1.7.1",
+ "clarity-repl",
  "clarity-vm",
  "futures",
- "hiro-system-kit 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "hiro-system-kit",
  "http-body",
  "hyper",
  "k8s-openapi",
@@ -2977,9 +2941,11 @@ dependencies = [
 
 [[package]]
 name = "stacks-rpc-client"
-version = "1.0.8-alpha.0"
+version = "1.0.8-alpha.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f29d3c69dfd22f955c342746e8ab7e178426c9e362fd4fa79e7418fe08e61a50"
 dependencies = [
- "clarity-repl 1.7.2-alpha.0",
+ "clarity-repl",
  "hmac 0.12.1",
  "libsecp256k1 0.7.1",
  "pbkdf2",
