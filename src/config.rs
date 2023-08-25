@@ -331,10 +331,7 @@ mod tests {
         let mut template = get_template_config("src/tests/fixtures/stacks-devnet-config.json");
         let logger = hiro_system_kit::log::setup_logger();
         let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
-        let ctx = Context {
-            logger: None,
-            tracer: false,
-        };
+        let ctx = Context::empty();
         template.contracts[0].source = "invalid base64 string".to_string();
         template
             .to_validated_config(ctx)
@@ -346,10 +343,7 @@ mod tests {
         let template = get_template_config("src/tests/fixtures/stacks-devnet-config.json");
         let logger = hiro_system_kit::log::setup_logger();
         let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
-        let ctx = Context {
-            logger: None,
-            tracer: false,
-        };
+        let ctx = Context::empty();
         let validated_config = template
             .to_validated_config(ctx)
             .unwrap_or_else(|e| panic!("config validation test failed: {}", e.message));
