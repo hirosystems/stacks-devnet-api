@@ -128,7 +128,6 @@ jobs:
 
       - name: Install and run cargo-tarpaulin
         run: |
-          apt install cargo -y
           cargo install cargo-tarpaulin
           cargo --version
           cargo tarpaulin
