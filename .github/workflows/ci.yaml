@@ -119,7 +119,6 @@ jobs:
       - run: kubectl get all --all-namespaces
       - run: kubectl -n devnet get cm
       - run: kubectl -n devnet describe po stacks-devnet-api
-      - run: kubectl -n devnet logs stacks-devnet-api
 
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
