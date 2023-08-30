@@ -131,6 +131,11 @@ jobs:
           cargo --version
           cargo tarpaulin
 
+      - name: Upload to codecov.io
+        uses: codecov/codecov-action@v2
+        with:
+          token: ${{secrets.CODECOV_TOKEN}}
+
   build-publish-release:
     runs-on: ubuntu-latest
     needs:
