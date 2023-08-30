@@ -129,7 +129,7 @@ jobs:
         run: |
           cargo install cargo-tarpaulin
           cargo --version
-          cargo tarpaulin
+          cargo tarpaulin --out Lcov
 
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v2
