@@ -68,12 +68,6 @@ jobs:
     needs: build
 
     steps:
-      - name: Download Version Artifact
-        uses: actions/download-artifact@v2
-        with:
-          name: version-artifact
-          path: artifacts
-
       - name: Read version into env var
         env:
           version: ${{ needs.build.outputs.version_output }}
