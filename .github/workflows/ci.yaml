@@ -60,7 +60,7 @@ jobs:
 
       - name: Create Version output
         run: |
-          echo "versions=${{ steps.meta.outputs.Version }}" >> "$GITHUB_OUTPUT"
+          echo "version=${{ steps.meta.outputs.Version }}" >> "$GITHUB_OUTPUT"
         id: version_output
 
   k8s-tests:
@@ -72,7 +72,7 @@ jobs:
         env:
           version: ${{ needs.build.outputs.version_output }}
         run: |
-          echo "version_tag=$version" >> $GITHUB_ENV
+          echo "version_tag=$version" >> "$GITHUB_ENV"
           echo "Extracted version tag: $version_tag"
 
       - name: Checkout repository
