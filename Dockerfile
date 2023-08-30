@@ -1,4 +1,4 @@
-FROM rust:bullseye as builder
+FROM rust:bookworm as builder
 WORKDIR /src
 COPY . /src
 
