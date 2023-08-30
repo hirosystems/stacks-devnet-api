@@ -78,7 +78,7 @@ jobs:
         env:
           version: ${{ needs.build.outputs.version_output }}
         run: |
-          echo "version_tag=${{ version }}" >> $GITHUB_ENV
+          echo "version_tag=$version" >> $GITHUB_ENV
           echo "Extracted version tag: $version_tag"
 
       - name: Checkout repository
