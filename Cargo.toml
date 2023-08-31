@@ -25,12 +25,11 @@ http-body = "0.4.5"
 hiro-system-kit = {version = "0.1.0", features = ["log"]}
 strum_macros = "0.24.3"
 strum = "0.24.1"
-base64 = "0.21.2"
-clarity-vm = "2.1.1"
-clarity-repl = "1.6.4"
-clarinet-files = "1.0.0"
-chainhook-types = "1.0.1"
-clarinet-deployments = "1.0.1"
+clarity-vm =  "2.1.1"
+clarity-repl = "1.7.2"
+clarinet-files = {version = "1.0.2" }
+chainhook-types = "1.0"
+clarinet-deployments = {version = "1.0.2" }
 toml = "0.5.9"
 
 [dev-dependencies]

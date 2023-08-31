@@ -1,8 +1,5 @@
 use chainhook_types::StacksNetwork;
-use clarinet_files::{
-    compute_addresses, DEFAULT_DERIVATION_PATH, DEFAULT_EPOCH_2_0, DEFAULT_EPOCH_2_05,
-    DEFAULT_EPOCH_2_1, DEFAULT_POX2_ACTIVATION, DEFAULT_STACKS_MINER_MNEMONIC,
-};
+use clarinet_files::compute_addresses;
 use futures::future::try_join4;
 use hiro_system_kit::{slog, Logger};
 use hyper::{body::Bytes, Body, Client as HttpClient, Request, Response, Uri};
@@ -26,11 +23,12 @@ use strum::IntoEnumIterator;
 use tower::BoxError;
 
 pub mod config;
-use config::{StacksDevnetConfig, ValidatedStacksDevnetConfig};
+use config::ValidatedStacksDevnetConfig;
 
 mod template_parser;
 use template_parser::get_yaml_from_resource;
 
+pub mod api_config;
 pub mod resources;
 pub mod responder;
 pub mod routes;
@@ -135,8 +133,7 @@ impl StacksDevnetApiK8sManager {
         &self,
         config: ValidatedStacksDevnetConfig,
     ) -> Result<(), DevNetError> {
-        let user_config = config.user_config;
-        let namespace = &user_config.namespace;
+        let namespace = &config.namespace;
 
         let context = format!("NAMESPACE: {}", &namespace);
         let namespace_exists = self.check_namespace_exists(&namespace).await?;
@@ -169,20 +166,13 @@ impl StacksDevnetApiK8sManager {
             });
         };
 
-        self.deploy_bitcoin_node_pod(
-            &user_config,
-            config.project_manifest_yaml_string,
-            config.network_manifest_yaml_string,
-            config.deployment_plan_yaml_string,
-            config.contract_configmap_data,
-        )
-        .await?;
+        self.deploy_bitcoin_node_pod(&config).await?;
 
         sleep(Duration::from_secs(5));
 
-        self.deploy_stacks_node_pod(&user_config).await?;
+        self.deploy_stacks_node_pod(&config).await?;
 
-        if !user_config.disable_stacks_api {
+        if !config.disable_stacks_api {
             self.deploy_stacks_api_pod(&namespace).await?;
         }
         Ok(())
@@ -794,13 +784,10 @@ impl StacksDevnetApiK8sManager {
 
     async fn deploy_bitcoin_node_pod(
         &self,
-        config: &StacksDevnetConfig,
-        project_mainfest: String,
-        network_manifest: String,
-        deployment_plan: String,
-        contracts: Vec<(String, String)>,
+        config: &ValidatedStacksDevnetConfig,
     ) -> Result<(), DevNetError> {
         let namespace = &config.namespace;
+        let devnet_config = &config.devnet_config;
 
         let bitcoin_rpc_port =
             get_service_port(StacksDevnetService::BitcoindNode, ServicePort::RPC).unwrap();
@@ -831,8 +818,8 @@ impl StacksDevnetApiK8sManager {
                 rpcbind=0.0.0.0:{}
                 rpcport={}
                 "#,
-            config.bitcoin_node_username,
-            config.bitcoin_node_password,
+            devnet_config.bitcoin_node_username,
+            devnet_config.bitcoin_node_password,
             bitcoin_p2p_port,
             bitcoin_rpc_port,
             bitcoin_rpc_port
@@ -855,28 +842,37 @@ impl StacksDevnetApiK8sManager {
         self.deploy_configmap(
             StacksDevnetConfigmap::ProjectManifest,
             &namespace,
-            Some(vec![("Clarinet.toml".into(), project_mainfest)]),
+            Some(vec![(
+                "Clarinet.toml".into(),
+                config.project_manifest_yaml_string.to_owned(),
+            )]),
         )
         .await?;
 
         self.deploy_configmap(
             StacksDevnetConfigmap::Devnet,
             &namespace,
-            Some(vec![("Devnet.toml".into(), network_manifest)]),
+            Some(vec![(
+                "Devnet.toml".into(),
+                config.network_manifest_yaml_string.to_owned(),
+            )]),
         )
         .await?;
 
         self.deploy_configmap(
             StacksDevnetConfigmap::DeploymentPlan,
             &namespace,
-            Some(vec![("default.devnet-plan.yaml".into(), deployment_plan)]),
+            Some(vec![(
+                "default.devnet-plan.yaml".into(),
+                config.deployment_plan_yaml_string.to_owned(),
+            )]),
         )
         .await?;
 
         self.deploy_configmap(
             StacksDevnetConfigmap::ProjectDir,
             &namespace,
-            Some(contracts),
+            Some(config.contract_configmap_data.to_owned()),
         )
         .await?;
 
@@ -889,21 +885,19 @@ impl StacksDevnetApiK8sManager {
         Ok(())
     }
 
-    async fn deploy_stacks_node_pod(&self, config: &StacksDevnetConfig) -> Result<(), DevNetError> {
+    async fn deploy_stacks_node_pod(
+        &self,
+        config: &ValidatedStacksDevnetConfig,
+    ) -> Result<(), DevNetError> {
         let namespace = &config.namespace;
+        let devnet_config = &config.devnet_config;
 
         let chain_coordinator_ingestion_port =
             get_service_port(StacksDevnetService::BitcoindNode, ServicePort::Ingestion).unwrap();
 
         let (miner_coinbase_recipient, _, stacks_miner_secret_key_hex) = compute_addresses(
-            &config
-                .miner_mnemonic
-                .clone()
-                .unwrap_or(DEFAULT_STACKS_MINER_MNEMONIC.into()),
-            &config
-                .miner_derivation_path
-                .clone()
-                .unwrap_or(DEFAULT_DERIVATION_PATH.into()),
+            &devnet_config.miner_mnemonic,
+            &devnet_config.miner_derivation_path,
             &StacksNetwork::Devnet.get_networks(),
         );
 
@@ -941,31 +935,20 @@ impl StacksDevnetApiK8sManager {
                 get_service_port(StacksDevnetService::StacksNode, ServicePort::P2P).unwrap(),
                 stacks_miner_secret_key_hex,
                 stacks_miner_secret_key_hex,
-                config.stacks_node_wait_time_for_microblocks.unwrap_or(50),
-                config.stacks_node_first_attempt_time_ms.unwrap_or(500),
-                config
-                    .stacks_node_subsequent_attempt_time_ms
-                    .unwrap_or(1_000),
+                devnet_config.stacks_node_wait_time_for_microblocks,
+                devnet_config.stacks_node_first_attempt_time_ms,
+                devnet_config.stacks_node_subsequent_attempt_time_ms,
                 miner_coinbase_recipient
             );
 
-            for account in config.accounts.clone().iter() {
-                let derivation_path = account
-                    .derivation
-                    .clone()
-                    .unwrap_or(DEFAULT_DERIVATION_PATH.into());
-                let (stx_address, _, _) = compute_addresses(
-                    &account.mnemonic,
-                    &derivation_path,
-                    &StacksNetwork::Devnet.get_networks(),
-                );
+            for (_, account) in config.accounts.iter() {
                 stacks_conf.push_str(&format!(
                     r#"
                     [[ustx_balance]]
                     address = "{}"
                     amount = {}
                 "#,
-                    stx_address, account.balance
+                    account.stx_address, account.balance
                 ));
             }
 
@@ -1023,8 +1006,8 @@ impl StacksDevnetApiK8sManager {
                 peer_port = {}
                 "#,
                 bitcoind_chain_coordinator_host,
-                config.bitcoin_node_username,
-                config.bitcoin_node_password,
+                devnet_config.bitcoin_node_username,
+                devnet_config.bitcoin_node_password,
                 chain_coordinator_ingestion_port,
                 get_service_port(StacksDevnetService::BitcoindNode, ServicePort::P2P).unwrap()
             ));
@@ -1053,11 +1036,11 @@ impl StacksDevnetApiK8sManager {
                 # epoch_name = "2.2"
                 # start_height = {}
                 "#,
-                config.pox_2_activation.unwrap_or(DEFAULT_POX2_ACTIVATION),
-                config.epoch_2_0.unwrap_or(DEFAULT_EPOCH_2_0),
-                config.epoch_2_05.unwrap_or(DEFAULT_EPOCH_2_05),
-                config.epoch_2_1.unwrap_or(DEFAULT_EPOCH_2_1),
-                config.epoch_2_2.unwrap_or(110) //todo - get default value and uncomment config once stacks image is updated
+                devnet_config.pox_2_activation,
+                devnet_config.epoch_2_0,
+                devnet_config.epoch_2_05,
+                devnet_config.epoch_2_1,
+                devnet_config.epoch_2_2,
             ));
             stacks_conf
         };

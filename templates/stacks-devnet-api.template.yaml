@@ -40,6 +40,8 @@ metadata:
   namespace: devnet
 spec:
   serviceAccountName: stacks-devnet-api-service-account
+  imagePullSecrets:
+  - name: stacks-devnet-api-secret
   containers:
   - command: ["stacks-devnet-api"]
     name: stacks-devnet-api-container

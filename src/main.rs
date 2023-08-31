@@ -1,7 +1,8 @@
 use hiro_system_kit::slog;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, Server};
-use stacks_devnet_api::responder::{Responder, ResponderConfig};
+use stacks_devnet_api::api_config::ApiConfig;
+use stacks_devnet_api::responder::Responder;
 use stacks_devnet_api::routes::{
     get_standardized_path_parts, handle_check_devnet, handle_delete_devnet, handle_get_devnet,
     handle_new_devnet, handle_try_proxy_service, API_PATH,
@@ -28,7 +29,7 @@ async fn main() {
     } else {
         "/etc/config/Config.toml"
     };
-    let config = ResponderConfig::from_path(config_path);
+    let config = ApiConfig::from_path(config_path);
 
     let make_svc = make_service_fn(|_| {
         let k8s_manager = k8s_manager.clone();
@@ -53,7 +54,10 @@ async fn main() {
 async fn handle_request(
     request: Request<Body>,
     k8s_manager: StacksDevnetApiK8sManager,
-    config: ResponderConfig,
+    ApiConfig {
+        http_response_config,
+        auth_config,
+    }: ApiConfig,
     ctx: Context,
 ) -> Result<Response<Body>, Infallible> {
     let uri = request.uri();
@@ -67,14 +71,32 @@ async fn handle_request(
             path
         )
     });
+    let headers = request.headers().clone();
+    let responder = Responder::new(http_response_config, headers.clone()).unwrap();
 
-    let responder = Responder::new(config, request.headers().clone()).unwrap();
+    let auth_header = auth_config
+        .auth_header
+        .unwrap_or("x-auth-request-user".to_string());
+    let user_id = match headers.get(auth_header) {
+        Some(auth_header_value) => match auth_header_value.to_str() {
+            Ok(user_id) => user_id.replace("|", "-"),
+            Err(e) => {
+                let msg = format!("unable to parse auth header: {}", &e);
+                ctx.try_log(|logger| slog::warn!(logger, "{}", msg));
+                return responder.err_bad_request(msg);
+            }
+        },
+        None => return responder.err_bad_request("missing required auth header".into()),
+    };
+
     if method == &Method::OPTIONS {
         return responder.ok();
     }
     if path == "/api/v1/networks" {
         return match method {
-            &Method::POST => handle_new_devnet(request, k8s_manager, responder, ctx).await,
+            &Method::POST => {
+                handle_new_devnet(request, &user_id, k8s_manager, responder, ctx).await
+            }
             _ => responder.err_method_not_allowed("network creation must be a POST request".into()),
         };
     } else if path.starts_with(API_PATH) {
@@ -88,6 +110,9 @@ async fn handle_request(
             return responder.err_bad_request("no network id provided".into());
         }
         let network = path_parts.network.unwrap();
+        if network != user_id {
+            return responder.err_bad_request("network id must match authenticated user id".into());
+        }
 
         // verify that we have a valid namespace and the network actually exists
         let exists = match k8s_manager.check_namespace_exists(&network).await {
