@@ -1,0 +1,184 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    tags-ignore:
+      - "**"
+    paths-ignore:
+      - "**/CHANGELOG.md"
+      - "**/package.json"
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      version_output: ${{ steps.meta.outputs.version }}
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          token: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Docker Meta
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: |
+            hirosystems/${{ github.event.repository.name }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}},value=${{ steps.semantic.outputs.new_release_version }},enable=${{ steps.semantic.outputs.new_release_version != '' }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ steps.semantic.outputs.new_release_version }},enable=${{ steps.semantic.outputs.new_release_version != '' }}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Create artifact directory
+        run: mkdir -p /tmp/artifacts
+
+      - name: Build/Save Image
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          tags: ${{ steps.meta.outputs.tags }},
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=docker,dest=/tmp/artifacts/myimage.tar
+
+      - name: Save docker artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: docker-image
+          path: /tmp/artifacts/myimage.tar
+
+  k8s-tests:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Read version into env var
+        env:
+          version: ${{ needs.build.outputs.version_output }}
+        run: |
+          echo "version_tag=$version" >> "$GITHUB_ENV"
+          echo "Extracted version tag: $version_tag"
+
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Build k8s cluster
+        uses: nolar/setup-k3d-k3s@v1
+        with:
+          version: v1.26
+          k3d-name: k3d-kube
+          k3d-args: "--no-lb --no-rollback --k3s-arg --disable=traefik,servicelb,metrics-server@server:*"
+
+      - name: Pull docker image artifact from previous docker job
+        uses: actions/download-artifact@v3
+        with:
+          name: docker-image
+          path: /tmp/artifacts
+
+      - name: Load image
+        run: |
+          docker load --input /tmp/artifacts/myimage.tar
+          docker tag hirosystems/stacks-devnet-api:$version_tag hirosystems/stacks-devnet-api:ci
+          docker image ls -a
+
+      - name: Deploy k8s manifests
+        run: |
+          k3d image import hirosystems/stacks-devnet-api:ci -c k3d-kube
+          kubectl create namespace devnet
+          kubectl create configmap stacks-devnet-api-conf --from-file=./Config.toml --namespace devnet
+          kubectl apply -f ./templates/ci/stacks-devnet-api.template.yaml
+          echo "sleep for 30 sec"
+          sleep 30
+
+      - name: Sanity check on k8s resources deployed
+        run: |
+          kubectl get all --all-namespaces
+          kubectl -n devnet get cm
+          kubectl -n devnet describe po stacks-devnet-api
+          kubectl -n devnet logs stacks-devnet-api
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Install and run cargo-tarpaulin
+        run: |
+          cargo install cargo-tarpaulin
+          cargo --version
+          cargo tarpaulin --out Lcov
+
+      - name: Upload to codecov.io
+        uses: codecov/codecov-action@v2
+        with:
+          token: ${{secrets.CODECOV_TOKEN}}
+
+  build-publish-release:
+    runs-on: ubuntu-latest
+    needs:
+      - build
+      - k8s-tests
+    if: needs.build.result == 'success' && needs.k8s-tests.result == 'success'
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          token: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Semantic Release
+        uses: cycjimmy/semantic-release-action@v3
+        id: semantic
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+          SEMANTIC_RELEASE_PACKAGE: ${{ github.event.repository.name }}
+        with:
+          semantic_version: 19
+          extra_plugins: |
+            @semantic-release/changelog@6.0.3
+            @semantic-release/git@10.0.1
+            conventional-changelog-conventionalcommits@6.1.0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Docker Meta
+        id: meta
+        uses: docker/metadata-action@v4
+        with:
+          images: |
+            hirosystems/${{ github.event.repository.name }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}},value=${{ steps.semantic.outputs.new_release_version }},enable=${{ steps.semantic.outputs.new_release_version != '' }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ steps.semantic.outputs.new_release_version }},enable=${{ steps.semantic.outputs.new_release_version != '' }}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_PASSWORD }}
+
+      - name: Build/Push Image
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          tags: ${{ steps.meta.outputs.tags }},
+          labels: ${{ steps.meta.outputs.labels }}
+          # Only push if (there's a new release on main branch, or if building a non-main branch) and (Only run on non-PR events or only PRs that aren't from forks)
+          push: ${{ (github.ref != 'refs/heads/main' || steps.semantic.outputs.new_release_version != '') && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
