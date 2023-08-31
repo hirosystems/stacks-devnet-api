@@ -1,10 +1,23 @@
-[project]
-name = "px"
-description = "my description"
-authors = ['test1','test2']
-requirements = ['test1','test2']
-
-[contracts.px]
-path = "contracts/px.clar"
-clarity_version = 2
-epoch = "2.1"
+---
+metadata:
+  name: px
+  description: my description
+  authors:
+    - test1
+    - test2
+  telemetry: false
+  cache_dir: /etc/stacks-network/project/contracts
+  requirements: []
+contracts:
+  px:
+    path: contracts/px.clar
+    clarity_version: 2
+    epoch: 2.1
+repl:
+  analysis:
+    passes: []
+    check_checker:
+      strict: false
+      trusted_sender: false
+      trusted_caller: false
+      callee_filter: false
