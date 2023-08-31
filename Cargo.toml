@@ -27,11 +27,9 @@ strum_macros = "0.24.3"
 strum = "0.24.1"
 clarity-vm =  "2.1.1"
 clarity-repl = "1.7.2-alpha.1"
-# clarinet-files = {version = "1.0.2-alpha.1", path="../clarinet/components/clarinet-files" }
-clarinet-files = {version = "1.0.2-alpha.2" }
+clarinet-files = {version = "1.0.2" }
 chainhook-types = "1.0"
-# clarinet-deployments = {version = "1.0.2-alpha.0", path="../clarinet/components/clarinet-deployments" }
-clarinet-deployments = {version = "1.0.2-alpha.1" }
+clarinet-deployments = {version = "1.0.2" }
 toml = "0.5.9"
 
 [dev-dependencies]
