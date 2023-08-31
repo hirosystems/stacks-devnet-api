@@ -404,11 +404,8 @@ async fn main_starts_server() {
     });
     sleep(Duration::new(1, 0));
     let client = Client::new();
-    let request_builder = Request::builder()
-        .uri("http://localhost:8477")
-        .method(Method::OPTIONS)
-        .body(Body::empty())
-        .unwrap();
-    let response = client.request(request_builder).await;
+    let request_builder = get_request_builder("http://localhost:8477", Method::OPTIONS, "user-id");
+    let request = request_builder.body(Body::empty()).unwrap();
+    let response = client.request(request).await;
     assert_eq!(response.unwrap().status(), 200);
 }
