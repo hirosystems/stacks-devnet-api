@@ -6,87 +6,77 @@ network:
   deployment_fee_rate: 10
   sats_per_bytes: 10
 accounts:
-  deployer:
-    label: deployer
+  - label: deployer
     mnemonic: twice kind fence tip hidden tilt action fragile skin nothing glory cousin green tomorrow spring wrist shed math olympic multiply hip blue scout claw
     derivation: "m/44'/5757'/0'/0/0"
     balance: 100000000000000
     stx_address: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
     btc_address: mqVnk6NPRdhntvfm4hh9vvjiRkFDUuSYsH
     is_mainnet: false
-  faucet:
-    label: faucet
+  - label: faucet
     mnemonic: shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform
     derivation: "m/44'/5757'/0'/0/0"
     balance: 100000000000000
     stx_address: STNHKEPYEPJ8ET55ZZ0M5A34J0R3N5FM2CMMMAZ6
     btc_address: mjSrB3wS4xab3kYqFktwBzfTdPg367ZJ2d
     is_mainnet: false
-  wallet_1:
-    label: wallet_1
+  - label: wallet_1
     mnemonic: crazy vibrant runway diagram beach language above aerobic maze coral this gas mirror output vehicle cover usage ecology unfold room feel file rocket expire
     derivation: "m/44'/5757'/0'/0/0"
     balance: 100000000000000
     stx_address: STB8E0SMACY4A6DCCH4WE48YGX3P877407QW176V
     btc_address: mha4u7F3e93P9Xy1WQgVvGtYtynnJtT22x
     is_mainnet: false
-  wallet_2:
-    label: wallet_2
+  - label: wallet_2
     mnemonic: hold excess usual excess ring elephant install account glad dry fragile donkey gaze humble truck breeze nation gasp vacuum limb head keep delay hospital
     derivation: "m/44'/5757'/0'/0/0"
     balance: 100000000000000
     stx_address: ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG
     btc_address: muYdXKmX9bByAueDe6KFfHd5Ff1gdN9ErG
     is_mainnet: false
-  wallet_3:
-    label: wallet_3
+  - label: wallet_3
     mnemonic: cycle puppy glare enroll cost improve round trend wrist mushroom scorpion tower claim oppose clever elephant dinosaur eight problem before frozen dune wagon high
     derivation: "m/44'/5757'/0'/0/0"
     balance: 100000000000000
     stx_address: ST2JHG361ZXG51QTKY2NQCVBPPRRE2KZB1HR05NNC
     btc_address: mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7
     is_mainnet: false
-  wallet_4:
-    label: wallet_4
+  - label: wallet_4
     mnemonic: board list obtain sugar hour worth raven scout denial thunder horse logic fury scorpion fold genuine phrase wealth news aim below celery when cabin
     derivation: "m/44'/5757'/0'/0/0"
     balance: 100000000000000
     stx_address: ST2NEB84ASENDXKYGJPQW86YXQCEFEX2ZQPG87ND
     btc_address: mg1C76bNTutiCDV3t9nWhZs3Dc8LzUufj8
     is_mainnet: false
-  wallet_5:
-    label: wallet_5
+  - label: wallet_5
     mnemonic: hurry aunt blame peanut heavy update captain human rice crime juice adult scale device promote vast project quiz unit note reform update climb purchase
     derivation: "m/44'/5757'/0'/0/0"
     balance: 100000000000000
     stx_address: ST2REHHS5J3CERCRBEPMGH7921Q6PYKAADT7JP2VB
     btc_address: mweN5WVqadScHdA81aATSdcVr4B6dNokqx
     is_mainnet: false
-  wallet_6:
-    label: wallet_6
+  - label: wallet_6
     mnemonic: area desk dutch sign gold cricket dawn toward giggle vibrant indoor bench warfare wagon number tiny universe sand talk dilemma pottery bone trap buddy
     derivation: "m/44'/5757'/0'/0/0"
     balance: 100000000000000
     stx_address: ST3AM1A56AK2C1XAFJ4115ZSV26EB49BVQ10MGCS0
     btc_address: mzxXgV6e4BZSsz8zVHm3TmqbECt7mbuErt
     is_mainnet: false
-  wallet_7:
-    label: wallet_7
+  - label: wallet_7
     mnemonic: prevent gallery kind limb income control noise together echo rival record wedding sense uncover school version force bleak nuclear include danger skirt enact arrow
     derivation: "m/44'/5757'/0'/0/0"
     balance: 100000000000000
     stx_address: ST3PF13W7Z0RRM42A8VZRVFQ75SV1K26RXEP8YGKJ
     btc_address: n37mwmru2oaVosgfuvzBwgV2ysCQRrLko7
     is_mainnet: false
-  wallet_8:
-    label: wallet_8
+  - label: wallet_8
     mnemonic: female adjust gallery certain visit token during great side clown fitness like hurt clip knife warm bench start reunion globe detail dream depend fortune
     derivation: "m/44'/5757'/0'/0/0"
     balance: 100000000000000
     stx_address: ST3NBRSFKX28FQ2ZJ1MAKX58HKHSDGNV5N7R21XCP
     btc_address: n2v875jbJ4RjBnTjgbfikDfnwsDV5iUByw
     is_mainnet: false
-devnet:
+devnet_settings:
   name: devnet
   network_id: ~
   orchestrator_ingestion_port: 20445
@@ -100,7 +90,8 @@ devnet:
   stacks_node_wait_time_for_microblocks: 50
   stacks_node_first_attempt_time_ms: 500
   stacks_node_subsequent_attempt_time_ms: 1000
-  stacks_node_events_observers: []
+  stacks_node_events_observers:
+    - "host.docker.internal:20455"
   stacks_node_env_vars: []
   stacks_api_port: 3999
   stacks_api_events_port: 3700
@@ -150,8 +141,8 @@ devnet:
   stacks_explorer_image_url: "hirosystems/explorer:latest"
   postgres_image_url: "postgres:14"
   bitcoin_explorer_image_url: "quay.io/hirosystems/bitcoin-explorer:devnet"
-  disable_bitcoin_explorer: false
-  disable_stacks_explorer: false
+  disable_bitcoin_explorer: true
+  disable_stacks_explorer: true
   disable_stacks_api: false
   bind_containers_volumes: false
   enable_subnet_node: false
