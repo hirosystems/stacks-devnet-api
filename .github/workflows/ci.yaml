@@ -17,7 +17,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     outputs:
-      version_output: ${{ steps.version_output.outputs.version }}
+      version_output: ${{ steps.meta.outputs.Version }}
     steps:
       - uses: actions/checkout@v2
         with:
@@ -57,11 +57,6 @@ jobs:
         with:
           name: docker-image
           path: /tmp/artifacts/myimage.tar
-
-      - name: Create Version output
-        run: |
-          echo "version=${{ steps.meta.outputs.Version }}" >> "$GITHUB_OUTPUT"
-        id: version_output
 
   k8s-tests:
     runs-on: ubuntu-latest
