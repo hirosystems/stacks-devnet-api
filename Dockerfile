@@ -1,4 +1,5 @@
 FROM rust:bookworm as builder
+RUN apt update && apt install -y ca-certificates pkg-config libssl-dev libclang-11-dev
 WORKDIR /src
 COPY . /src
 
