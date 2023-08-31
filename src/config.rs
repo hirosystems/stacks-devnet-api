@@ -22,7 +22,7 @@ pub struct ValidatedStacksDevnetConfig {
     pub contract_configmap_data: Vec<(String, String)>,
     pub disable_stacks_api: bool,
 }
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct StacksDevnetConfig {
     pub namespace: String,
     pub disable_stacks_api: bool,
@@ -275,8 +275,9 @@ mod tests {
             tracer: false,
         };
         template.network_manifest.devnet = None;
+        let user_id = template.clone().namespace;
         template
-            .to_validated_config(ctx)
+            .to_validated_config(&user_id, ctx)
             .unwrap_or_else(|e| panic!("config validation test failed: {}", e.message));
     }
 
