@@ -78,8 +78,8 @@ async fn handle_request(
         .auth_header
         .unwrap_or("x-auth-request-user".to_string());
     let user_id = match headers.get(auth_header) {
-        Some(user_id) => match user_id.to_str() {
-            Ok(user_id) => user_id,
+        Some(auth_header_value) => match auth_header_value.to_str() {
+            Ok(user_id) => user_id.replace("|", "-"),
             Err(e) => {
                 let msg = format!("unable to parse auth header: {}", &e);
                 ctx.try_log(|logger| slog::warn!(logger, "{}", msg));
@@ -94,7 +94,9 @@ async fn handle_request(
     }
     if path == "/api/v1/networks" {
         return match method {
-            &Method::POST => handle_new_devnet(request, user_id, k8s_manager, responder, ctx).await,
+            &Method::POST => {
+                handle_new_devnet(request, &user_id, k8s_manager, responder, ctx).await
+            }
             _ => responder.err_method_not_allowed("network creation must be a POST request".into()),
         };
     } else if path.starts_with(API_PATH) {
