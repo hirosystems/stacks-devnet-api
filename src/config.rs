@@ -42,6 +42,7 @@ impl StacksDevnetConfig {
             "failed to validate config for NAMESPACE: {}",
             self.namespace
         );
+
         if user_id != self.namespace {
             let msg =
                 format!("{context}, ERROR: devnet namespace must match authenticated user id");
@@ -51,6 +52,7 @@ impl StacksDevnetConfig {
                 code: 400,
             });
         }
+
         let project_manifest_yaml_string = self
             .get_project_manifest_yaml_string()
             .map_err(|e| log_and_return_err(e, &context, &ctx))?;
@@ -226,10 +228,7 @@ mod tests {
         let user_id = &template.namespace.clone();
         let logger = hiro_system_kit::log::setup_logger();
         let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
-        let ctx = Context {
-            logger: None,
-            tracer: false,
-        };
+        let ctx = Context::empty();
         let validated_config = template
             .to_validated_config(user_id, ctx)
             .unwrap_or_else(|e| panic!("config validation test failed: {}", e.message));

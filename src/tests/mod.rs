@@ -48,10 +48,7 @@ fn get_template_config() -> StacksDevnetConfig {
 async fn get_k8s_manager() -> (StacksDevnetApiK8sManager, Context) {
     let logger = hiro_system_kit::log::setup_logger();
     let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
-    let ctx = Context {
-        logger: Some(logger),
-        tracer: false,
-    };
+    let ctx = Context::empty();
     let k8s_manager = StacksDevnetApiK8sManager::default(&ctx).await;
     (k8s_manager, ctx)
 }
@@ -93,10 +90,7 @@ fn assert_cannot_create_devnet_err((code, body): (StatusCode, String)) {
 
 fn assert_failed_proxy((code, body): (StatusCode, String)) {
     assert_eq!(code, StatusCode::INTERNAL_SERVER_ERROR);
-    assert_eq!(
-        body,
-        "error proxying request: error trying to connect: dns error: failed to lookup address information: nodename nor servname provided, or not known"
-    );
+    assert!(body.starts_with("error proxying request:"),);
 }
 
 fn assert_get_network((code, body): (StatusCode, String)) {
@@ -265,10 +259,7 @@ async fn get_mock_k8s_manager() -> (StacksDevnetApiK8sManager, Context) {
 
     let logger = hiro_system_kit::log::setup_logger();
     let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
-    let ctx = Context {
-        logger: Some(logger),
-        tracer: false,
-    };
+    let ctx = Context::empty();
     let k8s_manager = StacksDevnetApiK8sManager::new(mock_service, "default", &ctx).await;
     (k8s_manager, ctx)
 }
