@@ -17,7 +17,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     outputs:
-      version_output: ${{ steps.meta.outputs.Version }}
+      version_output: ${{ steps.meta.outputs.version }}
     steps:
       - uses: actions/checkout@v2
         with:
