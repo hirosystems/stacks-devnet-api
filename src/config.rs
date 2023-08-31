@@ -22,7 +22,7 @@ pub struct ValidatedStacksDevnetConfig {
     pub contract_configmap_data: Vec<(String, String)>,
     pub disable_stacks_api: bool,
 }
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct StacksDevnetConfig {
     pub namespace: String,
     pub disable_stacks_api: bool,
@@ -35,12 +35,24 @@ pub struct StacksDevnetConfig {
 impl StacksDevnetConfig {
     pub fn to_validated_config(
         self,
+        user_id: &str,
         ctx: Context,
     ) -> Result<ValidatedStacksDevnetConfig, DevNetError> {
         let context = format!(
             "failed to validate config for NAMESPACE: {}",
             self.namespace
         );
+
+        if user_id != self.namespace {
+            let msg =
+                format!("{context}, ERROR: devnet namespace must match authenticated user id");
+            ctx.try_log(|logger| slog::warn!(logger, "{}", msg));
+            return Err(DevNetError {
+                message: msg.into(),
+                code: 400,
+            });
+        }
+
         let project_manifest_yaml_string = self
             .get_project_manifest_yaml_string()
             .map_err(|e| log_and_return_err(e, &context, &ctx))?;
@@ -213,11 +225,12 @@ mod tests {
     #[test]
     fn it_converts_config_to_yaml() {
         let template = get_template_config("src/tests/fixtures/stacks-devnet-config.json");
+        let user_id = &template.namespace.clone();
         let logger = hiro_system_kit::log::setup_logger();
         let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
         let ctx = Context::empty();
         let validated_config = template
-            .to_validated_config(ctx)
+            .to_validated_config(user_id, ctx)
             .unwrap_or_else(|e| panic!("config validation test failed: {}", e.message));
 
         let expected_project_manifest = read_file("src/tests/fixtures/project-manifest.yaml");
@@ -261,8 +274,25 @@ mod tests {
             tracer: false,
         };
         template.network_manifest.devnet = None;
+        let user_id = template.clone().namespace;
         template
-            .to_validated_config(ctx)
+            .to_validated_config(&user_id, ctx)
             .unwrap_or_else(|e| panic!("config validation test failed: {}", e.message));
+    }
+
+    #[test]
+    fn it_rejects_config_with_namespace_user_id_mismatch() {
+        let template = get_template_config("src/tests/fixtures/stacks-devnet-config.json");
+        let namespace = template.namespace.clone();
+        let user_id = "wrong";
+        match template.to_validated_config(user_id, Context::empty()) {
+            Ok(_) => {
+                panic!("config validation with non-matching user_id should have been rejected")
+            }
+            Err(e) => {
+                assert_eq!(e.code, 400);
+                assert_eq!(e.message, format!("failed to validate config for NAMESPACE: {}, ERROR: devnet namespace must match authenticated user id", namespace));
+            }
+        }
     }
 }

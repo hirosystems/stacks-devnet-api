@@ -1,2 +1,6 @@
+[http_response]
 allowed_origins = ["*"]
 allowed_methods = ["DELETE", "GET", "OPTIONS", "POST", "HEAD"]
+
+[auth]
+auth_header = "x-auth-request-user"
