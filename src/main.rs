@@ -74,12 +74,24 @@ async fn handle_request(
     let headers = request.headers().clone();
     let responder = Responder::new(http_response_config, headers.clone()).unwrap();
 
+    if method == &Method::OPTIONS {
+        return responder.ok();
+    }
     let auth_header = auth_config
         .auth_header
         .unwrap_or("x-auth-request-user".to_string());
     let user_id = match headers.get(auth_header) {
         Some(auth_header_value) => match auth_header_value.to_str() {
-            Ok(user_id) => user_id.replace("|", "-"),
+            Ok(user_id) => {
+                let user_id = user_id.replace("|", "-");
+                match auth_config.namespace_prefix {
+                    Some(mut prefix) => {
+                        prefix.push_str(&user_id);
+                        prefix
+                    }
+                    None => user_id,
+                }
+            }
             Err(e) => {
                 let msg = format!("unable to parse auth header: {}", &e);
                 ctx.try_log(|logger| slog::warn!(logger, "{}", msg));
@@ -89,9 +101,6 @@ async fn handle_request(
         None => return responder.err_bad_request("missing required auth header".into()),
     };
 
-    if method == &Method::OPTIONS {
-        return responder.ok();
-    }
     if path == "/api/v1/networks" {
         return match method {
             &Method::POST => {
