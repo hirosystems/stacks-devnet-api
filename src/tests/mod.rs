@@ -328,6 +328,25 @@ async fn it_responds_to_invalid_request_header() {
     assert_eq!(body_str, "missing required auth header".to_string());
 }
 
+#[tokio::test]
+async fn it_ignores_request_header_for_options_requests() {
+    let (k8s_manager, ctx) = get_mock_k8s_manager().await;
+
+    let request_builder = Request::builder()
+        .uri("/api/v1/network/test")
+        .method(Method::OPTIONS);
+    let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
+    let response = handle_request(
+        request,
+        k8s_manager.clone(),
+        ApiConfig::default(),
+        ctx.clone(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(response.status(), 200);
+}
+
 #[test_case("" => is equal_to PathParts { route: String::new(), ..Default::default() }; "for empty path")]
 #[test_case("/api/v1/" => is equal_to PathParts { route: String::new(), ..Default::default() }; "for /api/v1/ path")]
 #[test_case("/api/v1/some-route" => is equal_to PathParts { route: String::from("some-route"), ..Default::default() }; "for /api/v1/some-route path")]

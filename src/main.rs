@@ -74,6 +74,9 @@ async fn handle_request(
     let headers = request.headers().clone();
     let responder = Responder::new(http_response_config, headers.clone()).unwrap();
 
+    if method == &Method::OPTIONS {
+        return responder.ok();
+    }
     let auth_header = auth_config
         .auth_header
         .unwrap_or("x-auth-request-user".to_string());
@@ -89,9 +92,6 @@ async fn handle_request(
         None => return responder.err_bad_request("missing required auth header".into()),
     };
 
-    if method == &Method::OPTIONS {
-        return responder.ok();
-    }
     if path == "/api/v1/networks" {
         return match method {
             &Method::POST => {
