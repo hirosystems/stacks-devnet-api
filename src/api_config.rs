@@ -22,6 +22,10 @@ pub struct ResponderConfig {
 #[derive(Serialize, Deserialize, Clone, Default)]
 pub struct AuthConfig {
     pub auth_header: Option<String>,
+    /// When the auth header is retrieved from the request,
+    /// this value will be prepended to the string to create
+    /// the k8s namespace.
+    pub namespace_prefix: Option<String>,
 }
 
 impl ApiConfig {

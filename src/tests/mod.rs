@@ -14,7 +14,7 @@ use hyper::{
 };
 use k8s_openapi::api::core::v1::Namespace;
 use stacks_devnet_api::{
-    api_config::ResponderConfig,
+    api_config::{AuthConfig, ResponderConfig},
     config::StacksDevnetConfig,
     resources::service::{
         get_service_from_path_part, get_service_port, get_service_url, ServicePort,
@@ -408,12 +408,49 @@ fn responder_allows_configuring_allowed_origins() {
     );
 }
 
+#[serial_test::serial]
+#[tokio::test]
+async fn namespace_prefix_config_prepends_header() {
+    let (k8s_manager, ctx) = get_k8s_manager().await;
+
+    // using the ApiConfig's `namespace_prefix` field will add the prefix
+    // before the `user_id` as the authenticated user, which should match the request path
+    let namespace = &get_random_namespace();
+    let _ = k8s_manager.deploy_namespace(&namespace).await.unwrap();
+
+    let (namespace_prefix, user_id) = namespace.split_at(4);
+    let api_config = ApiConfig {
+        auth_config: AuthConfig {
+            namespace_prefix: Some(namespace_prefix.to_string()),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let request_builder = get_request_builder(
+        &format!("/api/v1/network/{namespace}"),
+        Method::HEAD,
+        user_id,
+    );
+    let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
+    let mut response = handle_request(request, k8s_manager.clone(), api_config, ctx.clone())
+        .await
+        .unwrap();
+
+    let body = response.body_mut();
+    let bytes = body::to_bytes(body).await.unwrap().to_vec();
+    let body_str = String::from_utf8(bytes).unwrap();
+    assert_eq!(response.status(), 404);
+    assert_eq!(body_str, "not found");
+}
+
 #[test]
 fn config_reads_from_file() {
     let config = ApiConfig::from_path("Config.toml");
     assert!(config.http_response_config.allowed_methods.is_some());
     assert!(config.http_response_config.allowed_origins.is_some());
     assert!(config.auth_config.auth_header.is_some());
+    assert!(config.auth_config.namespace_prefix.is_some());
 }
 
 #[tokio::test]

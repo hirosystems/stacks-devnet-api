@@ -4,3 +4,4 @@ allowed_methods = ["DELETE", "GET", "OPTIONS", "POST", "HEAD"]
 
 [auth]
 auth_header = "x-auth-request-user"
+namespace_prefix = "platform-"
