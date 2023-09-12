@@ -193,9 +193,9 @@ checksum = "0ea22880d78093b0cbe17c89f64a7d457941e65759157ec6cb31a31d652b05e5"
 
 [[package]]
 name = "base64"
-version = "0.21.2"
+version = "0.21.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "604178f6c5c21f02dc555784810edfb88d34ac2c73b2eae109655649ee73ce3d"
+checksum = "9ba43ea6f343b788c8764558649e08df62f86c6ef251fdaeb1ffd010a9ae50a2"
 
 [[package]]
 name = "base64-compat"
@@ -399,11 +399,12 @@ dependencies = [
 
 [[package]]
 name = "clarinet-deployments"
-version = "1.0.2"
+version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ad2b850465d600a43e35e24a4a250504f946757bfcdd57d38ce012ffee2aa29"
+checksum = "e5b484bdc8880ac7cc3fff38d1cd17d957685af68f8dde2bba82878c48381bb4"
 dependencies = [
  "base58 0.2.0",
+ "base64 0.21.4",
  "bitcoin",
  "bitcoincore-rpc",
  "bitcoincore-rpc-json",
@@ -422,9 +423,9 @@ dependencies = [
 
 [[package]]
 name = "clarinet-files"
-version = "1.0.2"
+version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1fc42d784155c3dc4f578f14f41fd7fa4f01c3354a8b5a93e5cbe966cf002cce"
+checksum = "7dc81af3686bcf35e8f8bfe844473f1af3372a7e148561378f6598a871dc018b"
 dependencies = [
  "bip39",
  "bitcoin",
@@ -454,9 +455,9 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "1.7.2"
+version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b21c5cf2058527e435fbfb0040dd715190989a020c9ae7bcebce4cf4b3aabb9"
+checksum = "7ce75a1ed41a078a67f78abe73c84c241331044304831af8db8b7056dcef46fc"
 dependencies = [
  "ansi_term",
  "atty",
@@ -1420,7 +1421,7 @@ version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cd990069640f9db34b3b0f7a1afc62a05ffaa3be9b66aa3c313f58346df7f788"
 dependencies = [
- "base64 0.21.2",
+ "base64 0.21.4",
  "bytes",
  "chrono",
  "http",
@@ -2167,7 +2168,7 @@ version = "0.11.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cde824a14b7c14f85caff81225f411faacc04a2013f41670f41443742b1c1c55"
 dependencies = [
- "base64 0.21.2",
+ "base64 0.21.4",
  "bytes",
  "encoding_rs",
  "futures-core",
@@ -2328,7 +2329,7 @@ version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2d3987094b1d07b653b7dfdc3f70ce9a1da9c51ac18c1b06b662e4f9a0e9f4b2"
 dependencies = [
- "base64 0.21.2",
+ "base64 0.21.4",
 ]
 
 [[package]]
@@ -2868,9 +2869,9 @@ dependencies = [
 
 [[package]]
 name = "stacks-rpc-client"
-version = "1.0.9"
+version = "1.0.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "55ed9348051a94c97b7173792fd8d1308a2e89dada5da920dd22ac629464e6cb"
+checksum = "12eef9ff174e8345b414abbfa5ed7e271e772d1e6b2c3eaa9f7f02209c87f48e"
 dependencies = [
  "clarity-repl",
  "hmac 0.12.1",
@@ -3346,7 +3347,7 @@ version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ac8060a61f8758a61562f6fb53ba3cbe1ca906f001df2e53cccddcdbee91e7c"
 dependencies = [
- "base64 0.21.2",
+ "base64 0.21.4",
  "bitflags 2.3.3",
  "bytes",
  "futures-core",
