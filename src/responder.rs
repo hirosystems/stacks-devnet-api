@@ -1,7 +1,7 @@
 use hyper::{
     header::{
-        ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_ALLOW_METHODS,
-        ACCESS_CONTROL_ALLOW_ORIGIN, ORIGIN,
+        ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_ALLOW_HEADERS,
+        ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN, ORIGIN,
     },
     http::{response::Builder, HeaderValue},
     Body, HeaderMap, Response, StatusCode,
@@ -14,6 +14,7 @@ use crate::api_config::ResponderConfig;
 pub struct Responder {
     allowed_origins: Vec<String>,
     allowed_methods: Vec<String>,
+    allowed_headers: String,
     headers: HeaderMap<HeaderValue>,
 }
 
@@ -25,12 +26,15 @@ impl Responder {
         Ok(Responder {
             allowed_origins: config.allowed_origins.unwrap_or_default(),
             allowed_methods: config.allowed_methods.unwrap_or_default(),
+            allowed_headers: config.allowed_headers.unwrap_or("*".to_string()),
             headers,
         })
     }
 
     pub fn response_builder(&self) -> Builder {
-        let mut builder = Response::builder().header(ACCESS_CONTROL_ALLOW_CREDENTIALS, "true");
+        let mut builder = Response::builder()
+            .header(ACCESS_CONTROL_ALLOW_CREDENTIALS, "true")
+            .header(ACCESS_CONTROL_ALLOW_HEADERS, &self.allowed_headers);
 
         for method in &self.allowed_methods {
             builder = builder.header(ACCESS_CONTROL_ALLOW_METHODS, method);

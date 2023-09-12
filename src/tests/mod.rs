@@ -395,6 +395,7 @@ fn responder_allows_configuring_allowed_origins() {
     let config = ResponderConfig {
         allowed_origins: Some(vec!["*".to_string()]),
         allowed_methods: Some(vec!["GET".to_string()]),
+        allowed_headers: None,
     };
     let mut headers = HeaderMap::new();
     headers.append("ORIGIN", HeaderValue::from_str("example.com").unwrap());
