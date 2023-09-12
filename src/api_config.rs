@@ -17,6 +17,7 @@ pub struct ApiConfig {
 pub struct ResponderConfig {
     pub allowed_origins: Option<Vec<String>>,
     pub allowed_methods: Option<Vec<String>>,
+    pub allowed_headers: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Default)]
