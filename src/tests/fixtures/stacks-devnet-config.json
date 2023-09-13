@@ -336,7 +336,7 @@
     }
   },
   "project_manifest": {
-    "metadata": {
+    "project": {
       "name": "px",
       "description": "my description",
       "authors": ["test1", "test2"],
