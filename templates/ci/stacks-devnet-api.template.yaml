@@ -11,9 +11,11 @@ metadata:
   name: stacks-devnet-api-service-account
 rules:
   - apiGroups: [""]
-    # TODO: production version should not be able to create/delete namespaces (only get) 
-    resources: ["pods", "pods/status", "services", "configmaps", "persistentvolumeclaims", "namespaces"]
+    resources: ["pods", "pods/status", "services", "configmaps", "persistentvolumeclaims"]
     verbs: ["get", "delete", "create"]
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get"]
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
