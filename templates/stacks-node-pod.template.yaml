@@ -32,7 +32,13 @@ spec:
     - mountPath: /src/stacks-node
       name: stacks-node-conf-volume
       readOnly: true
+    - mountPath: /devnet
+      name: stacks-node-data-volume
+      readOnly: false
   volumes:
-  - configMap:
+  - name: stacks-node-conf-volume
+    configMap:
       name: stacks-node-conf
-    name: stacks-node-conf-volume
+  - name: stacks-node-data-volume
+    persistentVolumeClaim:
+      claimName: stacks-node-pvc

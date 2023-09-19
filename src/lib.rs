@@ -796,6 +796,7 @@ impl StacksDevnetApiK8sManager {
 
         let bitcoind_conf = format!(
             r#"
+                datadir=/etc/bitcoin
                 server=1
                 regtest=1
                 rpcallowip=0.0.0.0/0
@@ -875,6 +876,9 @@ impl StacksDevnetApiK8sManager {
             Some(config.contract_configmap_data.to_owned()),
         )
         .await?;
+
+        self.deploy_pvc(StacksDevnetPvc::BitcoindNode, &namespace)
+            .await?;
 
         self.deploy_pod(StacksDevnetPod::BitcoindNode, &namespace)
             .await?;
@@ -1051,6 +1055,9 @@ impl StacksDevnetApiK8sManager {
             Some(vec![("Stacks.toml".into(), stacks_conf)]),
         )
         .await?;
+
+        self.deploy_pvc(StacksDevnetPvc::StacksNode, &namespace)
+            .await?;
 
         self.deploy_pod(StacksDevnetPod::StacksNode, &namespace)
             .await?;

@@ -9,7 +9,7 @@ spec:
   containers:
   - command:
     - /usr/local/bin/bitcoind
-    - -conf=/etc/bitcoin/bitcoin.conf
+    - -conf=/tmp/conf/bitcoin.conf
     - -nodebuglogfile
     - -pid=/run/bitcoind.pid
     image: quay.io/hirosystems/bitcoind:devnet-v3
@@ -23,9 +23,12 @@ spec:
       name: rpc
       protocol: TCP
     volumeMounts:
-    - mountPath: /etc/bitcoin
+    - mountPath: /tmp/conf
       name: bitcoind-conf-volume
       readOnly: true
+    - mountPath: /etc/bitcoin
+      name: bitcoind-data-volume
+      readOnly: false
   - command:
     - ./stacks-network
     - --namespace=$(NAMESPACE)
@@ -74,3 +77,6 @@ spec:
   - configMap:
       name: project-dir-conf
     name: project-dir-conf-volume
+  - persistentVolumeClaim:
+      claimName: bitcoind-node-pvc
+    name: bitcoind-data-volume
