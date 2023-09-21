@@ -110,7 +110,14 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
+          profile: minimal
           override: true
+
+      - name: Cache cargo
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Install and run cargo-tarpaulin
         run: |
