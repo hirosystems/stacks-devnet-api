@@ -132,7 +132,7 @@ async fn handle_request(
         };
         if !exists {
             let msg = format!("network {} does not exist", &network);
-            ctx.try_log(|logger| slog::warn!(logger, "{}", msg));
+            ctx.try_log(|logger| slog::info!(logger, "{}", msg));
             return responder.err_not_found(msg);
         }
 
