@@ -11,5 +11,5 @@ spec:
       storage: 750Mi
     requests:
       storage: 500Mi
-  storageClassName: devnet-storage-class
+  storageClassName: premium-rwo
   volumeMode: Filesystem
