@@ -221,6 +221,7 @@ jobs:
         with:
           docker_tag: ${{ needs.build-publish-release.outputs.docker_image_digest }}
           k8s_repo: k8s-platform
+          k8s_branch: main
           file_pattern: manifests/api/stacks-devnet-api/${{ env.DEPLOY_ENV }}/base/kustomization.yaml
           gh_token: ${{ secrets.GH_TOKEN }}
 
@@ -262,6 +263,7 @@ jobs:
         with:
           docker_tag: ${{ needs.build-publish-release.outputs.docker_image_digest }}
           k8s_repo: k8s-platform
+          k8s_branch: main
           file_pattern: manifests/api/stacks-devnet-api/${{ env.DEPLOY_ENV }}/base/kustomization.yaml
           gh_token: ${{ secrets.GH_TOKEN }}
 
@@ -304,5 +306,6 @@ jobs:
         with:
           docker_tag: ${{ needs.build-publish-release.outputs.docker_image_digest }}
           k8s_repo: k8s-platform
+          k8s_branch: main
           file_pattern: manifests/api/stacks-devnet-api/${{ env.DEPLOY_ENV }}/base/kustomization.yaml
           gh_token: ${{ secrets.GH_TOKEN }}
