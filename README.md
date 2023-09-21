@@ -23,13 +23,8 @@ The `Config.toml` at the root directory of the project can be used to control so
  - `allowed_methods` - this setting is an array of strings that sets what HTTP methods can be made to this server.
 
 ## Deploying the Stable Version
-First, you'll need to use your docker credentials to be able to pull the docker image. To create the needed secret, in your terminal run:
-```
-kubectl create secret --namespace devnet docker-registry stacks-devnet-api-secret --docker-server=https://index.docker.io/v1/ --docker-username=<user> --docker-email=<email> --docker-password=<password>
-```
-and enter in the details for a docker user that has access to the `hirosystems/stacks-devnet-api` image.
 
-Then, in your terminal, run
+In your terminal, run
 ```
 ./scripts/deploy-api.sh
 ```
