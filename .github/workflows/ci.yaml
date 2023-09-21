@@ -5,51 +5,50 @@ on:
     branches:
       - main
       - develop
-    tags-ignore:
-      - "**"
     paths-ignore:
-      - "**/CHANGELOG.md"
-      - "**/package.json"
+      - '**/CHANGELOG.md'
   pull_request:
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
     outputs:
-      version_output: ${{ steps.meta.outputs.version }}
+      version: ${{ steps.docker_meta.outputs.version }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
           persist-credentials: false
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
       - name: Docker Meta
-        id: meta
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@v5
+        id: docker_meta
         with:
           images: |
             hirosystems/${{ github.event.repository.name }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
-            type=semver,pattern={{version}},value=${{ steps.semantic.outputs.new_release_version }},enable=${{ steps.semantic.outputs.new_release_version != '' }}
-            type=semver,pattern={{major}}.{{minor}},value=${{ steps.semantic.outputs.new_release_version }},enable=${{ steps.semantic.outputs.new_release_version != '' }}
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Create artifact directory
         run: mkdir -p /tmp/artifacts
 
       - name: Build/Save Image
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v5
         with:
           context: .
-          tags: ${{ steps.meta.outputs.tags }},
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.docker_meta.outputs.tags }},
+          labels: ${{ steps.docker_meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           outputs: type=docker,dest=/tmp/artifacts/myimage.tar
 
       - name: Save docker artifact
@@ -61,17 +60,16 @@ jobs:
   k8s-tests:
     runs-on: ubuntu-latest
     needs: build
+    env:
+      VERSION: ${{ needs.build.outputs.version }}
 
     steps:
       - name: Read version into env var
-        env:
-          version: ${{ needs.build.outputs.version_output }}
         run: |
-          echo "version_tag=$version" >> "$GITHUB_ENV"
-          echo "Extracted version tag: $version_tag"
+          echo "Extracted version tag: ${VERSION}"
 
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
       - name: Build k8s cluster
         uses: nolar/setup-k3d-k3s@v1
@@ -89,7 +87,7 @@ jobs:
       - name: Load image
         run: |
           docker load --input /tmp/artifacts/myimage.tar
-          docker tag hirosystems/stacks-devnet-api:$version_tag hirosystems/stacks-devnet-api:ci
+          docker tag hirosystems/stacks-devnet-api:${VERSION} hirosystems/stacks-devnet-api:ci
           docker image ls -a
 
       - name: Deploy k8s manifests
@@ -121,7 +119,7 @@ jobs:
           cargo tarpaulin --out lcov
 
       - name: Upload to codecov.io
-        uses: codecov/codecov-action@v2
+        uses: codecov/codecov-action@v3
         with:
           token: ${{secrets.CODECOV_TOKEN}}
 
@@ -130,20 +128,20 @@ jobs:
     needs:
       - build
       - k8s-tests
-    if: needs.build.result == 'success' && needs.k8s-tests.result == 'success'
+    outputs:
+      docker_image_digest: ${{ steps.docker_push.outputs.digest }}
+      new_release_published: ${{ steps.semantic.outputs.new_release_published }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
-          fetch-depth: 0
           persist-credentials: false
 
       - name: Semantic Release
-        uses: cycjimmy/semantic-release-action@v3
+        uses: cycjimmy/semantic-release-action@v4
         id: semantic
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SEMANTIC_RELEASE_PACKAGE: ${{ github.event.repository.name }}
         with:
           semantic_version: 19
@@ -152,12 +150,19 @@ jobs:
             @semantic-release/git@10.0.1
             conventional-changelog-conventionalcommits@6.1.0
 
+      - name: Checkout tag
+        if: steps.semantic.outputs.new_release_version != ''
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          ref: v${{ steps.semantic.outputs.new_release_version }}
+
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
       - name: Docker Meta
-        id: meta
-        uses: docker/metadata-action@v4
+        uses: docker/metadata-action@v5
+        id: docker_meta
         with:
           images: |
             hirosystems/${{ github.event.repository.name }}
@@ -168,18 +173,130 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},value=${{ steps.semantic.outputs.new_release_version }},enable=${{ steps.semantic.outputs.new_release_version != '' }}
             type=raw,value=latest,enable={{is_default_branch}}
 
-      - name: Login to DockerHub
-        uses: docker/login-action@v2
+      - name: Log in to DockerHub
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_PASSWORD }}
 
       - name: Build/Push Image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v5
+        id: docker_push
         with:
           context: .
-          tags: ${{ steps.meta.outputs.tags }},
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.docker_meta.outputs.tags }},
+          labels: ${{ steps.docker_meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           # Only push if (there's a new release on main branch, or if building a non-main branch) and (Only run on non-PR events or only PRs that aren't from forks)
           push: ${{ (github.ref != 'refs/heads/main' || steps.semantic.outputs.new_release_version != '') && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+
+  deploy-dev:
+    runs-on: ubuntu-latest
+    needs:
+      - build-publish-release
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    env:
+      DEPLOY_ENV: dev
+    environment:
+      name: Development
+      url: https://platform.dev.hiro.so/
+    steps:
+      - name: Checkout actions repo
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GH_TOKEN }}
+          repository: ${{ secrets.DEVOPS_ACTIONS_REPO }}
+
+      - name: Deploy Stacks Devnet API
+        uses: ./actions/deploy
+        with:
+          docker_tag: ${{ needs.build-publish-release.outputs.docker_image_digest }}
+          k8s_repo: k8s-platform
+          application_path: manifests/api/stacks-devnet-api/${{ env.DEPLOY_ENV }}/base/kustomization.yaml
+          gh_token: ${{ secrets.GH_TOKEN }}
+
+  auto-approve-dev:
+    runs-on: ubuntu-latest
+    if: needs.build-publish-release.outputs.new_release_published == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    needs:
+      - build-publish-release
+    steps:
+      - name: Approve pending deployment
+        run: |
+          sleep 5
+          ENV_ID=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/hirosystems/stacks-devnet-api/actions/runs/${{ github.run_id }}/pending_deployments" | jq -r '.[0].environment.id // empty')
+          if [[ -n "${ENV_ID}" ]]; then
+            curl -s -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/hirosystems/stacks-devnet-api/actions/runs/${{ github.run_id }}/pending_deployments" -d "{\"environment_ids\":[${ENV_ID}],\"state\":\"approved\",\"comment\":\"auto approve\"}"
+          fi
+
+  deploy-staging:
+    runs-on: ubuntu-latest
+    needs:
+      - build-publish-release
+      - deploy-dev
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    env:
+      DEPLOY_ENV: stg
+    environment:
+      name: Staging
+      url: https://platform.stg.hiro.so/
+    steps:
+      - name: Checkout actions repo
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GH_TOKEN }}
+          repository: ${{ secrets.DEVOPS_ACTIONS_REPO }}
+
+      - name: Deploy Stacks Devnet API
+        uses: ./actions/deploy
+        with:
+          docker_tag: ${{ needs.build-publish-release.outputs.docker_image_digest }}
+          k8s_repo: k8s-platform
+          application_path: manifests/api/stacks-devnet-api/${{ env.DEPLOY_ENV }}/base/kustomization.yaml
+          gh_token: ${{ secrets.GH_TOKEN }}
+
+  auto-approve-staging:
+    runs-on: ubuntu-latest
+    if: needs.build-publish-release.outputs.new_release_published == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    needs:
+      - build-publish-release
+      - deploy-dev
+    steps:
+      - name: Approve pending deployment
+        run: |
+          sleep 5
+          ENV_ID=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/hirosystems/stacks-devnet-api/actions/runs/${{ github.run_id }}/pending_deployments" | jq -r '.[0].environment.id // empty')
+          if [[ -n "${ENV_ID}" ]]; then
+            curl -s -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/hirosystems/stacks-devnet-api/actions/runs/${{ github.run_id }}/pending_deployments" -d "{\"environment_ids\":[${ENV_ID}],\"state\":\"approved\",\"comment\":\"auto approve\"}"
+          fi
+
+  deploy-prod:
+    runs-on: ubuntu-latest
+    if: needs.build-publish-release.outputs.new_release_published == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    needs:
+      - build-publish-release
+      - deploy-staging
+    env:
+      DEPLOY_ENV: prd
+    environment:
+      name: Production
+      url: https://platform.hiro.so/
+    steps:
+      - name: Checkout actions repo
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GH_TOKEN }}
+          repository: ${{ secrets.DEVOPS_ACTIONS_REPO }}
+
+      - name: Deploy Stacks Devnet API
+        uses: ./actions/deploy
+        with:
+          docker_tag: ${{ needs.build-publish-release.outputs.docker_image_digest }}
+          k8s_repo: k8s-platform
+          application_path: manifests/api/stacks-devnet-api/${{ env.DEPLOY_ENV }}/base/kustomization.yaml
+          gh_token: ${{ secrets.GH_TOKEN }}
