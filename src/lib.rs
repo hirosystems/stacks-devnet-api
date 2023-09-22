@@ -437,8 +437,9 @@ impl StacksDevnetApiK8sManager {
         namespace: &str,
     ) -> Result<StacksV2InfoResponse, DevNetError> {
         let client = HttpClient::new();
-        let url = get_service_url(namespace, StacksDevnetService::StacksNode);
-        let port = get_service_port(StacksDevnetService::StacksNode, ServicePort::RPC).unwrap();
+        let url = get_service_url(namespace, StacksDevnetService::StacksBlockchain);
+        let port =
+            get_service_port(StacksDevnetService::StacksBlockchain, ServicePort::RPC).unwrap();
         let url = format!("http://{}:{}/v2/info", url, port);
 
         let context = format!("NAMESPACE: {}", namespace);
@@ -548,8 +549,8 @@ impl StacksDevnetApiK8sManager {
                     chain_info,
                 ) = try_join4(
                     self.get_pod_status_info(&namespace, StacksDevnetPod::BitcoindNode),
-                    self.get_pod_status_info(&namespace, StacksDevnetPod::StacksNode),
-                    self.get_pod_status_info(&namespace, StacksDevnetPod::StacksApi),
+                    self.get_pod_status_info(&namespace, StacksDevnetPod::StacksBlockchain),
+                    self.get_pod_status_info(&namespace, StacksDevnetPod::StacksBlockchainApi),
                     self.get_stacks_v2_info(&namespace),
                 )
                 .await?;
@@ -833,13 +834,6 @@ impl StacksDevnetApiK8sManager {
         .await?;
 
         self.deploy_configmap(
-            StacksDevnetConfigmap::Namespace,
-            &namespace,
-            Some(vec![("NAMESPACE".into(), namespace.clone())]),
-        )
-        .await?;
-
-        self.deploy_configmap(
             StacksDevnetConfigmap::ProjectManifest,
             &namespace,
             Some(vec![(
@@ -931,8 +925,8 @@ impl StacksDevnetApiK8sManager {
                     block_reward_recipient = "{}"
                     # microblock_attempt_time_ms = 15000
                 "#,
-                get_service_port(StacksDevnetService::StacksNode, ServicePort::RPC).unwrap(),
-                get_service_port(StacksDevnetService::StacksNode, ServicePort::P2P).unwrap(),
+                get_service_port(StacksDevnetService::StacksBlockchain, ServicePort::RPC).unwrap(),
+                get_service_port(StacksDevnetService::StacksBlockchain, ServicePort::P2P).unwrap(),
                 stacks_miner_secret_key_hex,
                 stacks_miner_secret_key_hex,
                 devnet_config.stacks_node_wait_time_for_microblocks,
@@ -979,15 +973,16 @@ impl StacksDevnetApiK8sManager {
 
             stacks_conf.push_str(&format!(
                 r#"
-            # Add stacks-api as an event observer
+            # Add stacks-blockchain-api as an event observer
             [[events_observer]]
             endpoint = "{}:{}"
             retry_count = 255
             include_data_events = false
             events_keys = ["*"]
             "#,
-                get_service_url(&namespace, StacksDevnetService::StacksApi),
-                get_service_port(StacksDevnetService::StacksApi, ServicePort::Event).unwrap(),
+                get_service_url(&namespace, StacksDevnetService::StacksBlockchainApi),
+                get_service_port(StacksDevnetService::StacksBlockchainApi, ServicePort::Event)
+                    .unwrap(),
             ));
 
             stacks_conf.push_str(&format!(
@@ -1046,16 +1041,16 @@ impl StacksDevnetApiK8sManager {
         };
 
         self.deploy_configmap(
-            StacksDevnetConfigmap::StacksNode,
+            StacksDevnetConfigmap::StacksBlockchain,
             &namespace,
             Some(vec![("Stacks.toml".into(), stacks_conf)]),
         )
         .await?;
 
-        self.deploy_pod(StacksDevnetPod::StacksNode, &namespace)
+        self.deploy_pod(StacksDevnetPod::StacksBlockchain, &namespace)
             .await?;
 
-        self.deploy_service(StacksDevnetService::StacksNode, namespace)
+        self.deploy_service(StacksDevnetService::StacksBlockchain, namespace)
             .await?;
 
         Ok(())
@@ -1068,19 +1063,22 @@ impl StacksDevnetApiK8sManager {
             ("POSTGRES_DB".into(), "stacks_api".into()),
         ]);
         self.deploy_configmap(
-            StacksDevnetConfigmap::StacksApiPostgres,
+            StacksDevnetConfigmap::StacksBlockchainApiPg,
             &namespace,
             Some(stacks_api_pg_env),
         )
         .await?;
 
         // configmap env vars for api conatainer
-        let stacks_node_host = get_service_url(&namespace, StacksDevnetService::StacksNode);
-        let rpc_port = get_service_port(StacksDevnetService::StacksNode, ServicePort::RPC).unwrap();
-        let api_port = get_service_port(StacksDevnetService::StacksApi, ServicePort::API).unwrap();
+        let stacks_node_host = get_service_url(&namespace, StacksDevnetService::StacksBlockchain);
+        let rpc_port =
+            get_service_port(StacksDevnetService::StacksBlockchain, ServicePort::RPC).unwrap();
+        let api_port =
+            get_service_port(StacksDevnetService::StacksBlockchainApi, ServicePort::API).unwrap();
         let event_port =
-            get_service_port(StacksDevnetService::StacksApi, ServicePort::Event).unwrap();
-        let db_port = get_service_port(StacksDevnetService::StacksApi, ServicePort::DB).unwrap();
+            get_service_port(StacksDevnetService::StacksBlockchainApi, ServicePort::Event).unwrap();
+        let db_port =
+            get_service_port(StacksDevnetService::StacksBlockchainApi, ServicePort::DB).unwrap();
         let stacks_api_env = Vec::from([
             ("STACKS_CORE_RPC_HOST".into(), stacks_node_host),
             ("STACKS_BLOCKCHAIN_API_DB".into(), "pg".into()),
@@ -1101,19 +1099,19 @@ impl StacksDevnetApiK8sManager {
             ("STACKS_API_LOG_LEVEL".into(), "debug".into()),
         ]);
         self.deploy_configmap(
-            StacksDevnetConfigmap::StacksApi,
+            StacksDevnetConfigmap::StacksBlockchainApi,
             &namespace,
             Some(stacks_api_env),
         )
         .await?;
 
-        self.deploy_pvc(StacksDevnetPvc::StacksApi, &namespace)
+        self.deploy_pvc(StacksDevnetPvc::StacksBlockchainApiPg, &namespace)
             .await?;
 
-        self.deploy_pod(StacksDevnetPod::StacksApi, &namespace)
+        self.deploy_pod(StacksDevnetPod::StacksBlockchainApi, &namespace)
             .await?;
 
-        self.deploy_service(StacksDevnetService::StacksApi, &namespace)
+        self.deploy_service(StacksDevnetService::StacksBlockchainApi, &namespace)
             .await?;
 
         Ok(())

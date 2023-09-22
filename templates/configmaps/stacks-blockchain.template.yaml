@@ -1,7 +1,7 @@
 apiVersion: v1
 data:
-  key: "{value}"
+  Stacks.toml: "{data}"
 kind: ConfigMap
 metadata:
-  name: stacks-api-postgres-conf
+  name: stacks-blockchain
   namespace: "{namespace}"

@@ -3,5 +3,5 @@ data:
   key: "{value}"
 kind: ConfigMap
 metadata:
-  name: devnet-conf
+  name: stacks-blockchain-api
   namespace: "{namespace}"

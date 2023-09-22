@@ -112,7 +112,7 @@ enum TestBody {
 #[test_case("/api/v1/networks", Method::POST, Some(TestBody::CreateNetwork), true => using assert_cannot_create_devnet_err; "409 for create network POST request if devnet exists")]
 #[test_case("/api/v1/network/{namespace}", Method::GET, None, true => using assert_get_network; "200 for network GET request to existing network")]
 #[test_case("/api/v1/network/{namespace}", Method::HEAD, None, true => is equal_to (StatusCode::OK, "Ok".to_string()); "200 for network HEAD request to existing network")]
-#[test_case("/api/v1/network/{namespace}/stacks-node/v2/info/", Method::GET, None, true => using assert_failed_proxy; "proxies requests to downstream nodes")]
+#[test_case("/api/v1/network/{namespace}/stacks-blockchain/v2/info/", Method::GET, None, true => using assert_failed_proxy; "proxies requests to downstream nodes")]
 #[serial_test::serial]
 #[tokio::test]
 async fn it_responds_to_valid_requests_with_deploy(
@@ -178,7 +178,7 @@ async fn it_responds_to_valid_requests_with_deploy(
 #[test_case("/api/v1/network/{namespace}", Method::DELETE, true => using assert_cannot_delete_devnet_err; "409 for network DELETE request to non-existing network")]
 #[test_case("/api/v1/network/{namespace}", Method::GET, true => using assert_not_all_assets_exist_err; "404 for network GET request to non-existing network")]
 #[test_case("/api/v1/network/{namespace}", Method::HEAD, true => is equal_to (StatusCode::NOT_FOUND, "not found".to_string()); "404 for network HEAD request to non-existing network")]
-#[test_case("/api/v1/network/{namespace}/stacks-node/v2/info/", Method::GET, true => using assert_not_all_assets_exist_err; "404 for proxy requests to downstream nodes of non-existing network")]
+#[test_case("/api/v1/network/{namespace}/stacks-blockchain/v2/info/", Method::GET, true => using assert_not_all_assets_exist_err; "404 for proxy requests to downstream nodes of non-existing network")]
 #[tokio::test]
 async fn it_responds_to_valid_requests(
     mut request_path: &str,
@@ -364,7 +364,7 @@ fn request_paths_are_parsed_correctly(path: &str) -> PathParts {
 
 #[tokio::test]
 async fn request_mutation_should_create_valid_proxy_destination() {
-    let path = "/api/v1/some-route/some-network/stacks-node/the//remaining///path";
+    let path = "/api/v1/some-route/some-network/stacks-blockchain/the//remaining///path";
     let path_parts = get_standardized_path_parts(path);
     let network = path_parts.network.unwrap();
     let subroute = path_parts.subroute.unwrap();
@@ -382,9 +382,9 @@ async fn request_mutation_should_create_valid_proxy_destination() {
     let actual_url = request.uri().to_string();
     let expected = format!(
         "http://{}.{}.svc.cluster.local:{}/{}",
-        StacksDevnetService::StacksNode,
+        StacksDevnetService::StacksBlockchain,
         network,
-        get_service_port(StacksDevnetService::StacksNode, ServicePort::RPC).unwrap(),
+        get_service_port(StacksDevnetService::StacksBlockchain, ServicePort::RPC).unwrap(),
         &remainder
     );
     assert_eq!(actual_url, expected);

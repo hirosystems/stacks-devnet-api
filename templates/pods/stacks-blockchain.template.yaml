@@ -2,15 +2,15 @@ apiVersion: v1
 kind: Pod
 metadata:
   labels:
-    name: stacks-node
-  name: stacks-node
+    name: stacks-blockchain
+  name: stacks-blockchain
   namespace: "{namespace}"
 spec:
   containers:
   - command:
-    - stacks-node
+    - stacks-blockchain
     - start
-    - --config=/src/stacks-node/Stacks.toml
+    - --config=/src/stacks-blockchain/Stacks.toml
     env:
     - name: STACKS_LOG_PP
       value: "1"
@@ -18,9 +18,9 @@ spec:
       value: "1"
     - name: STACKS_LOG_DEBUG
       value: "0"
-    image: quay.io/hirosystems/stacks-node:devnet-v3
+    image: quay.io/hirosystems/stacks-blockchain:devnet-v3
     imagePullPolicy: IfNotPresent
-    name: stacks-node-container
+    name: stacks-blockchain
     ports:
     - containerPort: 20444
       name: p2p
@@ -29,10 +29,10 @@ spec:
       name: rpc
       protocol: TCP
     volumeMounts:
-    - mountPath: /src/stacks-node
-      name: stacks-node-conf-volume
+    - mountPath: /src/stacks-blockchain
+      name: stacks-blockchain
       readOnly: true
   volumes:
   - configMap:
-      name: stacks-node-conf
-    name: stacks-node-conf-volume
+      name: stacks-blockchain
+    name: stacks-blockchain
