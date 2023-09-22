@@ -117,6 +117,18 @@ impl Responder {
         self._respond(StatusCode::OK, "Ok".into())
     }
 
+    pub fn ok_with_json(&self, body: Body) -> Result<Response<Body>, Infallible> {
+        match self
+            .response_builder()
+            .status(StatusCode::OK)
+            .header("Content-Type", "application/json")
+            .body(body)
+        {
+            Ok(r) => Ok(r),
+            Err(e) => self.err_internal(format!("failed to send response: {}", e.to_string())),
+        }
+    }
+
     pub fn err_method_not_allowed(&self, body: String) -> Result<Response<Body>, Infallible> {
         self._respond(StatusCode::METHOD_NOT_ALLOWED, body)
     }
