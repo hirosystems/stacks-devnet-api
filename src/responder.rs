@@ -1,3 +1,4 @@
+use hiro_system_kit::slog;
 use hyper::{
     header::{
         ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_ALLOW_HEADERS,
@@ -73,9 +74,35 @@ impl Responder {
 
     fn _respond(&self, code: StatusCode, body: String) -> Result<Response<Body>, Infallible> {
         let builder = self.response_builder();
-        match builder.status(code).body(Body::try_from(body).unwrap()) {
+        let body = match Body::try_from(body) {
+            Ok(b) => b,
+            Err(e) => {
+                self.ctx.try_log(|logger| {
+                    slog::error!(
+                        logger,
+                        "responder failed to create response body: {}",
+                        e.to_string()
+                    )
+                });
+                Body::empty()
+            }
+        };
+        match builder.status(code).body(body) {
             Ok(r) => Ok(r),
-            Err(_) => unreachable!(),
+            Err(e) => {
+                self.ctx.try_log(|logger| {
+                    slog::error!(
+                        logger,
+                        "responder failed to send response: {}",
+                        e.to_string()
+                    )
+                });
+                Ok(self
+                    .response_builder()
+                    .status(500)
+                    .body(Body::empty())
+                    .unwrap())
+            }
         }
     }
 
