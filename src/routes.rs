@@ -60,12 +60,7 @@ pub async fn handle_get_devnet(
 ) -> Result<Response<Body>, Infallible> {
     match k8s_manager.get_devnet_info(&network).await {
         Ok(devnet_info) => match serde_json::to_vec(&devnet_info) {
-            Ok(body) => Ok(responder
-                .response_builder()
-                .status(StatusCode::OK)
-                .header("Content-Type", "application/json")
-                .body(Body::from(body))
-                .unwrap()),
+            Ok(body) => responder.ok_with_json(Body::from(body)),
             Err(e) => {
                 let msg = format!(
                     "failed to form response body: NAMESPACE: {}, ERROR: {}",
