@@ -8,26 +8,39 @@ use hyper::{
 };
 use std::convert::Infallible;
 
-use crate::api_config::ResponderConfig;
+use crate::{api_config::ResponderConfig, Context};
 
-#[derive(Default)]
 pub struct Responder {
     allowed_origins: Vec<String>,
     allowed_methods: Vec<String>,
     allowed_headers: String,
     headers: HeaderMap<HeaderValue>,
+    ctx: Context,
 }
 
+impl Default for Responder {
+    fn default() -> Self {
+        Responder {
+            allowed_origins: Vec::default(),
+            allowed_methods: Vec::default(),
+            allowed_headers: String::default(),
+            headers: HeaderMap::default(),
+            ctx: Context::empty(),
+        }
+    }
+}
 impl Responder {
     pub fn new(
         config: ResponderConfig,
         headers: HeaderMap<HeaderValue>,
+        ctx: Context,
     ) -> Result<Responder, String> {
         Ok(Responder {
             allowed_origins: config.allowed_origins.unwrap_or_default(),
             allowed_methods: config.allowed_methods.unwrap_or_default(),
             allowed_headers: config.allowed_headers.unwrap_or("*".to_string()),
             headers,
+            ctx,
         })
     }
 
