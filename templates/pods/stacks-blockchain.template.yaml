@@ -8,7 +8,7 @@ metadata:
 spec:
   containers:
   - command:
-    - stacks-blockchain
+    - stacks-node
     - start
     - --config=/src/stacks-blockchain/Stacks.toml
     env:
