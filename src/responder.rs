@@ -107,7 +107,10 @@ impl Responder {
     }
 
     pub fn respond(&self, code: u16, body: String) -> Result<Response<Body>, Infallible> {
-        self._respond(StatusCode::from_u16(code).unwrap(), body)
+        self._respond(
+            StatusCode::from_u16(code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
+            body,
+        )
     }
 
     pub fn ok(&self) -> Result<Response<Body>, Infallible> {
