@@ -34,8 +34,8 @@ spec:
       protocol: TCP
     volumeMounts:
     - mountPath: /var/lib/postgresql/data
-      name: stacks-blockchain-api
+      name: stacks-blockchain-api-pg
   volumes:
-  - name: stacks-blockchain-api
+  - name: stacks-blockchain-api-pg
     persistentVolumeClaim:
-      claimName: stacks-blockchain-api
+      claimName: stacks-blockchain-api-pg
