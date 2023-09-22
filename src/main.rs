@@ -8,6 +8,7 @@ use stacks_devnet_api::routes::{
     handle_new_devnet, handle_try_proxy_service, API_PATH,
 };
 use stacks_devnet_api::{Context, StacksDevnetApiK8sManager};
+use std::env;
 use std::{convert::Infallible, net::SocketAddr};
 
 #[tokio::main]
@@ -24,12 +25,17 @@ async fn main() {
         tracer: false,
     };
     let k8s_manager = StacksDevnetApiK8sManager::default(&ctx).await;
-    let config_path = if cfg!(debug_assertions) {
-        "./Config.toml"
-    } else {
-        "/etc/config/Config.toml"
+    let config_path = match env::var("CONFIG_PATH") {
+        Ok(path) => path,
+        Err(_) => {
+            if cfg!(debug_assertions) {
+                "./Config.toml".into()
+            } else {
+                "/etc/config/Config.toml".into()
+            }
+        }
     };
-    let config = ApiConfig::from_path(config_path);
+    let config = ApiConfig::from_path(&config_path);
 
     let make_svc = make_service_fn(|_| {
         let k8s_manager = k8s_manager.clone();
