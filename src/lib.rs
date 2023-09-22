@@ -252,7 +252,7 @@ impl StacksDevnetApiK8sManager {
 
     pub async fn check_namespace_exists(&self, namespace_str: &str) -> Result<bool, DevNetError> {
         self.ctx.try_log(|logger| {
-            slog::warn!(
+            slog::info!(
                 logger,
                 "checking if namespace NAMESPACE: {}",
                 &namespace_str
@@ -296,7 +296,7 @@ impl StacksDevnetApiK8sManager {
         namespace: &str,
     ) -> Result<bool, DevNetError> {
         self.ctx.try_log(|logger| {
-            slog::warn!(
+            slog::info!(
                 logger,
                 "checking if any devnet assets exist for devnet NAMESPACE: {}",
                 &namespace
@@ -346,7 +346,7 @@ impl StacksDevnetApiK8sManager {
         namespace: &str,
     ) -> Result<bool, DevNetError> {
         self.ctx.try_log(|logger| {
-            slog::warn!(
+            slog::info!(
                 logger,
                 "checking if all devnet assets exist for devnet NAMESPACE: {}",
                 &namespace
