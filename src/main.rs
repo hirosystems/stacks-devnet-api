@@ -78,8 +78,7 @@ async fn handle_request(
         )
     });
     let headers = request.headers().clone();
-    let responder = Responder::new(http_response_config, headers.clone()).unwrap();
-
+    let responder = Responder::new(http_response_config, headers.clone(), ctx.clone()).unwrap();
     if method == &Method::OPTIONS {
         return responder.ok();
     }

@@ -399,7 +399,7 @@ fn responder_allows_configuring_allowed_origins() {
     };
     let mut headers = HeaderMap::new();
     headers.append("ORIGIN", HeaderValue::from_str("example.com").unwrap());
-    let responder = Responder::new(config, headers).unwrap();
+    let responder = Responder::new(config, headers, Context::empty()).unwrap();
     let builder = responder.response_builder();
     let built_headers = builder.headers_ref().unwrap();
     assert_eq!(built_headers.get(ACCESS_CONTROL_ALLOW_ORIGIN).unwrap(), "*");
