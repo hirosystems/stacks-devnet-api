@@ -120,7 +120,7 @@ enum TestBody {
 #[test_case("/api/v1/network/{namespace}/stacks-node/v2/info/", Method::GET, None, true => using assert_failed_proxy; "proxies requests to downstream nodes")]
 #[serial_test::serial]
 #[tokio::test]
-#[cfg_attr(not(feature = "redis_tests"), ignore)]
+#[cfg_attr(not(feature = "k8s_tests"), ignore)]
 async fn it_responds_to_valid_requests_with_deploy(
     mut request_path: &str,
     method: Method,
@@ -188,7 +188,7 @@ async fn it_responds_to_valid_requests_with_deploy(
 #[test_case("/api/v1/network/{namespace}", Method::HEAD, true => is equal_to (StatusCode::NOT_FOUND, "not found".to_string()); "404 for network HEAD request to non-existing network")]
 #[test_case("/api/v1/network/{namespace}/stacks-node/v2/info/", Method::GET, true => using assert_not_all_assets_exist_err; "404 for proxy requests to downstream nodes of non-existing network")]
 #[tokio::test]
-#[cfg_attr(not(feature = "redis_tests"), ignore)]
+#[cfg_attr(not(feature = "k8s_tests"), ignore)]
 async fn it_responds_to_valid_requests(
     mut request_path: &str,
     method: Method,
@@ -425,7 +425,7 @@ fn responder_allows_configuring_allowed_origins() {
 
 #[serial_test::serial]
 #[tokio::test]
-#[cfg_attr(not(feature = "redis_tests"), ignore)]
+#[cfg_attr(not(feature = "k8s_tests"), ignore)]
 async fn namespace_prefix_config_prepends_header() {
     let (k8s_manager, ctx) = get_k8s_manager().await;
 
