@@ -41,6 +41,12 @@ pub fn get_yaml_from_resource(resource: StacksDevnetResource) -> &'static str {
         StacksDevnetResource::Pvc(StacksDevnetPvc::StacksApi) => {
             include_str!("../templates/stacks-api-pvc.template.yaml")
         }
+        StacksDevnetResource::Pvc(StacksDevnetPvc::StacksNode) => {
+            include_str!("../templates/stacks-node-pvc.template.yaml")
+        }
+        StacksDevnetResource::Pvc(StacksDevnetPvc::BitcoindNode) => {
+            include_str!("../templates/bitcoind-node-pvc.template.yaml")
+        }
         StacksDevnetResource::Service(StacksDevnetService::StacksApi) => {
             include_str!("../templates/stacks-api-service.template.yaml")
         }

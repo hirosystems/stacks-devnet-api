@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: stacks-node-pvc
+  namespace: "{namespace}"
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    limits:
+      storage: 750Mi
+    requests:
+      storage: 500Mi
+  storageClassName: devnet-storage-class
+  volumeMode: Filesystem

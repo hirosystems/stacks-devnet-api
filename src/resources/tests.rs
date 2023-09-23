@@ -26,6 +26,8 @@ fn it_prints_correct_name_for_pod(pod: StacksDevnetPod) -> String {
 }
 
 #[test_case(StacksDevnetPvc::StacksApi => is equal_to  "stacks-api-pvc".to_string(); "for StacksApi")]
+#[test_case(StacksDevnetPvc::StacksNode => is equal_to  "stacks-node-pvc".to_string(); "for StacksNode")]
+#[test_case(StacksDevnetPvc::BitcoindNode => is equal_to  "bitcoind-node-pvc".to_string(); "for BitcoindNode")]
 fn it_prints_correct_name_for_pvc(pvc: StacksDevnetPvc) -> String {
     pvc.to_string()
 }
