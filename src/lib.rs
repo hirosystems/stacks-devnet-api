@@ -121,10 +121,14 @@ impl StacksDevnetApiK8sManager {
                     cluster: Some(context),
                     user: None,
                 };
-                let client_config = Config::from_kubeconfig(&kube_config)
-                    .await
-                    .expect("could not create kube client config");
-                Client::try_from(client_config).expect("could not create kube client")
+                let client_config =
+                    Config::from_kubeconfig(&kube_config)
+                        .await
+                        .unwrap_or_else(|e| {
+                            panic!("could not create kube client config: {}", e.to_string())
+                        });
+                Client::try_from(client_config)
+                    .unwrap_or_else(|e| panic!("could not create kube client: {}", e.to_string()))
             }
             None => Client::try_default()
                 .await
