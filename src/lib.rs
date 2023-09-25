@@ -9,7 +9,8 @@ use k8s_openapi::{
 };
 use kube::{
     api::{Api, DeleteParams, PostParams},
-    Client,
+    config::KubeConfigOptions,
+    Client, Config,
 };
 use resources::{
     pvc::StacksDevnetPvc,
@@ -17,8 +18,8 @@ use resources::{
     StacksDevnetResource,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::thread::sleep;
 use std::{collections::BTreeMap, str::FromStr, time::Duration};
+use std::{env, thread::sleep};
 use strum::IntoEnumIterator;
 use tower::BoxError;
 
@@ -99,17 +100,44 @@ pub struct StacksDevnetApiK8sManager {
 }
 
 impl StacksDevnetApiK8sManager {
-    pub async fn default(ctx: &Context) -> StacksDevnetApiK8sManager {
-        let client = Client::try_default()
-            .await
-            .expect("could not create kube client");
+    pub async fn new(ctx: &Context) -> StacksDevnetApiK8sManager {
+        let context = match env::var("KUBE_CONTEXT") {
+            Ok(context) => Some(context),
+            Err(_) => {
+                // if no context is supplied and we're running a test,
+                // specify a local context so we don't deploy a bunch of
+                // test assets
+                if cfg!(test) {
+                    Some(format!("kind-kind"))
+                } else {
+                    None
+                }
+            }
+        };
+        let client = match context {
+            Some(context) => {
+                let kube_config = KubeConfigOptions {
+                    context: Some(context.clone()),
+                    cluster: Some(context),
+                    user: None,
+                };
+                let client_config = Config::from_kubeconfig(&kube_config)
+                    .await
+                    .expect("could not create kube client config");
+                Client::try_from(client_config).expect("could not create kube client")
+            }
+            None => Client::try_default()
+                .await
+                .expect("could not create kube client"),
+        };
+
         StacksDevnetApiK8sManager {
             client,
             ctx: ctx.to_owned(),
         }
     }
 
-    pub async fn new<S, B, T>(
+    pub async fn from_service<S, B, T>(
         service: S,
         default_namespace: T,
         ctx: &Context,

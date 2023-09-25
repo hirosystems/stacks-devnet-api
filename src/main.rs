@@ -14,7 +14,7 @@ use std::{convert::Infallible, net::SocketAddr};
 #[tokio::main]
 async fn main() {
     const HOST: &str = "0.0.0.0";
-    const PORT: &str = "8477";
+    const PORT: &str = "8478";
     let endpoint: String = HOST.to_owned() + ":" + PORT;
     let addr: SocketAddr = endpoint.parse().expect("Could not parse ip:port.");
 
@@ -24,7 +24,7 @@ async fn main() {
         logger: Some(logger),
         tracer: false,
     };
-    let k8s_manager = StacksDevnetApiK8sManager::default(&ctx).await;
+    let k8s_manager = StacksDevnetApiK8sManager::new(&ctx).await;
     let config_path = match env::var("CONFIG_PATH") {
         Ok(path) => path,
         Err(_) => {
