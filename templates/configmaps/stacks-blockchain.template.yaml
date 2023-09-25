@@ -3,5 +3,5 @@ data:
   Stacks.toml: "{data}"
 kind: ConfigMap
 metadata:
-  name: stacks-node-conf
+  name: stacks-blockchain
   namespace: "{namespace}"
