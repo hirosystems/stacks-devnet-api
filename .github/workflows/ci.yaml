@@ -123,7 +123,7 @@ jobs:
         run: |
           cargo install cargo-tarpaulin
           cargo --version
-          KUBE_CONTEXT="k3d-kube" cargo tarpaulin --out lcov --features k8s_tests
+          cargo tarpaulin --out lcov --features k8s_tests
 
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v3
