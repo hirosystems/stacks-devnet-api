@@ -94,7 +94,7 @@ jobs:
         run: |
           k3d image import hirosystems/stacks-devnet-api:ci -c k3d-kube
           kubectl create namespace devnet
-          kubectl create configmap stacks-devnet-api-conf --from-file=./Config.toml --namespace devnet
+          kubectl create configmap stacks-devnet-api --from-file=./Config.toml --namespace devnet
           kubectl apply -f ./templates/ci/stacks-devnet-api.template.yaml
           echo "sleep for 30 sec"
           sleep 30

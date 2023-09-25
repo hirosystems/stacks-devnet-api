@@ -1,7 +1,7 @@
 apiVersion: v1
 data:
-  bitcoin.conf: "{data}"
+  key: "{value}"
 kind: ConfigMap
 metadata:
-  name: bitcoind-conf
+  name: deployment-plan
   namespace: "{namespace}"

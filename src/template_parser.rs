@@ -6,52 +6,49 @@ use crate::resources::{
 pub fn get_yaml_from_resource(resource: StacksDevnetResource) -> &'static str {
     match resource {
         StacksDevnetResource::Pod(StacksDevnetPod::BitcoindNode) => {
-            include_str!("../templates/bitcoind-chain-coordinator-pod.template.yaml")
+            include_str!("../templates/pods/bitcoind-chain-coordinator.template.yaml")
         }
         StacksDevnetResource::Service(StacksDevnetService::BitcoindNode) => {
-            include_str!("../templates/bitcoind-chain-coordinator-service.template.yaml")
+            include_str!("../templates/services/bitcoind-chain-coordinator.template.yaml")
         }
         StacksDevnetResource::Configmap(StacksDevnetConfigmap::BitcoindNode) => {
-            include_str!("../templates/bitcoind-configmap.template.yaml")
+            include_str!("../templates/configmaps/bitcoind.template.yaml")
         }
         StacksDevnetResource::Configmap(StacksDevnetConfigmap::DeploymentPlan) => {
-            include_str!("../templates/chain-coord-deployment-plan-configmap.template.yaml")
+            include_str!("../templates/configmaps/chain-coord-deployment-plan.template.yaml")
         }
         StacksDevnetResource::Configmap(StacksDevnetConfigmap::Devnet) => {
-            include_str!("../templates/chain-coord-devnet-configmap.template.yaml")
-        }
-        StacksDevnetResource::Configmap(StacksDevnetConfigmap::Namespace) => {
-            include_str!("../templates/chain-coord-namespace-configmap.template.yaml")
+            include_str!("../templates/configmaps/chain-coord-devnet.template.yaml")
         }
         StacksDevnetResource::Configmap(StacksDevnetConfigmap::ProjectDir) => {
-            include_str!("../templates/chain-coord-project-dir-configmap.template.yaml")
+            include_str!("../templates/configmaps/chain-coord-project-dir.template.yaml")
         }
         StacksDevnetResource::Configmap(StacksDevnetConfigmap::ProjectManifest) => {
-            include_str!("../templates/chain-coord-project-manifest-configmap.template.yaml")
+            include_str!("../templates/configmaps/chain-coord-project-manifest.template.yaml")
         }
-        StacksDevnetResource::Configmap(StacksDevnetConfigmap::StacksApi) => {
-            include_str!("../templates/stacks-api-configmap.template.yaml")
+        StacksDevnetResource::Configmap(StacksDevnetConfigmap::StacksBlockchainApi) => {
+            include_str!("../templates/configmaps/stacks-blockchain-api.template.yaml")
         }
-        StacksDevnetResource::Pod(StacksDevnetPod::StacksApi) => {
-            include_str!("../templates/stacks-api-pod.template.yaml")
+        StacksDevnetResource::Pod(StacksDevnetPod::StacksBlockchainApi) => {
+            include_str!("../templates/pods/stacks-blockchain-api.template.yaml")
         }
-        StacksDevnetResource::Configmap(StacksDevnetConfigmap::StacksApiPostgres) => {
-            include_str!("../templates/stacks-api-postgres-configmap.template.yaml")
+        StacksDevnetResource::Configmap(StacksDevnetConfigmap::StacksBlockchainApiPg) => {
+            include_str!("../templates/configmaps/stacks-blockchain-api-pg.template.yaml")
         }
-        StacksDevnetResource::Pvc(StacksDevnetPvc::StacksApi) => {
-            include_str!("../templates/stacks-api-pvc.template.yaml")
+        StacksDevnetResource::Pvc(StacksDevnetPvc::StacksBlockchainApiPg) => {
+            include_str!("../templates/pvcs/stacks-blockchain-api-pg.template.yaml")
         }
-        StacksDevnetResource::Service(StacksDevnetService::StacksApi) => {
-            include_str!("../templates/stacks-api-service.template.yaml")
+        StacksDevnetResource::Service(StacksDevnetService::StacksBlockchainApi) => {
+            include_str!("../templates/services/stacks-blockchain-api.template.yaml")
         }
-        StacksDevnetResource::Configmap(StacksDevnetConfigmap::StacksNode) => {
-            include_str!("../templates/stacks-node-configmap.template.yaml")
+        StacksDevnetResource::Configmap(StacksDevnetConfigmap::StacksBlockchain) => {
+            include_str!("../templates/configmaps/stacks-blockchain.template.yaml")
         }
-        StacksDevnetResource::Pod(StacksDevnetPod::StacksNode) => {
-            include_str!("../templates/stacks-node-pod.template.yaml")
+        StacksDevnetResource::Pod(StacksDevnetPod::StacksBlockchain) => {
+            include_str!("../templates/pods/stacks-blockchain.template.yaml")
         }
-        StacksDevnetResource::Service(StacksDevnetService::StacksNode) => {
-            include_str!("../templates/stacks-node-service.template.yaml")
+        StacksDevnetResource::Service(StacksDevnetService::StacksBlockchain) => {
+            include_str!("../templates/services/stacks-blockchain.template.yaml")
         }
         StacksDevnetResource::Namespace => include_str!("../templates/namespace.template.yaml"),
     }

@@ -3,5 +3,5 @@ data:
   key: "{value}"
 kind: ConfigMap
 metadata:
-  name: deployment-plan-conf
+  name: project-manifest
   namespace: "{namespace}"

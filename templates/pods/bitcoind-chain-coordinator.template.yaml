@@ -14,7 +14,7 @@ spec:
     - -pid=/run/bitcoind.pid
     image: quay.io/hirosystems/bitcoind:devnet-v3
     imagePullPolicy: IfNotPresent
-    name: bitcoind-container
+    name: bitcoind
     ports:
     - containerPort: 18444
       name: p2p
@@ -24,7 +24,7 @@ spec:
       protocol: TCP
     volumeMounts:
     - mountPath: /etc/bitcoin
-      name: bitcoind-conf-volume
+      name: bitcoind
       readOnly: true
   - command:
     - ./stacks-network
@@ -36,12 +36,12 @@ spec:
     env:
       - name: NAMESPACE
         valueFrom:
-          configMapKeyRef:
-            name: namespace-conf
-            key: NAMESPACE
+          fieldRef:
+            apiVersion: v1
+            fieldPath: metadata.namespace
     image: hirosystems/stacks-network-orchestrator:latest
     imagePullPolicy: Always
-    name: chain-coordinator-container
+    name: chain-coordinator
     ports:
     - containerPort: 20445
       name: coordinator-in
@@ -51,26 +51,26 @@ spec:
       protocol: TCP
     volumeMounts:
     - mountPath: /etc/stacks-network/project
-      name: project-manifest-conf-volume
+      name: project-manifest
     - mountPath: /etc/stacks-network/project/settings
-      name: devnet-conf-volume
+      name: devnet
     - mountPath: /etc/stacks-network/project/deployments
-      name: deployment-plan-conf-volume
+      name: deployment-plan
     - mountPath: /etc/stacks-network/project/contracts
-      name: project-dir-conf-volume
+      name: project-dir
   volumes:
   - configMap:
-      name: bitcoind-conf
-    name: bitcoind-conf-volume
+      name: bitcoind
+    name: bitcoind
   - configMap:
-      name: project-manifest-conf
-    name: project-manifest-conf-volume
+      name: project-manifest
+    name: project-manifest
   - configMap:
-      name: devnet-conf
-    name: devnet-conf-volume
+      name: devnet
+    name: devnet
   - configMap:
-      name: deployment-plan-conf
-    name: deployment-plan-conf-volume
+      name: deployment-plan
+    name: deployment-plan
   - configMap:
-      name: project-dir-conf
-    name: project-dir-conf-volume
+      name: project-dir
+    name: project-dir

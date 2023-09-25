@@ -3,5 +3,5 @@ data:
   key: "{value}"
 kind: ConfigMap
 metadata:
-  name: project-dir-conf
+  name: project-dir
   namespace: "{namespace}"
