@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: stacks-api-pvc
+  name: stacks-blockchain-api-pg
   namespace: "{namespace}"
 spec:
   accessModes:
