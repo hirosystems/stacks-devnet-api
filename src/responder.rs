@@ -1,3 +1,4 @@
+use hiro_system_kit::slog;
 use hyper::{
     header::{
         ACCESS_CONTROL_ALLOW_CREDENTIALS, ACCESS_CONTROL_ALLOW_HEADERS,
@@ -8,26 +9,39 @@ use hyper::{
 };
 use std::convert::Infallible;
 
-use crate::api_config::ResponderConfig;
+use crate::{api_config::ResponderConfig, Context};
 
-#[derive(Default)]
 pub struct Responder {
     allowed_origins: Vec<String>,
     allowed_methods: Vec<String>,
     allowed_headers: String,
     headers: HeaderMap<HeaderValue>,
+    ctx: Context,
 }
 
+impl Default for Responder {
+    fn default() -> Self {
+        Responder {
+            allowed_origins: Vec::default(),
+            allowed_methods: Vec::default(),
+            allowed_headers: String::default(),
+            headers: HeaderMap::default(),
+            ctx: Context::empty(),
+        }
+    }
+}
 impl Responder {
     pub fn new(
         config: ResponderConfig,
         headers: HeaderMap<HeaderValue>,
+        ctx: Context,
     ) -> Result<Responder, String> {
         Ok(Responder {
             allowed_origins: config.allowed_origins.unwrap_or_default(),
             allowed_methods: config.allowed_methods.unwrap_or_default(),
             allowed_headers: config.allowed_headers.unwrap_or("*".to_string()),
             headers,
+            ctx,
         })
     }
 
@@ -60,18 +74,59 @@ impl Responder {
 
     fn _respond(&self, code: StatusCode, body: String) -> Result<Response<Body>, Infallible> {
         let builder = self.response_builder();
-        match builder.status(code).body(Body::try_from(body).unwrap()) {
+        let body = match Body::try_from(body) {
+            Ok(b) => b,
+            Err(e) => {
+                self.ctx.try_log(|logger| {
+                    slog::error!(
+                        logger,
+                        "responder failed to create response body: {}",
+                        e.to_string()
+                    )
+                });
+                Body::empty()
+            }
+        };
+        match builder.status(code).body(body) {
             Ok(r) => Ok(r),
-            Err(_) => unreachable!(),
+            Err(e) => {
+                self.ctx.try_log(|logger| {
+                    slog::error!(
+                        logger,
+                        "responder failed to send response: {}",
+                        e.to_string()
+                    )
+                });
+                Ok(self
+                    .response_builder()
+                    .status(500)
+                    .body(Body::empty())
+                    .unwrap())
+            }
         }
     }
 
     pub fn respond(&self, code: u16, body: String) -> Result<Response<Body>, Infallible> {
-        self._respond(StatusCode::from_u16(code).unwrap(), body)
+        self._respond(
+            StatusCode::from_u16(code).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
+            body,
+        )
     }
 
     pub fn ok(&self) -> Result<Response<Body>, Infallible> {
         self._respond(StatusCode::OK, "Ok".into())
+    }
+
+    pub fn ok_with_json(&self, body: Body) -> Result<Response<Body>, Infallible> {
+        match self
+            .response_builder()
+            .status(StatusCode::OK)
+            .header("Content-Type", "application/json")
+            .body(body)
+        {
+            Ok(r) => Ok(r),
+            Err(e) => self.err_internal(format!("failed to send response: {}", e.to_string())),
+        }
     }
 
     pub fn err_method_not_allowed(&self, body: String) -> Result<Response<Body>, Infallible> {

@@ -5,7 +5,7 @@ use stacks_devnet_api::api_config::ApiConfig;
 use stacks_devnet_api::responder::Responder;
 use stacks_devnet_api::routes::{
     get_standardized_path_parts, handle_check_devnet, handle_delete_devnet, handle_get_devnet,
-    handle_new_devnet, handle_try_proxy_service, API_PATH,
+    handle_get_status, handle_new_devnet, handle_try_proxy_service, API_PATH,
 };
 use stacks_devnet_api::{Context, StacksDevnetApiK8sManager};
 use std::env;
@@ -78,10 +78,12 @@ async fn handle_request(
         )
     });
     let headers = request.headers().clone();
-    let responder = Responder::new(http_response_config, headers.clone()).unwrap();
-
+    let responder = Responder::new(http_response_config, headers.clone(), ctx.clone()).unwrap();
     if method == &Method::OPTIONS {
         return responder.ok();
+    }
+    if method == &Method::GET && (path == "/" || path == &format!("{API_PATH}status")) {
+        return handle_get_status(responder, ctx).await;
     }
     let auth_header = auth_config
         .auth_header

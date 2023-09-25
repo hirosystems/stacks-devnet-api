@@ -1,5 +1,6 @@
 use hiro_system_kit::slog;
-use hyper::{Body, Client, Request, Response, StatusCode, Uri};
+use hyper::{Body, Client, Request, Response, Uri};
+use serde_json::json;
 use std::{convert::Infallible, str::FromStr};
 
 use crate::{
@@ -8,6 +9,27 @@ use crate::{
     responder::Responder,
     Context, StacksDevnetApiK8sManager,
 };
+
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+const PRJ_NAME: &str = env!("CARGO_PKG_NAME");
+
+pub async fn handle_get_status(
+    responder: Responder,
+    ctx: Context,
+) -> Result<Response<Body>, Infallible> {
+    let version_info = format!("{PRJ_NAME} v{VERSION}");
+    let version_info = json!({ "version": version_info });
+    let version_info = match serde_json::to_vec(&version_info) {
+        Ok(v) => v,
+        Err(e) => {
+            let msg = format!("failed to parse version info: {}", e.to_string());
+            ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+            return responder.err_internal(msg);
+        }
+    };
+    let body = Body::from(version_info);
+    responder.ok_with_json(body)
+}
 
 pub async fn handle_new_devnet(
     request: Request<Body>,
@@ -60,12 +82,7 @@ pub async fn handle_get_devnet(
 ) -> Result<Response<Body>, Infallible> {
     match k8s_manager.get_devnet_info(&network).await {
         Ok(devnet_info) => match serde_json::to_vec(&devnet_info) {
-            Ok(body) => Ok(responder
-                .response_builder()
-                .status(StatusCode::OK)
-                .header("Content-Type", "application/json")
-                .body(Body::from(body))
-                .unwrap()),
+            Ok(body) => responder.ok_with_json(Body::from(body)),
             Err(e) => {
                 let msg = format!(
                     "failed to form response body: NAMESPACE: {}, ERROR: {}",

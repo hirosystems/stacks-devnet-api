@@ -26,6 +26,11 @@ use stacks_devnet_api::{
 use test_case::test_case;
 use tower_test::mock::{self, Handle};
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+const PRJ_NAME: &str = env!("CARGO_PKG_NAME");
+fn get_version_info() -> String {
+    format!("{{\"version\":\"{PRJ_NAME} v{VERSION}\"}}")
+}
 fn get_template_config() -> StacksDevnetConfig {
     let file_path = "src/tests/fixtures/stacks-devnet-config.json";
     let file = File::open(file_path)
@@ -115,6 +120,7 @@ enum TestBody {
 #[test_case("/api/v1/network/{namespace}/stacks-node/v2/info/", Method::GET, None, true => using assert_failed_proxy; "proxies requests to downstream nodes")]
 #[serial_test::serial]
 #[tokio::test]
+#[cfg_attr(not(feature = "k8s_tests"), ignore)]
 async fn it_responds_to_valid_requests_with_deploy(
     mut request_path: &str,
     method: Method,
@@ -175,11 +181,14 @@ async fn it_responds_to_valid_requests_with_deploy(
 }
 
 #[test_case("any", Method::OPTIONS, false => is equal_to (StatusCode::OK, "Ok".to_string()); "200 for any OPTIONS request")]
+#[test_case("/", Method::GET, false => is equal_to (StatusCode::OK, get_version_info()); "200 for GET /")]
+#[test_case("/api/v1/status", Method::GET, false => is equal_to (StatusCode::OK, get_version_info()); "200 for GET /api/v1/status")]
 #[test_case("/api/v1/network/{namespace}", Method::DELETE, true => using assert_cannot_delete_devnet_err; "409 for network DELETE request to non-existing network")]
 #[test_case("/api/v1/network/{namespace}", Method::GET, true => using assert_not_all_assets_exist_err; "404 for network GET request to non-existing network")]
 #[test_case("/api/v1/network/{namespace}", Method::HEAD, true => is equal_to (StatusCode::NOT_FOUND, "not found".to_string()); "404 for network HEAD request to non-existing network")]
 #[test_case("/api/v1/network/{namespace}/stacks-node/v2/info/", Method::GET, true => using assert_not_all_assets_exist_err; "404 for proxy requests to downstream nodes of non-existing network")]
 #[tokio::test]
+#[cfg_attr(not(feature = "k8s_tests"), ignore)]
 async fn it_responds_to_valid_requests(
     mut request_path: &str,
     method: Method,
@@ -328,15 +337,16 @@ async fn it_responds_to_invalid_request_header() {
     assert_eq!(body_str, "missing required auth header".to_string());
 }
 
+#[test_case("/api/v1/network/test", Method::OPTIONS => is equal_to "Ok".to_string())]
+#[test_case("/api/v1/status", Method::GET => is equal_to get_version_info() )]
+#[test_case("/", Method::GET => is equal_to get_version_info())]
 #[tokio::test]
-async fn it_ignores_request_header_for_options_requests() {
+async fn it_ignores_request_header_for_some_requests(request_path: &str, method: Method) -> String {
     let (k8s_manager, ctx) = get_mock_k8s_manager().await;
 
-    let request_builder = Request::builder()
-        .uri("/api/v1/network/test")
-        .method(Method::OPTIONS);
+    let request_builder = Request::builder().uri(request_path).method(method);
     let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
-    let response = handle_request(
+    let mut response = handle_request(
         request,
         k8s_manager.clone(),
         ApiConfig::default(),
@@ -345,6 +355,10 @@ async fn it_ignores_request_header_for_options_requests() {
     .await
     .unwrap();
     assert_eq!(response.status(), 200);
+    let body = response.body_mut();
+    let bytes = body::to_bytes(body).await.unwrap().to_vec();
+    let body_str = String::from_utf8(bytes).unwrap();
+    body_str
 }
 
 #[test_case("" => is equal_to PathParts { route: String::new(), ..Default::default() }; "for empty path")]
@@ -399,7 +413,7 @@ fn responder_allows_configuring_allowed_origins() {
     };
     let mut headers = HeaderMap::new();
     headers.append("ORIGIN", HeaderValue::from_str("example.com").unwrap());
-    let responder = Responder::new(config, headers).unwrap();
+    let responder = Responder::new(config, headers, Context::empty()).unwrap();
     let builder = responder.response_builder();
     let built_headers = builder.headers_ref().unwrap();
     assert_eq!(built_headers.get(ACCESS_CONTROL_ALLOW_ORIGIN).unwrap(), "*");
@@ -411,6 +425,7 @@ fn responder_allows_configuring_allowed_origins() {
 
 #[serial_test::serial]
 #[tokio::test]
+#[cfg_attr(not(feature = "k8s_tests"), ignore)]
 async fn namespace_prefix_config_prepends_header() {
     let (k8s_manager, ctx) = get_k8s_manager().await;
 
