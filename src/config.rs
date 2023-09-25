@@ -113,27 +113,27 @@ impl StacksDevnetConfig {
                 .parse::<u16>()
                 .unwrap();
         devnet_config.stacks_node_p2p_port =
-            get_service_port(StacksDevnetService::StacksNode, ServicePort::P2P)
+            get_service_port(StacksDevnetService::StacksBlockchain, ServicePort::P2P)
                 .unwrap()
                 .parse::<u16>()
                 .unwrap();
         devnet_config.stacks_node_rpc_port =
-            get_service_port(StacksDevnetService::StacksNode, ServicePort::RPC)
+            get_service_port(StacksDevnetService::StacksBlockchain, ServicePort::RPC)
                 .unwrap()
                 .parse::<u16>()
                 .unwrap();
         devnet_config.stacks_api_port =
-            get_service_port(StacksDevnetService::StacksApi, ServicePort::API)
+            get_service_port(StacksDevnetService::StacksBlockchainApi, ServicePort::API)
                 .unwrap()
                 .parse::<u16>()
                 .unwrap();
         devnet_config.stacks_api_events_port =
-            get_service_port(StacksDevnetService::StacksApi, ServicePort::Event)
+            get_service_port(StacksDevnetService::StacksBlockchainApi, ServicePort::Event)
                 .unwrap()
                 .parse::<u16>()
                 .unwrap();
         devnet_config.postgres_port =
-            get_service_port(StacksDevnetService::StacksApi, ServicePort::DB)
+            get_service_port(StacksDevnetService::StacksBlockchainApi, ServicePort::DB)
                 .unwrap()
                 .parse::<u16>()
                 .unwrap();

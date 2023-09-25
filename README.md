@@ -47,11 +47,11 @@ metadata:
   name: stacks-devnet-api
   namespace: devnet
 spec:
-  serviceAccountName: stacks-devnet-api-service-account
+  serviceAccountName: stacks-devnet-api
   containers:
   - command:
     - ./stacks-devnet-api
-    name: stacks-devnet-api-container
+    name: stacks-devnet-api
 -    image: quay.io/hirosystems/stacks-devnet-api:latest
 -    imagePullPolicy: Always
 +    image: stacks-devnet-api:latest
@@ -83,9 +83,9 @@ When the service has been deployed to your Kubernetes cluster, it should be reac
     "bitcoin_chain_tip": 116
 }
 ```
- - `GET/POST localhost:8477/api/v1/network/<network-id>/stacks-node/*` - Forwards `*` to the underlying stacks node pod of the devnet. If not all devnet assets exist for the given namespace, a 404 error will be returned.
+ - `GET/POST localhost:8477/api/v1/network/<network-id>/stacks-blockchain/*` - Forwards `*` to the underlying stacks node pod of the devnet. If not all devnet assets exist for the given namespace, a 404 error will be returned.
  - `GET/POST localhost:8477/api/v1/network/<network-id>/bitcoin-node/*` - Forwards `*` to the underlying bitcoin node pod of the devnet. If not all devnet assets exist for the given namespace, a 404 error will be returned.
-- `GET/POST localhost:8477/api/v1/network/<network-id>/stacks-api/*` - Forwards `*` to the underlying stacks api pod of the devnet. If not all devnet assets exist for the given namespace, a 404 error will be returned.
+- `GET/POST localhost:8477/api/v1/network/<network-id>/stacks-blockchain-api/*` - Forwards `*` to the underlying stacks api pod of the devnet. If not all devnet assets exist for the given namespace, a 404 error will be returned.
 
 ## Bugs and feature requests
 

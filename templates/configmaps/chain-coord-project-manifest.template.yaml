@@ -1,7 +1,7 @@
 apiVersion: v1
 data:
-  Stacks.toml: "{data}"
+  key: "{value}"
 kind: ConfigMap
 metadata:
-  name: stacks-node-conf
+  name: project-manifest
   namespace: "{namespace}"

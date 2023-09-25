@@ -1,7 +1,0 @@
-apiVersion: v1
-data:
-  bitcoin.conf: "{data}"
-kind: ConfigMap
-metadata:
-  name: bitcoind-conf
-  namespace: "{namespace}"

@@ -1,14 +1,14 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: stacks-devnet-api-service-account
+  name: stacks-devnet-api
   namespace: devnet
 
 ---
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: stacks-devnet-api-service-account
+  name: stacks-devnet-api
 rules:
   - apiGroups: [""]
     resources: ["pods", "pods/status", "services", "configmaps", "persistentvolumeclaims"]
@@ -22,14 +22,14 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: stacks-devnet-api-service-account
+  name: stacks-devnet-api
 subjects:
   - kind: ServiceAccount
-    name: stacks-devnet-api-service-account
+    name: stacks-devnet-api
     namespace: devnet
 roleRef:
   kind: ClusterRole
-  name: stacks-devnet-api-service-account
+  name: stacks-devnet-api
   apiGroup: rbac.authorization.k8s.io
 
 ---  
@@ -42,10 +42,10 @@ metadata:
   name: stacks-devnet-api
   namespace: devnet
 spec:
-  serviceAccountName: stacks-devnet-api-service-account
+  serviceAccountName: stacks-devnet-api
   containers:
   - command: ["stacks-devnet-api"]
-    name: stacks-devnet-api-container
+    name: stacks-devnet-api
     image: hirosystems/stacks-devnet-api:latest
     imagePullPolicy: Always
     ports:
@@ -58,13 +58,13 @@ spec:
   volumes:
     - name: config-volume
       configMap:
-        name: stacks-devnet-api-conf
+        name: stacks-devnet-api
 
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: stacks-devnet-api-service
+  name: stacks-devnet-api
   namespace: devnet
 spec:
   ports:
