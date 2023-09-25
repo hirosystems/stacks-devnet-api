@@ -9,7 +9,8 @@ use k8s_openapi::{
 };
 use kube::{
     api::{Api, DeleteParams, PostParams},
-    Client,
+    config::KubeConfigOptions,
+    Client, Config,
 };
 use resources::{
     pvc::StacksDevnetPvc,
@@ -17,8 +18,8 @@ use resources::{
     StacksDevnetResource,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::thread::sleep;
 use std::{collections::BTreeMap, str::FromStr, time::Duration};
+use std::{env, thread::sleep};
 use strum::IntoEnumIterator;
 use tower::BoxError;
 
@@ -99,17 +100,55 @@ pub struct StacksDevnetApiK8sManager {
 }
 
 impl StacksDevnetApiK8sManager {
-    pub async fn default(ctx: &Context) -> StacksDevnetApiK8sManager {
-        let client = Client::try_default()
-            .await
-            .expect("could not create kube client");
+    pub async fn new(ctx: &Context) -> StacksDevnetApiK8sManager {
+        let context = match env::var("KUBE_CONTEXT") {
+            Ok(context) => Some(context),
+            Err(_) => {
+                if cfg!(test) {
+                    let is_ci = match env::var("GITHUB_ACTIONS") {
+                        Ok(is_ci) => is_ci == format!("true"),
+                        Err(_) => false,
+                    };
+                    if is_ci {
+                        None
+                    } else {
+                        // ensures that if no context is supplied and we're running
+                        // tests locally, we deploy to the local kind cluster
+                        Some(format!("kind-kind"))
+                    }
+                } else {
+                    None
+                }
+            }
+        };
+        let client = match context {
+            Some(context) => {
+                let kube_config = KubeConfigOptions {
+                    context: Some(context.clone()),
+                    cluster: Some(context),
+                    user: None,
+                };
+                let client_config =
+                    Config::from_kubeconfig(&kube_config)
+                        .await
+                        .unwrap_or_else(|e| {
+                            panic!("could not create kube client config: {}", e.to_string())
+                        });
+                Client::try_from(client_config)
+                    .unwrap_or_else(|e| panic!("could not create kube client: {}", e.to_string()))
+            }
+            None => Client::try_default()
+                .await
+                .expect("could not create kube client"),
+        };
+
         StacksDevnetApiK8sManager {
             client,
             ctx: ctx.to_owned(),
         }
     }
 
-    pub async fn new<S, B, T>(
+    pub async fn from_service<S, B, T>(
         service: S,
         default_namespace: T,
         ctx: &Context,

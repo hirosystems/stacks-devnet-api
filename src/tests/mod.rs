@@ -54,7 +54,7 @@ async fn get_k8s_manager() -> (StacksDevnetApiK8sManager, Context) {
     let logger = hiro_system_kit::log::setup_logger();
     let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
     let ctx = Context::empty();
-    let k8s_manager = StacksDevnetApiK8sManager::default(&ctx).await;
+    let k8s_manager = StacksDevnetApiK8sManager::new(&ctx).await;
     (k8s_manager, ctx)
 }
 
@@ -269,7 +269,7 @@ async fn get_mock_k8s_manager() -> (StacksDevnetApiK8sManager, Context) {
     let logger = hiro_system_kit::log::setup_logger();
     let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
     let ctx = Context::empty();
-    let k8s_manager = StacksDevnetApiK8sManager::new(mock_service, "default", &ctx).await;
+    let k8s_manager = StacksDevnetApiK8sManager::from_service(mock_service, "default", &ctx).await;
     (k8s_manager, ctx)
 }
 

@@ -24,7 +24,7 @@ async fn main() {
         logger: Some(logger),
         tracer: false,
     };
-    let k8s_manager = StacksDevnetApiK8sManager::default(&ctx).await;
+    let k8s_manager = StacksDevnetApiK8sManager::new(&ctx).await;
     let config_path = match env::var("CONFIG_PATH") {
         Ok(path) => path,
         Err(_) => {
