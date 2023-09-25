@@ -104,11 +104,18 @@ impl StacksDevnetApiK8sManager {
         let context = match env::var("KUBE_CONTEXT") {
             Ok(context) => Some(context),
             Err(_) => {
-                // if no context is supplied and we're running a test,
-                // specify a local context so we don't deploy a bunch of
-                // test assets
                 if cfg!(test) {
-                    Some(format!("kind-kind"))
+                    let is_ci = match env::var("GITHUB_ACTIONS") {
+                        Ok(is_ci) => is_ci == format!("true"),
+                        Err(_) => false,
+                    };
+                    if is_ci {
+                        None
+                    } else {
+                        // ensures that if no context is supplied and we're running
+                        // tests locally, we deploy to the local kind cluster
+                        Some(format!("kind-kind"))
+                    }
                 } else {
                     None
                 }
