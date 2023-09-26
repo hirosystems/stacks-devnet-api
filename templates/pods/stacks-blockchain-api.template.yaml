@@ -13,7 +13,7 @@ spec:
           name: stacks-blockchain-api
           optional: false
     image: hirosystems/stacks-blockchain-api
-    imagePullPolicy: Always
+    imagePullPolicy: IfNotPresent
     ports:
     - containerPort: 3999
       name: api
