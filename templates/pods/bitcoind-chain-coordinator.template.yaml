@@ -39,7 +39,7 @@ spec:
           fieldRef:
             apiVersion: v1
             fieldPath: metadata.namespace
-    image: hirosystems/stacks-network-orchestrator:latest
+    image: hirosystems/stacks-network-orchestrator@sha256:a9cfca24df3c9e46419174f190b14620837d4a277b6fdd3ba8495d0e7625dce8
     imagePullPolicy: IfNotPresent
     name: chain-coordinator
     ports:
