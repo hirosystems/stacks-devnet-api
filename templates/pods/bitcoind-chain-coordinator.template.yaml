@@ -39,7 +39,7 @@ spec:
           fieldRef:
             apiVersion: v1
             fieldPath: metadata.namespace
-    image: hirosystems/stacks-network-orchestrator@sha256:1a1f60688759bc742bd1b64384eedba38faed46e0067cb3c121914004fe1df0a
+    image: hirosystems/stacks-network-orchestrator:rpc-error
     imagePullPolicy: IfNotPresent
     name: chain-coordinator
     ports:
