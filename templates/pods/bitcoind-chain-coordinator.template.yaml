@@ -40,7 +40,7 @@ spec:
             apiVersion: v1
             fieldPath: metadata.namespace
     image: hirosystems/stacks-network-orchestrator:rpc-error
-    imagePullPolicy: IfNotPresent
+    imagePullPolicy: Always
     name: chain-coordinator
     ports:
     - containerPort: 20445
