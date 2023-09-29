@@ -60,9 +60,9 @@ spec:
           resources:
             requests:
               cpu: 250m
-              memory: 750Mi
+              memory: 750Mi # todo: revisit allocation
             limits:
-              memory: 750Mi
+              memory: 750Mi # todo: revisit allocation
       volumes:
         - configMap:
             name: stacks-blockchain
