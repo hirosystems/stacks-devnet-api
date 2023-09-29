@@ -11,8 +11,11 @@ metadata:
   name: stacks-devnet-api
 rules:
   - apiGroups: [""]
-    resources: ["pods", "pods/status", "services", "configmaps", "persistentvolumeclaims"]
-    verbs: ["get", "delete", "create"]
+    resources: ["pods", "pods/status", "services", "configmaps"]
+    verbs: ["get", "delete", "create", "list"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets"]
+    verbs: ["get", "delete", "create", "list"]
   - apiGroups: [""]
     resources: ["namespaces"]
     verbs: ["get"]
