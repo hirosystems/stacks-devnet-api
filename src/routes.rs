@@ -77,10 +77,11 @@ pub async fn handle_delete_devnet(
 pub async fn handle_get_devnet(
     k8s_manager: StacksDevnetApiK8sManager,
     network: &str,
+    user_id: &str,
     responder: Responder,
     ctx: Context,
 ) -> Result<Response<Body>, Infallible> {
-    match k8s_manager.get_devnet_info(&network).await {
+    match k8s_manager.get_devnet_info(&network, user_id).await {
         Ok(devnet_info) => match serde_json::to_vec(&devnet_info) {
             Ok(body) => responder.ok_with_json(Body::from(body)),
             Err(e) => {

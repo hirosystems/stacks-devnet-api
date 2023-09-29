@@ -4,17 +4,21 @@ use futures::future::try_join4;
 use hiro_system_kit::{slog, Logger};
 use hyper::{body::Bytes, Body, Client as HttpClient, Request, Response, Uri};
 use k8s_openapi::{
-    api::core::v1::{ConfigMap, Namespace, PersistentVolumeClaim, Pod, Service},
+    api::{
+        apps::v1::{Deployment, StatefulSet},
+        core::v1::{ConfigMap, Namespace, Pod, Service},
+    },
     NamespaceResourceScope,
 };
 use kube::{
-    api::{Api, DeleteParams, PostParams},
+    api::{Api, DeleteParams, ListParams, PostParams},
     config::KubeConfigOptions,
     Client, Config,
 };
 use resources::{
-    pvc::StacksDevnetPvc,
+    deployment::StacksDevnetDeployment,
     service::{get_service_port, ServicePort},
+    stateful_set::StacksDevnetStatefulSet,
     StacksDevnetResource,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -205,14 +209,14 @@ impl StacksDevnetApiK8sManager {
             });
         };
 
-        self.deploy_bitcoin_node_pod(&config).await?;
+        self.deploy_bitcoin_node(&config).await?;
 
         sleep(Duration::from_secs(5));
 
-        self.deploy_stacks_node_pod(&config).await?;
+        self.deploy_stacks_blockchain(&config).await?;
 
         if !config.disable_stacks_api {
-            self.deploy_stacks_api_pod(&namespace).await?;
+            self.deploy_stacks_blockchain_api(&config).await?;
         }
         Ok(())
     }
@@ -221,9 +225,26 @@ impl StacksDevnetApiK8sManager {
         match self.check_any_devnet_assets_exist(&namespace).await? {
             true => {
                 let mut errors = vec![];
-                let pods: Vec<String> = StacksDevnetPod::iter().map(|p| p.to_string()).collect();
-                for pod in pods {
-                    if let Err(e) = self.delete_resource::<Pod>(namespace, &pod).await {
+                let deployments: Vec<String> = StacksDevnetDeployment::iter()
+                    .map(|p| p.to_string())
+                    .collect();
+                for deployment in deployments {
+                    if let Err(e) = self
+                        .delete_resource::<Deployment>(namespace, &deployment)
+                        .await
+                    {
+                        errors.push(e);
+                    }
+                }
+
+                let stateful_sets: Vec<String> = StacksDevnetStatefulSet::iter()
+                    .map(|p| p.to_string())
+                    .collect();
+                for stateful_set in stateful_sets {
+                    if let Err(e) = self
+                        .delete_resource::<StatefulSet>(namespace, &stateful_set)
+                        .await
+                    {
                         errors.push(e);
                     }
                 }
@@ -248,15 +269,6 @@ impl StacksDevnetApiK8sManager {
                     }
                 }
 
-                let pvcs: Vec<String> = StacksDevnetPvc::iter().map(|s| s.to_string()).collect();
-                for pvc in pvcs {
-                    if let Err(e) = self
-                        .delete_resource::<PersistentVolumeClaim>(namespace, &pvc)
-                        .await
-                    {
-                        errors.push(e);
-                    }
-                }
                 if errors.is_empty() {
                     Ok(())
                 } else if errors.len() == 1 {
@@ -341,9 +353,18 @@ impl StacksDevnetApiK8sManager {
                 &namespace
             )
         });
-        for pod in StacksDevnetPod::iter() {
+        for deployment in StacksDevnetDeployment::iter() {
             if self
-                .check_resource_exists::<Pod>(namespace, &pod.to_string())
+                .check_resource_exists::<Deployment>(namespace, &deployment.to_string())
+                .await?
+            {
+                return Ok(true);
+            }
+        }
+
+        for stateful_set in StacksDevnetStatefulSet::iter() {
+            if self
+                .check_resource_exists::<StatefulSet>(namespace, &stateful_set.to_string())
                 .await?
             {
                 return Ok(true);
@@ -362,15 +383,6 @@ impl StacksDevnetApiK8sManager {
         for service in StacksDevnetService::iter() {
             if self
                 .check_resource_exists::<Service>(namespace, &service.to_string())
-                .await?
-            {
-                return Ok(true);
-            }
-        }
-
-        for pvc in StacksDevnetPvc::iter() {
-            if self
-                .check_resource_exists::<PersistentVolumeClaim>(namespace, &pvc.to_string())
                 .await?
             {
                 return Ok(true);
@@ -391,9 +403,18 @@ impl StacksDevnetApiK8sManager {
                 &namespace
             )
         });
-        for pod in StacksDevnetPod::iter() {
+        for deployment in StacksDevnetDeployment::iter() {
             if !self
-                .check_resource_exists::<Pod>(namespace, &pod.to_string())
+                .check_resource_exists::<Deployment>(namespace, &deployment.to_string())
+                .await?
+            {
+                return Ok(false);
+            }
+        }
+
+        for stateful_set in StacksDevnetStatefulSet::iter() {
+            if !self
+                .check_resource_exists::<StatefulSet>(namespace, &stateful_set.to_string())
                 .await?
             {
                 return Ok(false);
@@ -418,21 +439,13 @@ impl StacksDevnetApiK8sManager {
             }
         }
 
-        for pvc in StacksDevnetPvc::iter() {
-            if !self
-                .check_resource_exists::<PersistentVolumeClaim>(namespace, &pvc.to_string())
-                .await?
-            {
-                return Ok(false);
-            }
-        }
-
         Ok(true)
     }
 
     async fn get_pod_status_info(
         &self,
         namespace: &str,
+        user_id: &str,
         pod: StacksDevnetPod,
     ) -> Result<PodStatusResponse, DevNetError> {
         let context = format!("NAMESPACE: {}, POD: {}", namespace, pod);
@@ -441,24 +454,33 @@ impl StacksDevnetApiK8sManager {
             slog::info!(logger, "getting pod status {}", context)
         });
         let pod_api: Api<Pod> = Api::namespaced(self.client.to_owned(), &namespace);
-        let pod_name = pod.to_string();
-        match pod_api.get_status(&pod_name).await {
-            Ok(pod_with_status) => match pod_with_status.status {
-                Some(status) => {
-                    self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
-                        slog::info!(logger, "successfully retrieved pod status {}", context)
-                    });
-                    let start_time = match status.start_time {
-                        Some(st) => Some(st.0.to_string()),
-                        None => None,
-                    };
-                    Ok(PodStatusResponse {
-                        status: status.phase,
-                        start_time,
-                    })
+        let pod_label_selector = format!("app.kubernetes.io/component={}", pod);
+        let user_label_selector = format!("app.kubernetes.io/instance={}", user_id);
+        let label_selector = format!("{pod_label_selector},{user_label_selector}");
+        let lp = ListParams::default()
+            .match_any()
+            .labels(&label_selector)
+            .limit(1);
+        match pod_api.list(&lp).await {
+            Ok(pods) => {
+                let pod_with_status = &pods.items[0];
+                match &pod_with_status.status {
+                    Some(status) => {
+                        self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
+                            slog::info!(logger, "successfully retrieved pod status {}", context)
+                        });
+                        let start_time = match &status.start_time {
+                            Some(st) => Some(st.0.to_string()),
+                            None => None,
+                        };
+                        Ok(PodStatusResponse {
+                            status: status.phase.to_owned(),
+                            start_time,
+                        })
+                    }
+                    None => Ok(PodStatusResponse::default()),
                 }
-                None => Ok(PodStatusResponse::default()),
-            },
+            }
             Err(e) => {
                 let (msg, code) = match e {
                     kube::Error::Api(api_error) => (api_error.message, api_error.code),
@@ -554,6 +576,7 @@ impl StacksDevnetApiK8sManager {
     pub async fn get_devnet_info(
         &self,
         namespace: &str,
+        user_id: &str,
     ) -> Result<StacksDevnetInfoResponse, DevNetError> {
         let context = format!("NAMESPACE: {}", namespace);
 
@@ -587,9 +610,17 @@ impl StacksDevnetApiK8sManager {
                     },
                     chain_info,
                 ) = try_join4(
-                    self.get_pod_status_info(&namespace, StacksDevnetPod::BitcoindNode),
-                    self.get_pod_status_info(&namespace, StacksDevnetPod::StacksBlockchain),
-                    self.get_pod_status_info(&namespace, StacksDevnetPod::StacksBlockchainApi),
+                    self.get_pod_status_info(&namespace, user_id, StacksDevnetPod::BitcoindNode),
+                    self.get_pod_status_info(
+                        &namespace,
+                        user_id,
+                        StacksDevnetPod::StacksBlockchain,
+                    ),
+                    self.get_pod_status_info(
+                        &namespace,
+                        user_id,
+                        StacksDevnetPod::StacksBlockchainApi,
+                    ),
                     self.get_stacks_v2_info(&namespace),
                 )
                 .await?;
@@ -772,21 +803,140 @@ impl StacksDevnetApiK8sManager {
         }
     }
 
-    async fn deploy_pod(&self, pod: StacksDevnetPod, namespace: &str) -> Result<(), DevNetError> {
-        let mut pod: Pod = self.get_resource_from_file(StacksDevnetResource::Pod(pod))?;
+    async fn deploy_deployment(
+        &self,
+        deployment: StacksDevnetDeployment,
+        namespace: &str,
+        user_id: &str,
+    ) -> Result<(), DevNetError> {
+        let mut deployment: Deployment =
+            self.get_resource_from_file(StacksDevnetResource::Deployment(deployment))?;
 
-        pod.metadata.namespace = Some(namespace.to_owned());
-        self.deploy_resource(namespace, pod, "pod").await
+        let key = "app.kubernetes.io/instance".to_string();
+        let user_id = user_id.to_owned();
+
+        if let Some(mut labels) = deployment.clone().metadata.labels {
+            if let Some(label) = labels.get_mut(&key) {
+                *label = user_id.clone();
+            } else {
+                labels.insert(key.clone(), user_id.clone());
+            }
+            deployment.metadata.labels = Some(labels);
+        }
+
+        if let Some(mut spec) = deployment.clone().spec {
+            if let Some(mut match_labels) = spec.selector.match_labels {
+                if let Some(match_label) = match_labels.get_mut(&key) {
+                    *match_label = user_id.clone();
+                } else {
+                    match_labels.insert(key.clone(), user_id.clone());
+                }
+                spec.selector.match_labels = Some(match_labels);
+            }
+
+            if let Some(mut metadata) = spec.template.metadata {
+                if let Some(mut labels) = metadata.labels {
+                    if let Some(label) = labels.get_mut(&key) {
+                        *label = user_id.clone();
+                    } else {
+                        labels.insert(key.clone(), user_id.clone());
+                    }
+                    metadata.labels = Some(labels);
+                }
+                spec.template.metadata = Some(metadata);
+            }
+
+            deployment.spec = Some(spec);
+        }
+
+        deployment.metadata.namespace = Some(namespace.to_owned());
+        self.deploy_resource(namespace, deployment, "deployment")
+            .await
+    }
+
+    async fn deploy_stateful_set(
+        &self,
+        stateful_set: StacksDevnetStatefulSet,
+        namespace: &str,
+        user_id: &str,
+    ) -> Result<(), DevNetError> {
+        let mut stateful_set: StatefulSet =
+            self.get_resource_from_file(StacksDevnetResource::StatefulSet(stateful_set))?;
+        let key = "app.kubernetes.io/instance".to_string();
+        let user_id = user_id.to_owned();
+
+        if let Some(mut labels) = stateful_set.clone().metadata.labels {
+            if let Some(label) = labels.get_mut(&key) {
+                *label = user_id.clone();
+            } else {
+                labels.insert(key.clone(), user_id.clone());
+            }
+            stateful_set.metadata.labels = Some(labels);
+        }
+
+        if let Some(mut spec) = stateful_set.clone().spec {
+            if let Some(mut match_labels) = spec.selector.match_labels {
+                if let Some(match_label) = match_labels.get_mut(&key) {
+                    *match_label = user_id.clone();
+                } else {
+                    match_labels.insert(key.clone(), user_id.clone());
+                }
+                spec.selector.match_labels = Some(match_labels);
+            }
+
+            if let Some(mut metadata) = spec.template.metadata {
+                if let Some(mut labels) = metadata.labels {
+                    if let Some(label) = labels.get_mut(&key) {
+                        *label = user_id.clone();
+                    } else {
+                        labels.insert(key.clone(), user_id.clone());
+                    }
+                    metadata.labels = Some(labels);
+                }
+                spec.template.metadata = Some(metadata);
+            }
+
+            stateful_set.spec = Some(spec);
+        }
+
+        stateful_set.metadata.namespace = Some(namespace.to_owned());
+        self.deploy_resource(namespace, stateful_set, "stateful_set")
+            .await
     }
 
     async fn deploy_service(
         &self,
         service: StacksDevnetService,
         namespace: &str,
+        user_id: &str,
     ) -> Result<(), DevNetError> {
         let mut service: Service =
             self.get_resource_from_file(StacksDevnetResource::Service(service))?;
 
+        let key = "app.kubernetes.io/instance".to_string();
+        let user_id = user_id.to_owned();
+
+        if let Some(mut labels) = service.clone().metadata.labels {
+            if let Some(label) = labels.get_mut(&key) {
+                *label = user_id.clone();
+            } else {
+                labels.insert(key.clone(), user_id.clone());
+            }
+            service.metadata.labels = Some(labels);
+        }
+
+        if let Some(mut spec) = service.clone().spec {
+            if let Some(mut selector_map) = spec.selector {
+                if let Some(selector_entry) = selector_map.get_mut(&key) {
+                    *selector_entry = user_id.clone();
+                } else {
+                    selector_map.insert(key.clone(), user_id.clone());
+                }
+                spec.selector = Some(selector_map);
+            }
+
+            service.spec = Some(spec);
+        }
         service.metadata.namespace = Some(namespace.to_owned());
         self.deploy_resource(namespace, service, "service").await
     }
@@ -813,20 +963,12 @@ impl StacksDevnetApiK8sManager {
             .await
     }
 
-    async fn deploy_pvc(&self, pvc: StacksDevnetPvc, namespace: &str) -> Result<(), DevNetError> {
-        let mut pvc: PersistentVolumeClaim =
-            self.get_resource_from_file(StacksDevnetResource::Pvc(pvc))?;
-
-        pvc.metadata.namespace = Some(namespace.to_owned());
-
-        self.deploy_resource(namespace, pvc, "pvc").await
-    }
-
-    async fn deploy_bitcoin_node_pod(
+    async fn deploy_bitcoin_node(
         &self,
         config: &ValidatedStacksDevnetConfig,
     ) -> Result<(), DevNetError> {
         let namespace = &config.namespace;
+        let user_id = &config.user_id;
         let devnet_config = &config.devnet_config;
 
         let bitcoin_rpc_port =
@@ -909,20 +1051,21 @@ impl StacksDevnetApiK8sManager {
         )
         .await?;
 
-        self.deploy_pod(StacksDevnetPod::BitcoindNode, &namespace)
+        self.deploy_deployment(StacksDevnetDeployment::BitcoindNode, &namespace, &user_id)
             .await?;
 
-        self.deploy_service(StacksDevnetService::BitcoindNode, namespace)
+        self.deploy_service(StacksDevnetService::BitcoindNode, namespace, &user_id)
             .await?;
 
         Ok(())
     }
 
-    async fn deploy_stacks_node_pod(
+    async fn deploy_stacks_blockchain(
         &self,
         config: &ValidatedStacksDevnetConfig,
     ) -> Result<(), DevNetError> {
         let namespace = &config.namespace;
+        let user_id = &config.user_id;
         let devnet_config = &config.devnet_config;
 
         let chain_coordinator_ingestion_port =
@@ -1086,16 +1229,25 @@ impl StacksDevnetApiK8sManager {
         )
         .await?;
 
-        self.deploy_pod(StacksDevnetPod::StacksBlockchain, &namespace)
-            .await?;
+        self.deploy_deployment(
+            StacksDevnetDeployment::StacksBlockchain,
+            &namespace,
+            &user_id,
+        )
+        .await?;
 
-        self.deploy_service(StacksDevnetService::StacksBlockchain, namespace)
+        self.deploy_service(StacksDevnetService::StacksBlockchain, namespace, &user_id)
             .await?;
 
         Ok(())
     }
 
-    async fn deploy_stacks_api_pod(&self, namespace: &str) -> Result<(), DevNetError> {
+    async fn deploy_stacks_blockchain_api(
+        &self,
+        config: &ValidatedStacksDevnetConfig,
+    ) -> Result<(), DevNetError> {
+        let namespace = &config.namespace;
+        let user_id = &config.user_id;
         // configmap env vars for pg conatainer
         let stacks_api_pg_env = Vec::from([
             ("POSTGRES_PASSWORD".into(), "postgres".into()),
@@ -1144,14 +1296,19 @@ impl StacksDevnetApiK8sManager {
         )
         .await?;
 
-        self.deploy_pvc(StacksDevnetPvc::StacksBlockchainApiPg, &namespace)
-            .await?;
+        self.deploy_stateful_set(
+            StacksDevnetStatefulSet::StacksBlockchainApi,
+            &namespace,
+            user_id,
+        )
+        .await?;
 
-        self.deploy_pod(StacksDevnetPod::StacksBlockchainApi, &namespace)
-            .await?;
-
-        self.deploy_service(StacksDevnetService::StacksBlockchainApi, &namespace)
-            .await?;
+        self.deploy_service(
+            StacksDevnetService::StacksBlockchainApi,
+            &namespace,
+            &user_id,
+        )
+        .await?;
 
         Ok(())
     }

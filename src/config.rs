@@ -14,6 +14,7 @@ const CONTRACT_DIR: &str = "/etc/stacks-network/project/contracts";
 #[derive(Serialize, Deserialize, Debug)]
 pub struct ValidatedStacksDevnetConfig {
     pub namespace: String,
+    pub user_id: String,
     pub devnet_config: DevnetConfig,
     pub accounts: BTreeMap<String, AccountConfig>,
     pub project_manifest_yaml_string: String,
@@ -72,6 +73,7 @@ impl StacksDevnetConfig {
 
         Ok(ValidatedStacksDevnetConfig {
             namespace: self.namespace,
+            user_id: user_id.to_owned(),
             devnet_config: devnet_config.to_owned(),
             accounts: self.network_manifest.accounts,
             project_manifest_yaml_string: project_manifest_yaml_string.to_owned(),
