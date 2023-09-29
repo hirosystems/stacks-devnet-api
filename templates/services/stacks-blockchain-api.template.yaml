@@ -10,15 +10,15 @@ metadata:
   namespace: "{namespace}"
 spec:
   ports:
-  - name: api
+  - name: http-api
     port: 3999
     protocol: TCP
     targetPort: 3999
-  - name: postgres
+  - name: tcp-postgres
     port: 5432
     protocol: TCP
     targetPort: 5432
-  - name: eventport
+  - name: tcp-eventport
     port: 3700
     protocol: TCP
     targetPort: 3700

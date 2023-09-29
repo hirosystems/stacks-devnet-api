@@ -10,19 +10,19 @@ metadata:
   namespace: "{namespace}"
 spec:
   ports:
-  - name: p2p
+  - name: tcp-p2p
     port: 18444
     protocol: TCP
     targetPort: 18444
-  - name: rpc
+  - name: tcp-rpc
     port: 18443
     protocol: TCP
     targetPort: 18443
-  - name: coordinator-in
+  - name: http-coordinator-in
     port: 20445
     protocol: TCP
     targetPort: 20445
-  - name: coordinator-con
+  - name: http-coordinator-con
     port: 20446
     protocol: TCP
     targetPort: 20446
