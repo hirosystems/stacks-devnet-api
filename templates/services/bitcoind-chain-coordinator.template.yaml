@@ -1,6 +1,11 @@
 apiVersion: v1
 kind: Service
 metadata:
+  labels:
+    app.kubernetes.io/component: bitcoind-chain-coordinator
+    app.kubernetes.io/instance: "{user_id}"
+    app.kubernetes.io/managed-by: stacks-devnet-api
+    app.kubernetes.io/name: bitcoind-chain-coordinator
   name: bitcoind-chain-coordinator
   namespace: "{namespace}"
 spec:
@@ -22,4 +27,7 @@ spec:
     protocol: TCP
     targetPort: 20446
   selector:
-    name: bitcoind-chain-coordinator
+    app.kubernetes.io/component: bitcoind-chain-coordinator
+    app.kubernetes.io/instance: "{user_id}"
+    app.kubernetes.io/managed-by: stacks-devnet-api
+    app.kubernetes.io/name: bitcoind-chain-coordinator

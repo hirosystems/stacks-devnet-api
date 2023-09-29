@@ -1,6 +1,11 @@
 apiVersion: v1
 kind: Service
 metadata:
+  labels:
+    app.kubernetes.io/component: stacks-blockchain-api
+    app.kubernetes.io/instance: "{user_id}"
+    app.kubernetes.io/managed-by: stacks-devnet-api
+    app.kubernetes.io/name: stacks-blockchain-api
   name: stacks-blockchain-api
   namespace: "{namespace}"
 spec:
@@ -18,4 +23,7 @@ spec:
     protocol: TCP
     targetPort: 3700
   selector:
-    name: stacks-blockchain-api
+    app.kubernetes.io/component: stacks-blockchain-api
+    app.kubernetes.io/instance: "{user_id}"
+    app.kubernetes.io/managed-by: stacks-devnet-api
+    app.kubernetes.io/name: stacks-blockchain-api
