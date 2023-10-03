@@ -113,7 +113,7 @@ enum TestBody {
 }
 
 #[test_case("/api/v1/network/{namespace}", Method::DELETE, None, false => is equal_to (StatusCode::OK, "Ok".to_string()); "200 for network DELETE request")]
-// #[test_case("/api/v1/network/{namespace}", Method::DELETE, None, true => using assert_cannot_delete_devnet_multiple_errs; "500 for network DELETE request with multiple errors")]
+#[test_case("/api/v1/network/{namespace}", Method::DELETE, None, true => using assert_cannot_delete_devnet_multiple_errs; "500 for network DELETE request with multiple errors")]
 #[test_case("/api/v1/networks", Method::POST, Some(TestBody::CreateNetwork), true => using assert_cannot_create_devnet_err; "409 for create network POST request if devnet exists")]
 #[test_case("/api/v1/network/{namespace}", Method::GET, None, true => using assert_get_network; "200 for network GET request to existing network")]
 #[test_case("/api/v1/network/{namespace}", Method::HEAD, None, true => is equal_to (StatusCode::OK, "Ok".to_string()); "200 for network HEAD request to existing network")]
@@ -144,6 +144,7 @@ async fn it_responds_to_valid_requests_with_deploy(
     let mut config = get_template_config();
     config.namespace = namespace.to_owned();
     let validated_config = config.to_validated_config(&namespace, ctx.clone()).unwrap();
+    let user_id = &namespace;
     let _ = k8s_manager.deploy_devnet(validated_config).await.unwrap();
     // short delay to allow assets to start
     sleep(Duration::new(5, 0));
@@ -168,7 +169,7 @@ async fn it_responds_to_valid_requests_with_deploy(
     let mut status = response.status();
 
     if tear_down {
-        match k8s_manager.delete_devnet(namespace).await {
+        match k8s_manager.delete_devnet(namespace, user_id).await {
             Ok(_) => {}
             Err(e) => {
                 body_str = e.message;

@@ -41,6 +41,10 @@ use crate::resources::configmap::StacksDevnetConfigmap;
 use crate::resources::pod::StacksDevnetPod;
 use crate::resources::service::{get_service_url, StacksDevnetService};
 
+const COMPONENT_SELECTOR: &str = "app.kubernetes.io/component";
+const USER_SELECTOR: &str = "app.kubernetes.io/instance";
+const NAME_SELECTOR: &str = "app.kubernetes.io/name";
+
 #[derive(Clone, Debug)]
 pub struct DevNetError {
     pub message: String,
@@ -177,6 +181,7 @@ impl StacksDevnetApiK8sManager {
         config: ValidatedStacksDevnetConfig,
     ) -> Result<(), DevNetError> {
         let namespace = &config.namespace;
+        let user_id = &config.user_id;
 
         let context = format!("NAMESPACE: {}", &namespace);
         let namespace_exists = self.check_namespace_exists(&namespace).await?;
@@ -196,7 +201,9 @@ impl StacksDevnetApiK8sManager {
             }
         }
 
-        let any_assets_exist = self.check_any_devnet_assets_exist(&namespace).await?;
+        let any_assets_exist = self
+            .check_any_devnet_assets_exist(&namespace, &user_id)
+            .await?;
         if any_assets_exist {
             let msg = format!(
                 "cannot create devnet because assets already exist {}",
@@ -221,8 +228,11 @@ impl StacksDevnetApiK8sManager {
         Ok(())
     }
 
-    pub async fn delete_devnet(&self, namespace: &str) -> Result<(), DevNetError> {
-        match self.check_any_devnet_assets_exist(&namespace).await? {
+    pub async fn delete_devnet(&self, namespace: &str, user_id: &str) -> Result<(), DevNetError> {
+        match self
+            .check_any_devnet_assets_exist(namespace, user_id)
+            .await?
+        {
             true => {
                 let mut errors = vec![];
                 let deployments: Vec<String> = StacksDevnetDeployment::iter()
@@ -345,6 +355,7 @@ impl StacksDevnetApiK8sManager {
     pub async fn check_any_devnet_assets_exist(
         &self,
         namespace: &str,
+        user_id: &str,
     ) -> Result<bool, DevNetError> {
         self.ctx.try_log(|logger| {
             slog::info!(
@@ -365,6 +376,15 @@ impl StacksDevnetApiK8sManager {
         for stateful_set in StacksDevnetStatefulSet::iter() {
             if self
                 .check_resource_exists::<StatefulSet>(namespace, &stateful_set.to_string())
+                .await?
+            {
+                return Ok(true);
+            }
+        }
+
+        for pod in StacksDevnetPod::iter() {
+            if self
+                .check_resource_exists_by_label::<Pod>(namespace, &pod.to_string(), user_id)
                 .await?
             {
                 return Ok(true);
@@ -454,13 +474,18 @@ impl StacksDevnetApiK8sManager {
             slog::info!(logger, "getting pod status {}", context)
         });
         let pod_api: Api<Pod> = Api::namespaced(self.client.to_owned(), &namespace);
-        let pod_label_selector = format!("app.kubernetes.io/component={}", pod);
-        let user_label_selector = format!("app.kubernetes.io/instance={}", user_id);
-        let label_selector = format!("{pod_label_selector},{user_label_selector}");
+
+        let pod_label_selector = format!("{COMPONENT_SELECTOR}={pod}");
+        let user_label_selector = format!("{USER_SELECTOR}={user_id}");
+        let name_label_selector = format!("{NAME_SELECTOR}={pod}");
+        let label_selector =
+            format!("{pod_label_selector},{user_label_selector},{name_label_selector}");
+
         let lp = ListParams::default()
             .match_any()
             .labels(&label_selector)
             .limit(1);
+
         match pod_api.list(&lp).await {
             Ok(pods) => {
                 let pod_with_status = &pods.items[0];
@@ -675,6 +700,67 @@ impl StacksDevnetApiK8sManager {
         }
     }
 
+    async fn get_resource_by_label<K: kube::Resource<Scope = NamespaceResourceScope>>(
+        &self,
+        namespace: &str,
+        name: &str,
+        user_id: &str,
+    ) -> Result<Option<K>, DevNetError>
+    where
+        <K as kube::Resource>::DynamicType: Default,
+        K: Clone,
+        K: DeserializeOwned,
+        K: std::fmt::Debug,
+        K: Serialize,
+    {
+        let resource_api: Api<K> = Api::namespaced(self.client.to_owned(), &namespace);
+
+        let pod_label_selector = format!("{COMPONENT_SELECTOR}={name}");
+        let user_label_selector = format!("{USER_SELECTOR}={user_id}");
+        let label_selector = format!("{pod_label_selector},{user_label_selector}");
+        let lp = ListParams::default()
+            .match_any()
+            .labels(&label_selector)
+            .limit(1);
+
+        let resource_details = format!(
+            "RESOURCE: {}, NAME: {}, NAMESPACE: {}",
+            std::any::type_name::<K>(),
+            name,
+            namespace
+        );
+        self.ctx
+            .try_log(|logger| slog::info!(logger, "fetching {}", resource_details));
+
+        match resource_api.list(&lp).await {
+            Ok(pods) => {
+                if pods.items.len() > 0 {
+                    let pod = &pods.items[0];
+                    Ok(Some(pod.clone()))
+                } else {
+                    Ok(None)
+                }
+            }
+            Err(e) => {
+                let (msg, code) = match e {
+                    kube::Error::Api(api_error) => {
+                        if api_error.code == 404 {
+                            return Ok(None);
+                        }
+                        (api_error.message, api_error.code)
+                    }
+                    e => (e.to_string(), 500),
+                };
+                let msg = format!("failed to fetch {}, ERROR: {}", resource_details, msg);
+                self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                Err(DevNetError {
+                    message: msg,
+                    code: code,
+                })
+            }
+        }
+    }
+
     async fn get_resource<K: kube::Resource<Scope = NamespaceResourceScope>>(
         &self,
         namespace: &str,
@@ -725,6 +811,28 @@ impl StacksDevnetApiK8sManager {
                     code: code,
                 })
             }
+        }
+    }
+
+    async fn check_resource_exists_by_label<K: kube::Resource<Scope = NamespaceResourceScope>>(
+        &self,
+        namespace: &str,
+        name: &str,
+        user_id: &str,
+    ) -> Result<bool, DevNetError>
+    where
+        <K as kube::Resource>::DynamicType: Default,
+        K: Clone,
+        K: DeserializeOwned,
+        K: std::fmt::Debug,
+        K: Serialize,
+    {
+        match self
+            .get_resource_by_label::<K>(namespace, name, user_id)
+            .await?
+        {
+            Some(_) => Ok(true),
+            None => Ok(false),
         }
     }
 
