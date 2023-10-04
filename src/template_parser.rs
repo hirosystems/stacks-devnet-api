@@ -48,6 +48,6 @@ pub fn get_yaml_from_resource(resource: StacksDevnetResource) -> &'static str {
             include_str!("../templates/services/stacks-blockchain.template.yaml")
         }
         StacksDevnetResource::Namespace => include_str!("../templates/namespace.template.yaml"),
-        StacksDevnetResource::Pod(_) => unreachable!(),
+        StacksDevnetResource::Pod(_) | StacksDevnetResource::Pvc(_) => unreachable!(),
     }
 }
