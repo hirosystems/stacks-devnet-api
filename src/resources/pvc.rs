@@ -9,7 +9,7 @@ pub enum StacksDevnetPvc {
 impl fmt::Display for StacksDevnetPvc {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            StacksDevnetPvc::StacksBlockchainApiPg => write!(f, "stacks-blockchain-api-pg"),
+            StacksDevnetPvc::StacksBlockchainApiPg => write!(f, "stacks-blockchain-api"),
         }
     }
 }
