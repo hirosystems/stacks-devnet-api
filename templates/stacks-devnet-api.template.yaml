@@ -49,7 +49,7 @@ spec:
   containers:
   - command: ["stacks-devnet-api"]
     name: stacks-devnet-api
-    image: stacks-devnet-api
+    image: hirosystems/stacks-devnet-api:latest
     imagePullPolicy: IfNotPresent
     ports:
     - containerPort: 8477
