@@ -6,7 +6,7 @@ use hyper::{body::Bytes, Body, Client as HttpClient, Request, Response, Uri};
 use k8s_openapi::{
     api::{
         apps::v1::{Deployment, StatefulSet},
-        core::v1::{ConfigMap, Namespace, Pod, Service},
+        core::v1::{ConfigMap, Namespace, PersistentVolumeClaim, Pod, Service},
     },
     NamespaceResourceScope,
 };
@@ -17,6 +17,7 @@ use kube::{
 };
 use resources::{
     deployment::StacksDevnetDeployment,
+    pvc::StacksDevnetPvc,
     service::{get_service_port, ServicePort},
     stateful_set::StacksDevnetStatefulSet,
     StacksDevnetResource,
@@ -279,6 +280,17 @@ impl StacksDevnetApiK8sManager {
                     }
                 }
 
+                let pvcs: Vec<String> =
+                    StacksDevnetPvc::iter().map(|pvc| pvc.to_string()).collect();
+                for pvc in pvcs {
+                    if let Err(e) = self
+                        .delete_resource_by_label::<PersistentVolumeClaim>(namespace, &pvc, user_id)
+                        .await
+                    {
+                        errors.push(e);
+                    }
+                }
+
                 if errors.is_empty() {
                     Ok(())
                 } else if errors.len() == 1 {
@@ -409,6 +421,18 @@ impl StacksDevnetApiK8sManager {
             }
         }
 
+        for pvc in StacksDevnetPvc::iter() {
+            if self
+                .check_resource_exists_by_label::<PersistentVolumeClaim>(
+                    namespace,
+                    &pvc.to_string(),
+                    user_id,
+                )
+                .await?
+            {
+                return Ok(true);
+            }
+        }
         Ok(false)
     }
 
@@ -717,7 +741,9 @@ impl StacksDevnetApiK8sManager {
 
         let pod_label_selector = format!("{COMPONENT_SELECTOR}={name}");
         let user_label_selector = format!("{USER_SELECTOR}={user_id}");
-        let label_selector = format!("{pod_label_selector},{user_label_selector}");
+        let name_label_selector = format!("{NAME_SELECTOR}={name}");
+        let label_selector =
+            format!("{pod_label_selector},{user_label_selector},{name_label_selector}");
         let lp = ListParams::default()
             .match_any()
             .labels(&label_selector)
@@ -1464,6 +1490,63 @@ impl StacksDevnetApiK8sManager {
             }
         }
     }
+
+    async fn delete_resource_by_label<K: kube::Resource<Scope = NamespaceResourceScope>>(
+        &self,
+        namespace: &str,
+        resource_name: &str,
+        user_id: &str,
+    ) -> Result<(), DevNetError>
+    where
+        <K as kube::Resource>::DynamicType: Default,
+        K: Clone,
+        K: DeserializeOwned,
+        K: std::fmt::Debug,
+    {
+        let api: Api<K> = Api::namespaced(self.client.to_owned(), &namespace);
+        let dp = DeleteParams::default();
+
+        let pod_label_selector = format!("{COMPONENT_SELECTOR}={resource_name}");
+        let user_label_selector = format!("{USER_SELECTOR}={user_id}");
+        let name_label_selector = format!("{NAME_SELECTOR}={resource_name}");
+        let label_selector =
+            format!("{pod_label_selector},{user_label_selector},{name_label_selector}");
+
+        let lp = ListParams::default()
+            .match_any()
+            .labels(&label_selector)
+            .limit(1);
+
+        let resource_details = format!(
+            "RESOURCE: {}, NAME: {}, NAMESPACE: {}",
+            std::any::type_name::<K>(),
+            resource_name,
+            namespace
+        );
+        self.ctx
+            .try_log(|logger| slog::info!(logger, "deleting {}", resource_details));
+        match api.delete_collection(&dp, &lp).await {
+            Ok(_) => {
+                self.ctx.try_log(|logger| {
+                    slog::info!(logger, "successfully deleted {}", resource_details)
+                });
+                Ok(())
+            }
+            Err(e) => {
+                let e = match e {
+                    kube::Error::Api(api_error) => (api_error.message, api_error.code),
+                    e => (e.to_string(), 500),
+                };
+                let msg = format!("failed to delete {}, ERROR: {}", resource_details, e.0);
+                self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                Err(DevNetError {
+                    message: msg,
+                    code: e.1,
+                })
+            }
+        }
+    }
+
     pub async fn delete_namespace(&self, namespace_str: &str) -> Result<(), DevNetError> {
         if cfg!(debug_assertions) {
             use kube::ResourceExt;
