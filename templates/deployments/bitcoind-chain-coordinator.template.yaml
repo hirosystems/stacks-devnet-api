@@ -70,8 +70,8 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: metadata.namespace
-          image: stacks-network-orchestrator
-          imagePullPolicy: Never
+          image: hirosystems/stacks-network-orchestrator@sha256:e9c88e46adb10deba74e29883533de747a2200665f919d1708a5ea0f2638d32a
+          imagePullPolicy: IfNotPresent
           name: chain-coordinator
           ports:
             - containerPort: 20445
