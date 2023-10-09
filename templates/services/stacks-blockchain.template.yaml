@@ -1,15 +1,23 @@
 apiVersion: v1
 kind: Service
 metadata:
+  labels:
+    app.kubernetes.io/component: stacks-blockchain
+    app.kubernetes.io/instance: "{user_id}"
+    app.kubernetes.io/managed-by: stacks-devnet-api
+    app.kubernetes.io/name: stacks-blockchain
   name: stacks-blockchain
   namespace: "{namespace}"
 spec:
   ports:
-  - name: p2p
+  - name: tcp-p2p
     port: 20444
     protocol: TCP
-  - name: rpc
+  - name: http-rpc
     port: 20443
     protocol: TCP
   selector:
-    name: stacks-blockchain
+    app.kubernetes.io/component: stacks-blockchain
+    app.kubernetes.io/instance: "{user_id}"
+    app.kubernetes.io/managed-by: stacks-devnet-api
+    app.kubernetes.io/name: stacks-blockchain

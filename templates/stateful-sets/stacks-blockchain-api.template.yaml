@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  labels:
+    app.kubernetes.io/component: stacks-blockchain-api
+    app.kubernetes.io/instance: "{user_id}"
+    app.kubernetes.io/managed-by: stacks-devnet-api
+    app.kubernetes.io/name: stacks-blockchain-api
+  name: stacks-blockchain-api
+  namespace: "{namespace}"
+spec:
+  replicas: 1
+  serviceName: stacks-blockchain-api
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: stacks-blockchain-api
+      app.kubernetes.io/instance: "{user_id}"
+      app.kubernetes.io/managed-by: stacks-devnet-api
+      app.kubernetes.io/name: stacks-blockchain-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: stacks-blockchain-api
+        app.kubernetes.io/instance: "{user_id}"
+        app.kubernetes.io/managed-by: stacks-devnet-api
+        app.kubernetes.io/name: stacks-blockchain-api
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: cloud.google.com/gke-preemptible
+                    operator: DoesNotExist
+      containers:
+        - name: stacks-blockchain-api
+          envFrom:
+            - configMapRef:
+                name: stacks-blockchain-api
+                optional: false
+          image: hirosystems/stacks-blockchain-api
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3999
+              name: api
+              protocol: TCP
+            - containerPort: 3700
+              name: eventport
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 250m
+              memory: 750Mi # todo: revisit allocation
+            limits:
+              memory: 750Mi # todo: revisit allocation
+        - name: postgres
+          envFrom:
+            - configMapRef:
+                name: stacks-blockchain-api-pg
+                optional: false
+          image: postgres:15
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5432
+              name: postgres
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /var/lib/postgresql/data
+              name: pg
+              subPath: postgres
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              memory: 512Mi
+  volumeClaimTemplates:
+    - metadata:
+        name: pg
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        storageClassName: premium-rwo
+        resources:
+          requests:
+            storage: 1Gi

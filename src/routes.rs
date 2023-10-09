@@ -63,9 +63,10 @@ pub async fn handle_new_devnet(
 pub async fn handle_delete_devnet(
     k8s_manager: StacksDevnetApiK8sManager,
     network: &str,
+    user_id: &str,
     responder: Responder,
 ) -> Result<Response<Body>, Infallible> {
-    match k8s_manager.delete_devnet(network).await {
+    match k8s_manager.delete_devnet(network, user_id).await {
         Ok(_) => responder.ok(),
         Err(e) => {
             let msg = format!("error deleting network {}: {}", &network, e.message);
@@ -77,10 +78,11 @@ pub async fn handle_delete_devnet(
 pub async fn handle_get_devnet(
     k8s_manager: StacksDevnetApiK8sManager,
     network: &str,
+    user_id: &str,
     responder: Responder,
     ctx: Context,
 ) -> Result<Response<Body>, Infallible> {
-    match k8s_manager.get_devnet_info(&network).await {
+    match k8s_manager.get_devnet_info(&network, user_id).await {
         Ok(devnet_info) => match serde_json::to_vec(&devnet_info) {
             Ok(body) => responder.ok_with_json(Body::from(body)),
             Err(e) => {
@@ -100,9 +102,13 @@ pub async fn handle_get_devnet(
 pub async fn handle_check_devnet(
     k8s_manager: StacksDevnetApiK8sManager,
     network: &str,
+    user_id: &str,
     responder: Responder,
 ) -> Result<Response<Body>, Infallible> {
-    match k8s_manager.check_any_devnet_assets_exist(&network).await {
+    match k8s_manager
+        .check_any_devnet_assets_exist(network, user_id)
+        .await
+    {
         Ok(assets_exist) => match assets_exist {
             true => responder.ok(),
             false => responder.err_not_found("not found".to_string()),

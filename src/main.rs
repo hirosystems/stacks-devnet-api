@@ -148,9 +148,15 @@ async fn handle_request(
         // so it must be a request to DELETE a network or GET network info
         if path_parts.subroute.is_none() {
             return match method {
-                &Method::DELETE => handle_delete_devnet(k8s_manager, &network, responder).await,
-                &Method::GET => handle_get_devnet(k8s_manager, &network, responder, ctx).await,
-                &Method::HEAD => handle_check_devnet(k8s_manager, &network, responder).await,
+                &Method::DELETE => {
+                    handle_delete_devnet(k8s_manager, &network, &user_id, responder).await
+                }
+                &Method::GET => {
+                    handle_get_devnet(k8s_manager, &network, &user_id, responder, ctx).await
+                }
+                &Method::HEAD => {
+                    handle_check_devnet(k8s_manager, &network, &user_id, responder).await
+                }
                 _ => responder
                     .err_method_not_allowed("can only GET/DELETE/HEAD at provided route".into()),
             };

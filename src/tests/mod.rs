@@ -144,6 +144,7 @@ async fn it_responds_to_valid_requests_with_deploy(
     let mut config = get_template_config();
     config.namespace = namespace.to_owned();
     let validated_config = config.to_validated_config(&namespace, ctx.clone()).unwrap();
+    let user_id = &namespace;
     let _ = k8s_manager.deploy_devnet(validated_config).await.unwrap();
     // short delay to allow assets to start
     sleep(Duration::new(5, 0));
@@ -168,7 +169,7 @@ async fn it_responds_to_valid_requests_with_deploy(
     let mut status = response.status();
 
     if tear_down {
-        match k8s_manager.delete_devnet(namespace).await {
+        match k8s_manager.delete_devnet(namespace, user_id).await {
             Ok(_) => {}
             Err(e) => {
                 body_str = e.message;

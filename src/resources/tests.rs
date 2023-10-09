@@ -1,6 +1,7 @@
 use super::{
-    pvc::StacksDevnetPvc,
+    deployment::StacksDevnetDeployment,
     service::{get_service_from_path_part, get_service_port, get_user_facing_port, ServicePort},
+    stateful_set::StacksDevnetStatefulSet,
     StacksDevnetConfigmap, StacksDevnetPod, StacksDevnetService,
 };
 use test_case::test_case;
@@ -24,9 +25,15 @@ fn it_prints_correct_name_for_pod(pod: StacksDevnetPod) -> String {
     pod.to_string()
 }
 
-#[test_case(StacksDevnetPvc::StacksBlockchainApiPg => is equal_to  "stacks-blockchain-api-pg".to_string(); "for StacksBlockchainApiPg")]
-fn it_prints_correct_name_for_pvc(pvc: StacksDevnetPvc) -> String {
-    pvc.to_string()
+#[test_case(StacksDevnetDeployment::BitcoindNode => is equal_to  "bitcoind-chain-coordinator".to_string(); "for BitcoindNode")]
+#[test_case(StacksDevnetDeployment::StacksBlockchain => is equal_to  "stacks-blockchain".to_string(); "for StacksBlockchain")]
+fn it_prints_correct_name_for_deployment(deployment: StacksDevnetDeployment) -> String {
+    deployment.to_string()
+}
+
+#[test_case(StacksDevnetStatefulSet::StacksBlockchainApi => is equal_to  "stacks-blockchain-api".to_string(); "for StacksBlockchainApi")]
+fn it_prints_correct_name_for_stateful_set(pod: StacksDevnetStatefulSet) -> String {
+    pod.to_string()
 }
 
 #[test_case(StacksDevnetService::BitcoindNode => is equal_to  "bitcoind-chain-coordinator".to_string(); "for BitcoindNode")]

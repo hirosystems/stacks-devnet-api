@@ -12,7 +12,10 @@ metadata:
 rules:
   - apiGroups: [""]
     resources: ["pods", "pods/status", "services", "configmaps", "persistentvolumeclaims"]
-    verbs: ["get", "delete", "create"]
+    verbs: ["get", "delete", "create", "list", "deletecollection"]
+  - apiGroups: ["apps"]
+    resources: ["deployments", "statefulsets"]
+    verbs: ["get", "delete", "create", "list"]
   - apiGroups: [""]
     resources: ["namespaces"]
     verbs: ["get"]
