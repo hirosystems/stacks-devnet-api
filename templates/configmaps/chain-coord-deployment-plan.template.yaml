@@ -5,3 +5,5 @@ kind: ConfigMap
 metadata:
   name: deployment-plan
   namespace: "{namespace}"
+  labels:
+    app.kubernetes.io/managed-by: stacks-devnet-api
