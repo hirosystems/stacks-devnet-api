@@ -5,3 +5,6 @@ kind: ConfigMap
 metadata:
   name: bitcoind
   namespace: "{namespace}"
+  labels:
+    app.kubernetes.io/managed-by: stacks-devnet-api
+
