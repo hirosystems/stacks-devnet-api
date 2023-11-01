@@ -7,3 +7,6 @@ metadata:
   namespace: "{namespace}"
   labels:
     app.kubernetes.io/managed-by: stacks-devnet-api
+    app.kubernetes.io/instance: "{user_id}"
+    app.kubernetes.io/name: devnet
+    app.kubernetes.io/component: devnet
