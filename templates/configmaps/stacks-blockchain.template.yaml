@@ -7,6 +7,5 @@ metadata:
   namespace: "{namespace}"
   labels:
     app.kubernetes.io/managed-by: stacks-devnet-api
-    app.kubernetes.io/instance: "{user_id}"
     app.kubernetes.io/name: stacks-blockchain
     app.kubernetes.io/component: stacks-blockchain
