@@ -7,3 +7,5 @@ metadata:
   namespace: "{namespace}"
   labels:
     app.kubernetes.io/managed-by: stacks-devnet-api
+    app.kubernetes.io/name: deployment-plan
+    app.kubernetes.io/component: deployment-plan
