@@ -9,3 +9,5 @@ metadata:
     app.kubernetes.io/managed-by: stacks-devnet-api
     app.kubernetes.io/name: stacks-blockchain
     app.kubernetes.io/component: stacks-blockchain
+    argocd.argoproj.io/instance: platform-user-resources.platform
+∑

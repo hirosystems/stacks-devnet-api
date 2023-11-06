@@ -9,3 +9,4 @@ metadata:
     app.kubernetes.io/managed-by: stacks-devnet-api
     app.kubernetes.io/name: project-manifest
     app.kubernetes.io/component: project-manifest
+    argocd.argoproj.io/instance: platform-user-resources.platform

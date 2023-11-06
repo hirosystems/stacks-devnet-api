@@ -6,6 +6,7 @@ metadata:
     app.kubernetes.io/instance: "{user_id}"
     app.kubernetes.io/managed-by: stacks-devnet-api
     app.kubernetes.io/name: stacks-blockchain-api
+    argocd.argoproj.io/instance: platform-user-resources.platform
   name: stacks-blockchain-api
   namespace: "{namespace}"
 spec:

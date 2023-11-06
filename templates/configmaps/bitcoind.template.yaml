@@ -9,3 +9,4 @@ metadata:
     app.kubernetes.io/managed-by: stacks-devnet-api
     app.kubernetes.io/name: bitcoind
     app.kubernetes.io/component: bitcoind
+    argocd.argoproj.io/instance: platform-user-resources.platform
