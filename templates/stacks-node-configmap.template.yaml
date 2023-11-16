@@ -1,7 +1,0 @@
-apiVersion: v1
-data:
-  Stacks.toml: "{data}"
-kind: ConfigMap
-metadata:
-  name: stacks-node-conf
-  namespace: "{namespace}"

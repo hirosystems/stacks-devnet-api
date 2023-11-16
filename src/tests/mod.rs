@@ -9,11 +9,12 @@ use super::*;
 use hyper::{
     body,
     header::{ACCESS_CONTROL_ALLOW_METHODS, ACCESS_CONTROL_ALLOW_ORIGIN},
-    http::HeaderValue,
+    http::{request::Builder, HeaderValue},
     Client, HeaderMap, Method, StatusCode,
 };
 use k8s_openapi::api::core::v1::Namespace;
 use stacks_devnet_api::{
+    api_config::{AuthConfig, ResponderConfig},
     config::StacksDevnetConfig,
     resources::service::{
         get_service_from_path_part, get_service_port, get_service_url, ServicePort,
@@ -25,6 +26,11 @@ use stacks_devnet_api::{
 use test_case::test_case;
 use tower_test::mock::{self, Handle};
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+const PRJ_NAME: &str = env!("CARGO_PKG_NAME");
+fn get_version_info() -> String {
+    format!("{{\"version\":\"{PRJ_NAME} v{VERSION}\"}}")
+}
 fn get_template_config() -> StacksDevnetConfig {
     let file_path = "src/tests/fixtures/stacks-devnet-config.json";
     let file = File::open(file_path)
@@ -48,10 +54,16 @@ async fn get_k8s_manager() -> (StacksDevnetApiK8sManager, Context) {
     let logger = hiro_system_kit::log::setup_logger();
     let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
     let ctx = Context::empty();
-    let k8s_manager = StacksDevnetApiK8sManager::default(&ctx).await;
+    let k8s_manager = StacksDevnetApiK8sManager::new(&ctx).await;
     (k8s_manager, ctx)
 }
 
+fn get_request_builder(request_path: &str, method: Method, user_id: &str) -> Builder {
+    Request::builder()
+        .uri(request_path)
+        .method(method)
+        .header("x-auth-request-user", user_id)
+}
 fn get_random_namespace() -> String {
     let mut rng = rand::thread_rng();
     let random_digit: u64 = rand::Rng::gen(&mut rng);
@@ -105,9 +117,10 @@ enum TestBody {
 #[test_case("/api/v1/networks", Method::POST, Some(TestBody::CreateNetwork), true => using assert_cannot_create_devnet_err; "409 for create network POST request if devnet exists")]
 #[test_case("/api/v1/network/{namespace}", Method::GET, None, true => using assert_get_network; "200 for network GET request to existing network")]
 #[test_case("/api/v1/network/{namespace}", Method::HEAD, None, true => is equal_to (StatusCode::OK, "Ok".to_string()); "200 for network HEAD request to existing network")]
-#[test_case("/api/v1/network/{namespace}/stacks-node/v2/info/", Method::GET, None, true => using assert_failed_proxy; "proxies requests to downstream nodes")]
+#[test_case("/api/v1/network/{namespace}/stacks-blockchain/v2/info/", Method::GET, None, true => using assert_failed_proxy; "proxies requests to downstream nodes")]
 #[serial_test::serial]
 #[tokio::test]
+#[cfg_attr(not(feature = "k8s_tests"), ignore)]
 async fn it_responds_to_valid_requests_with_deploy(
     mut request_path: &str,
     method: Method,
@@ -124,13 +137,14 @@ async fn it_responds_to_valid_requests_with_deploy(
 
     let (k8s_manager, ctx) = get_k8s_manager().await;
 
-    let request_builder = Request::builder().uri(request_path).method(method);
+    let request_builder = get_request_builder(request_path, method, &namespace);
 
     let _ = k8s_manager.deploy_namespace(&namespace).await.unwrap();
 
     let mut config = get_template_config();
     config.namespace = namespace.to_owned();
-    let validated_config = config.to_validated_config(ctx.clone()).unwrap();
+    let validated_config = config.to_validated_config(&namespace, ctx.clone()).unwrap();
+    let user_id = &namespace;
     let _ = k8s_manager.deploy_devnet(validated_config).await.unwrap();
     // short delay to allow assets to start
     sleep(Duration::new(5, 0));
@@ -145,14 +159,9 @@ async fn it_responds_to_valid_requests_with_deploy(
     };
 
     let request: Request<Body> = request_builder.body(body).unwrap();
-    let mut response = handle_request(
-        request,
-        k8s_manager.clone(),
-        ResponderConfig::default(),
-        ctx,
-    )
-    .await
-    .unwrap();
+    let mut response = handle_request(request, k8s_manager.clone(), ApiConfig::default(), ctx)
+        .await
+        .unwrap();
 
     let body = response.body_mut();
     let bytes = body::to_bytes(body).await.unwrap().to_vec();
@@ -160,7 +169,7 @@ async fn it_responds_to_valid_requests_with_deploy(
     let mut status = response.status();
 
     if tear_down {
-        match k8s_manager.delete_devnet(namespace).await {
+        match k8s_manager.delete_devnet(namespace, user_id).await {
             Ok(_) => {}
             Err(e) => {
                 body_str = e.message;
@@ -173,11 +182,14 @@ async fn it_responds_to_valid_requests_with_deploy(
 }
 
 #[test_case("any", Method::OPTIONS, false => is equal_to (StatusCode::OK, "Ok".to_string()); "200 for any OPTIONS request")]
+#[test_case("/", Method::GET, false => is equal_to (StatusCode::OK, get_version_info()); "200 for GET /")]
+#[test_case("/api/v1/status", Method::GET, false => is equal_to (StatusCode::OK, get_version_info()); "200 for GET /api/v1/status")]
 #[test_case("/api/v1/network/{namespace}", Method::DELETE, true => using assert_cannot_delete_devnet_err; "409 for network DELETE request to non-existing network")]
 #[test_case("/api/v1/network/{namespace}", Method::GET, true => using assert_not_all_assets_exist_err; "404 for network GET request to non-existing network")]
 #[test_case("/api/v1/network/{namespace}", Method::HEAD, true => is equal_to (StatusCode::NOT_FOUND, "not found".to_string()); "404 for network HEAD request to non-existing network")]
-#[test_case("/api/v1/network/{namespace}/stacks-node/v2/info/", Method::GET, true => using assert_not_all_assets_exist_err; "404 for proxy requests to downstream nodes of non-existing network")]
+#[test_case("/api/v1/network/{namespace}/stacks-blockchain/v2/info/", Method::GET, true => using assert_not_all_assets_exist_err; "404 for proxy requests to downstream nodes of non-existing network")]
 #[tokio::test]
+#[cfg_attr(not(feature = "k8s_tests"), ignore)]
 async fn it_responds_to_valid_requests(
     mut request_path: &str,
     method: Method,
@@ -193,21 +205,16 @@ async fn it_responds_to_valid_requests(
 
     let (k8s_manager, ctx) = get_k8s_manager().await;
 
-    let request_builder = Request::builder().uri(request_path).method(method);
+    let request_builder = get_request_builder(request_path, method, &namespace);
 
     if set_up {
         let _ = k8s_manager.deploy_namespace(&namespace).await.unwrap();
     }
 
     let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
-    let mut response = handle_request(
-        request,
-        k8s_manager.clone(),
-        ResponderConfig::default(),
-        ctx,
-    )
-    .await
-    .unwrap();
+    let mut response = handle_request(request, k8s_manager.clone(), ApiConfig::default(), ctx)
+        .await
+        .unwrap();
 
     let body = response.body_mut();
     let bytes = body::to_bytes(body).await.unwrap().to_vec();
@@ -263,35 +270,79 @@ async fn get_mock_k8s_manager() -> (StacksDevnetApiK8sManager, Context) {
     let logger = hiro_system_kit::log::setup_logger();
     let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
     let ctx = Context::empty();
-    let k8s_manager = StacksDevnetApiK8sManager::new(mock_service, "default", &ctx).await;
+    let k8s_manager = StacksDevnetApiK8sManager::from_service(mock_service, "default", &ctx).await;
     (k8s_manager, ctx)
 }
 
-#[test_case("/path", Method::GET => is equal_to (StatusCode::BAD_REQUEST, "invalid request path".to_string()) ; "400 for invalid requet path /path")]
-#[test_case("/api", Method::GET => is equal_to (StatusCode::BAD_REQUEST, "invalid request path".to_string()) ; "400 for invalid requet path /api")]
-#[test_case("/api/v1", Method::GET => is equal_to (StatusCode::BAD_REQUEST, "invalid request path".to_string()) ; "400 for invalid requet path /api/v1")]
-#[test_case("/api/v1/network2", Method::GET => is equal_to (StatusCode::BAD_REQUEST, "invalid request path".to_string()) ; "400 for invalid requet path /api/v1/network2")]
-#[test_case("/api/v1/network/undeployed", Method::GET => 
+#[test_case("/path", Method::GET, "some-user" => is equal_to (StatusCode::BAD_REQUEST, "invalid request path".to_string()) ; "400 for invalid requet path /path")]
+#[test_case("/api", Method::GET, "some-user" => is equal_to (StatusCode::BAD_REQUEST, "invalid request path".to_string()) ; "400 for invalid requet path /api")]
+#[test_case("/api/v1", Method::GET, "some-user" => is equal_to (StatusCode::BAD_REQUEST, "invalid request path".to_string()) ; "400 for invalid requet path /api/v1")]
+#[test_case("/api/v1/network2", Method::GET, "some-user" => is equal_to (StatusCode::BAD_REQUEST, "invalid request path".to_string()) ; "400 for invalid requet path /api/v1/network2")]
+#[test_case("/api/v1/network/undeployed", Method::GET, "undeployed" => 
         is equal_to (StatusCode::NOT_FOUND, "network undeployed does not exist".to_string()); "404 for undeployed namespace")]
-#[test_case("/api/v1/network/500_err", Method::GET => 
+#[test_case("/api/v1/network/500_err", Method::GET, "500_err" => 
     is equal_to (StatusCode::INTERNAL_SERVER_ERROR, "error getting namespace 500_err: \"\"".to_string()); "forwarded error if fetching namespace returns error")]
-#[test_case("/api/v1/network/test", Method::POST => 
+#[test_case("/api/v1/network/test", Method::POST, "test" => 
     is equal_to (StatusCode::METHOD_NOT_ALLOWED, "can only GET/DELETE/HEAD at provided route".to_string()); "405 for network route with POST request")]
-#[test_case("/api/v1/network/test/commands", Method::GET => 
+#[test_case("/api/v1/network/test/commands", Method::GET, "test" => 
 is equal_to (StatusCode::NOT_FOUND, "commands route in progress".to_string()); "404 for network commands route")]
-#[test_case("/api/v1/network/", Method::GET => 
+#[test_case("/api/v1/network/", Method::GET, "test" => 
         is equal_to (StatusCode::BAD_REQUEST, "no network id provided".to_string()); "400 for missing namespace")]
-#[test_case("/api/v1/networks", Method::GET => 
+#[test_case("/api/v1/networks", Method::GET, "test" => 
         is equal_to (StatusCode::METHOD_NOT_ALLOWED, "network creation must be a POST request".to_string()); "405 for network creation request with GET method")]
-#[test_case("/api/v1/networks", Method::DELETE => 
+#[test_case("/api/v1/networks", Method::DELETE, "test" => 
         is equal_to (StatusCode::METHOD_NOT_ALLOWED, "network creation must be a POST request".to_string()); "405 for network creation request with DELETE method")]
-#[test_case("/api/v1/networks", Method::POST => 
+#[test_case("/api/v1/networks", Method::POST, "test" => 
         is equal_to (StatusCode::BAD_REQUEST, "invalid configuration to create network: EOF while parsing a value at line 1 column 0".to_string()); "400 for network creation request invalid config")]
+#[test_case("/api/v1/network/test", Method::GET, "wrong-id" => 
+        is equal_to (StatusCode::BAD_REQUEST, "network id must match authenticated user id".to_string()); "400 for request with non-matching user")]
 #[tokio::test]
 async fn it_responds_to_invalid_requests(
     request_path: &str,
     method: Method,
+    user_id: &str,
 ) -> (StatusCode, String) {
+    let (k8s_manager, ctx) = get_mock_k8s_manager().await;
+
+    let request_builder = get_request_builder(request_path, method, &user_id);
+    let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
+    let mut response = handle_request(request, k8s_manager.clone(), ApiConfig::default(), ctx)
+        .await
+        .unwrap();
+    let body = response.body_mut();
+    let bytes = body::to_bytes(body).await.unwrap().to_vec();
+    let body_str = String::from_utf8(bytes).unwrap();
+    (response.status(), body_str)
+}
+
+#[tokio::test]
+async fn it_responds_to_invalid_request_header() {
+    let (k8s_manager, ctx) = get_mock_k8s_manager().await;
+
+    let request_builder = Request::builder()
+        .uri("/api/v1/network/test")
+        .method(Method::GET);
+    let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
+    let mut response = handle_request(
+        request,
+        k8s_manager.clone(),
+        ApiConfig::default(),
+        ctx.clone(),
+    )
+    .await
+    .unwrap();
+    let body = response.body_mut();
+    let bytes = body::to_bytes(body).await.unwrap().to_vec();
+    let body_str = String::from_utf8(bytes).unwrap();
+    assert_eq!(response.status(), 400);
+    assert_eq!(body_str, "missing required auth header".to_string());
+}
+
+#[test_case("/api/v1/network/test", Method::OPTIONS => is equal_to "Ok".to_string())]
+#[test_case("/api/v1/status", Method::GET => is equal_to get_version_info() )]
+#[test_case("/", Method::GET => is equal_to get_version_info())]
+#[tokio::test]
+async fn it_ignores_request_header_for_some_requests(request_path: &str, method: Method) -> String {
     let (k8s_manager, ctx) = get_mock_k8s_manager().await;
 
     let request_builder = Request::builder().uri(request_path).method(method);
@@ -299,15 +350,16 @@ async fn it_responds_to_invalid_requests(
     let mut response = handle_request(
         request,
         k8s_manager.clone(),
-        ResponderConfig::default(),
-        ctx,
+        ApiConfig::default(),
+        ctx.clone(),
     )
     .await
     .unwrap();
+    assert_eq!(response.status(), 200);
     let body = response.body_mut();
     let bytes = body::to_bytes(body).await.unwrap().to_vec();
     let body_str = String::from_utf8(bytes).unwrap();
-    (response.status(), body_str)
+    body_str
 }
 
 #[test_case("" => is equal_to PathParts { route: String::new(), ..Default::default() }; "for empty path")]
@@ -327,7 +379,7 @@ fn request_paths_are_parsed_correctly(path: &str) -> PathParts {
 
 #[tokio::test]
 async fn request_mutation_should_create_valid_proxy_destination() {
-    let path = "/api/v1/some-route/some-network/stacks-node/the//remaining///path";
+    let path = "/api/v1/some-route/some-network/stacks-blockchain/the//remaining///path";
     let path_parts = get_standardized_path_parts(path);
     let network = path_parts.network.unwrap();
     let subroute = path_parts.subroute.unwrap();
@@ -339,15 +391,15 @@ async fn request_mutation_should_create_valid_proxy_destination() {
         get_service_url(&network, service.clone()),
         get_service_port(service, ServicePort::RPC).unwrap()
     );
-    let request_builder = Request::builder().uri("/").method("POST");
+    let request_builder = get_request_builder("/", Method::POST, "some-network");
     let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
     let request = mutate_request_for_proxy(request, &forward_url, &remainder);
     let actual_url = request.uri().to_string();
     let expected = format!(
         "http://{}.{}.svc.cluster.local:{}/{}",
-        StacksDevnetService::StacksNode,
+        StacksDevnetService::StacksBlockchain,
         network,
-        get_service_port(StacksDevnetService::StacksNode, ServicePort::RPC).unwrap(),
+        get_service_port(StacksDevnetService::StacksBlockchain, ServicePort::RPC).unwrap(),
         &remainder
     );
     assert_eq!(actual_url, expected);
@@ -358,10 +410,11 @@ fn responder_allows_configuring_allowed_origins() {
     let config = ResponderConfig {
         allowed_origins: Some(vec!["*".to_string()]),
         allowed_methods: Some(vec!["GET".to_string()]),
+        allowed_headers: None,
     };
     let mut headers = HeaderMap::new();
     headers.append("ORIGIN", HeaderValue::from_str("example.com").unwrap());
-    let responder = Responder::new(config, headers).unwrap();
+    let responder = Responder::new(config, headers, Context::empty()).unwrap();
     let builder = responder.response_builder();
     let built_headers = builder.headers_ref().unwrap();
     assert_eq!(built_headers.get(ACCESS_CONTROL_ALLOW_ORIGIN).unwrap(), "*");
@@ -371,11 +424,50 @@ fn responder_allows_configuring_allowed_origins() {
     );
 }
 
+#[serial_test::serial]
+#[tokio::test]
+#[cfg_attr(not(feature = "k8s_tests"), ignore)]
+async fn namespace_prefix_config_prepends_header() {
+    let (k8s_manager, ctx) = get_k8s_manager().await;
+
+    // using the ApiConfig's `namespace_prefix` field will add the prefix
+    // before the `user_id` as the authenticated user, which should match the request path
+    let namespace = &get_random_namespace();
+    let _ = k8s_manager.deploy_namespace(&namespace).await.unwrap();
+
+    let (namespace_prefix, user_id) = namespace.split_at(4);
+    let api_config = ApiConfig {
+        auth_config: AuthConfig {
+            namespace_prefix: Some(namespace_prefix.to_string()),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let request_builder = get_request_builder(
+        &format!("/api/v1/network/{namespace}"),
+        Method::HEAD,
+        user_id,
+    );
+    let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
+    let mut response = handle_request(request, k8s_manager.clone(), api_config, ctx.clone())
+        .await
+        .unwrap();
+
+    let body = response.body_mut();
+    let bytes = body::to_bytes(body).await.unwrap().to_vec();
+    let body_str = String::from_utf8(bytes).unwrap();
+    assert_eq!(response.status(), 404);
+    assert_eq!(body_str, "not found");
+}
+
 #[test]
-fn responder_config_reads_from_file() {
-    let config = ResponderConfig::from_path("Config.toml");
-    assert!(config.allowed_methods.is_some());
-    assert!(config.allowed_origins.is_some());
+fn config_reads_from_file() {
+    let config = ApiConfig::from_path("Config.toml");
+    assert!(config.http_response_config.allowed_methods.is_some());
+    assert!(config.http_response_config.allowed_origins.is_some());
+    assert!(config.auth_config.auth_header.is_some());
+    assert!(config.auth_config.namespace_prefix.is_some());
 }
 
 #[tokio::test]
@@ -385,11 +477,8 @@ async fn main_starts_server() {
     });
     sleep(Duration::new(1, 0));
     let client = Client::new();
-    let request_builder = Request::builder()
-        .uri("http://localhost:8477")
-        .method(Method::OPTIONS)
-        .body(Body::empty())
-        .unwrap();
-    let response = client.request(request_builder).await;
+    let request_builder = get_request_builder("http://localhost:8477", Method::OPTIONS, "user-id");
+    let request = request_builder.body(Body::empty()).unwrap();
+    let response = client.request(request).await;
     assert_eq!(response.unwrap().status(), 200);
 }

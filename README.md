@@ -21,8 +21,20 @@ You should now be ready to deploy this service to your local Kubernetes cluster!
 The `Config.toml` at the root directory of the project can be used to control some settings. This same file can be used to update both the stable and development build. The following settings are supported:
  - `allowed_origins` - this setting is an array of strings and is used to set what origins are allowed in cross-origin requests. For example, `allowed_origins = ["*"]` allows any origins to make requests to this service, while `allowed_origins = ["localhost:3002", "dev.platform.so"]` will only allow requests from the two specified hosts.
  - `allowed_methods` - this setting is an array of strings that sets what HTTP methods can be made to this server.
+ - `auth_header` - all requests to the API specify a network id which indicates the network that is being modified. An auth header is checked on all requests to ensure that the value of the auth header matches the id of the request. This configuration value dictates the name of that auth header
+ - `namespace_prefix` - the user's id that is used for the auth header differs slightly from the network id that is used to differentiate devnets. This value is used to determine how to mutate a user id to create a namespace. For example, if the namespace prefix is `zzz-platform`, and a user makes a requests with an auth header value of `auth0|test-namespace`, the devnet API will ensure that the request is trying to create or update a devnet with namespace `zzz-platform-auth0-test-namespace`.
+
+## Environment Variables
+The following environment variables can be provided at runtime to further configure the API:
+ - `KUBE_CONTEXT="<context>" stacks-devnet-api`
+   - With this flag, you can specify the context that will be used for all requests.
+   - Default: the devnet API will deploy assets to the user's default Kubernetes context. Run `kubectl config get-context` to see your default.
+ - `CONFIG_PATH="/path/to/config" stacks-devnet-api` 
+   - Use this flag to specify the path of the `Config.toml`
+   - Default: in development mode (building the app using `cargo build`), the default location is `./Config.toml`; in release mode (building the app using `cargo build --release`), the default location is `/etc/config/Config.toml`  
 
 ## Deploying the Stable Version
+
 In your terminal, run
 ```
 ./scripts/deploy-api.sh
@@ -46,11 +58,11 @@ metadata:
   name: stacks-devnet-api
   namespace: devnet
 spec:
-  serviceAccountName: stacks-devnet-api-service-account
+  serviceAccountName: stacks-devnet-api
   containers:
   - command:
     - ./stacks-devnet-api
-    name: stacks-devnet-api-container
+    name: stacks-devnet-api
 -    image: quay.io/hirosystems/stacks-devnet-api:latest
 -    imagePullPolicy: Always
 +    image: stacks-devnet-api:latest
@@ -82,9 +94,9 @@ When the service has been deployed to your Kubernetes cluster, it should be reac
     "bitcoin_chain_tip": 116
 }
 ```
- - `GET/POST localhost:8477/api/v1/network/<network-id>/stacks-node/*` - Forwards `*` to the underlying stacks node pod of the devnet. If not all devnet assets exist for the given namespace, a 404 error will be returned.
+ - `GET/POST localhost:8477/api/v1/network/<network-id>/stacks-blockchain/*` - Forwards `*` to the underlying stacks node pod of the devnet. If not all devnet assets exist for the given namespace, a 404 error will be returned.
  - `GET/POST localhost:8477/api/v1/network/<network-id>/bitcoin-node/*` - Forwards `*` to the underlying bitcoin node pod of the devnet. If not all devnet assets exist for the given namespace, a 404 error will be returned.
-- `GET/POST localhost:8477/api/v1/network/<network-id>/stacks-api/*` - Forwards `*` to the underlying stacks api pod of the devnet. If not all devnet assets exist for the given namespace, a 404 error will be returned.
+- `GET/POST localhost:8477/api/v1/network/<network-id>/stacks-blockchain-api/*` - Forwards `*` to the underlying stacks api pod of the devnet. If not all devnet assets exist for the given namespace, a 404 error will be returned.
 
 ## Bugs and feature requests
 

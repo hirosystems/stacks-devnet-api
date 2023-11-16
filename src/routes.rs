@@ -1,5 +1,6 @@
 use hiro_system_kit::slog;
-use hyper::{Body, Client, Request, Response, StatusCode, Uri};
+use hyper::{Body, Client, Request, Response, Uri};
+use serde_json::json;
 use std::{convert::Infallible, str::FromStr};
 
 use crate::{
@@ -9,8 +10,30 @@ use crate::{
     Context, StacksDevnetApiK8sManager,
 };
 
+const VERSION: &str = env!("CARGO_PKG_VERSION");
+const PRJ_NAME: &str = env!("CARGO_PKG_NAME");
+
+pub async fn handle_get_status(
+    responder: Responder,
+    ctx: Context,
+) -> Result<Response<Body>, Infallible> {
+    let version_info = format!("{PRJ_NAME} v{VERSION}");
+    let version_info = json!({ "version": version_info });
+    let version_info = match serde_json::to_vec(&version_info) {
+        Ok(v) => v,
+        Err(e) => {
+            let msg = format!("failed to parse version info: {}", e.to_string());
+            ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+            return responder.err_internal(msg);
+        }
+    };
+    let body = Body::from(version_info);
+    responder.ok_with_json(body)
+}
+
 pub async fn handle_new_devnet(
     request: Request<Body>,
+    user_id: &str,
     k8s_manager: StacksDevnetApiK8sManager,
     responder: Responder,
     ctx: Context,
@@ -24,7 +47,7 @@ pub async fn handle_new_devnet(
     let body = body.unwrap();
     let config: Result<StacksDevnetConfig, _> = serde_json::from_slice(&body);
     match config {
-        Ok(config) => match config.to_validated_config(ctx) {
+        Ok(config) => match config.to_validated_config(user_id, ctx) {
             Ok(config) => match k8s_manager.deploy_devnet(config).await {
                 Ok(_) => responder.ok(),
                 Err(e) => responder.respond(e.code, e.message),
@@ -40,9 +63,10 @@ pub async fn handle_new_devnet(
 pub async fn handle_delete_devnet(
     k8s_manager: StacksDevnetApiK8sManager,
     network: &str,
+    user_id: &str,
     responder: Responder,
 ) -> Result<Response<Body>, Infallible> {
-    match k8s_manager.delete_devnet(network).await {
+    match k8s_manager.delete_devnet(network, user_id).await {
         Ok(_) => responder.ok(),
         Err(e) => {
             let msg = format!("error deleting network {}: {}", &network, e.message);
@@ -54,17 +78,13 @@ pub async fn handle_delete_devnet(
 pub async fn handle_get_devnet(
     k8s_manager: StacksDevnetApiK8sManager,
     network: &str,
+    user_id: &str,
     responder: Responder,
     ctx: Context,
 ) -> Result<Response<Body>, Infallible> {
-    match k8s_manager.get_devnet_info(&network).await {
+    match k8s_manager.get_devnet_info(&network, user_id).await {
         Ok(devnet_info) => match serde_json::to_vec(&devnet_info) {
-            Ok(body) => Ok(responder
-                .response_builder()
-                .status(StatusCode::OK)
-                .header("Content-Type", "application/json")
-                .body(Body::from(body))
-                .unwrap()),
+            Ok(body) => responder.ok_with_json(Body::from(body)),
             Err(e) => {
                 let msg = format!(
                     "failed to form response body: NAMESPACE: {}, ERROR: {}",
@@ -82,9 +102,13 @@ pub async fn handle_get_devnet(
 pub async fn handle_check_devnet(
     k8s_manager: StacksDevnetApiK8sManager,
     network: &str,
+    user_id: &str,
     responder: Responder,
 ) -> Result<Response<Body>, Infallible> {
-    match k8s_manager.check_any_devnet_assets_exist(&network).await {
+    match k8s_manager
+        .check_any_devnet_assets_exist(network, user_id)
+        .await
+    {
         Ok(assets_exist) => match assets_exist {
             true => responder.ok(),
             false => responder.err_not_found("not found".to_string()),

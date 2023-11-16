@@ -1,0 +1,114 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app.kubernetes.io/component: bitcoind-chain-coordinator
+    app.kubernetes.io/instance: "{user_id}"
+    app.kubernetes.io/managed-by: stacks-devnet-api
+    app.kubernetes.io/name: bitcoind-chain-coordinator
+    argocd.argoproj.io/instance: platform-user-resources.platform
+  name: bitcoind-chain-coordinator
+  namespace: "{namespace}"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: bitcoind-chain-coordinator
+      app.kubernetes.io/instance: "{user_id}"
+      app.kubernetes.io/managed-by: stacks-devnet-api
+      app.kubernetes.io/name: bitcoind-chain-coordinator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: bitcoind-chain-coordinator
+        app.kubernetes.io/instance: "{user_id}"
+        app.kubernetes.io/managed-by: stacks-devnet-api
+        app.kubernetes.io/name: bitcoind-chain-coordinator
+    spec:
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                  - key: cloud.google.com/gke-preemptible
+                    operator: DoesNotExist
+      containers:
+        - command:
+            - /usr/local/bin/bitcoind
+            - -conf=/etc/bitcoin/bitcoin.conf
+            - -nodebuglogfile
+            - -pid=/run/bitcoind.pid
+          image: quay.io/hirosystems/bitcoind:devnet-v3
+          imagePullPolicy: IfNotPresent
+          name: bitcoind
+          ports:
+            - containerPort: 18444
+              name: p2p
+              protocol: TCP
+            - containerPort: 18443
+              name: rpc
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /etc/bitcoin
+              name: bitcoind
+              readOnly: true
+          resources:
+            requests:
+              cpu: 250m
+              memory: 750Mi # todo: revisit allocation
+            limits:
+              memory: 750Mi # todo: revisit allocation
+        - command:
+            - ./stacks-network
+            - --namespace=$(NAMESPACE)
+            - --manifest-path=/etc/stacks-network/project/Clarinet.toml
+            - --network-manifest-path=/etc/stacks-network/project/settings/Devnet.toml
+            - --deployment-plan-path=/etc/stacks-network/project/deployments/default.devnet-plan.yaml
+            - --project-root-path=/etc/stacks-network/project/
+          env:
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+          image: hirosystems/stacks-network-orchestrator@sha256:e9c88e46adb10deba74e29883533de747a2200665f919d1708a5ea0f2638d32a
+          imagePullPolicy: IfNotPresent
+          name: chain-coordinator
+          ports:
+            - containerPort: 20445
+              name: coordinator-in
+              protocol: TCP
+            - containerPort: 20446
+              name: coordinator-con
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /etc/stacks-network/project
+              name: project-manifest
+            - mountPath: /etc/stacks-network/project/settings
+              name: devnet
+            - mountPath: /etc/stacks-network/project/deployments
+              name: deployment-plan
+            - mountPath: /etc/stacks-network/project/contracts
+              name: project-dir
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              memory: 256Mi
+      volumes:
+        - configMap:
+            name: bitcoind
+          name: bitcoind
+        - configMap:
+            name: project-manifest
+          name: project-manifest
+        - configMap:
+            name: devnet
+          name: devnet
+        - configMap:
+            name: deployment-plan
+          name: deployment-plan
+        - configMap:
+            name: project-dir
+          name: project-dir

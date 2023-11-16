@@ -19,7 +19,6 @@ rules:
   - apiGroups: [""]
     resources: ["namespaces"]
     verbs: ["get"]
-  
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -49,8 +48,8 @@ spec:
   containers:
   - command: ["stacks-devnet-api"]
     name: stacks-devnet-api
-    image: hirosystems/stacks-devnet-api:latest
-    imagePullPolicy: IfNotPresent
+    image: hirosystems/stacks-devnet-api:ci
+    imagePullPolicy: Never
     ports:
     - containerPort: 8477
       name: api

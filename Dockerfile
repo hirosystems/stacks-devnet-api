@@ -1,11 +1,13 @@
-FROM arm64v8/rust:1.67 as builder
+FROM rust:bullseye as builder
+RUN apt update && apt install -y ca-certificates pkg-config libssl-dev
+WORKDIR /src
+COPY . /src
 
-WORKDIR ./
-COPY . ./
-
+RUN mkdir /out
 RUN cargo build --release --manifest-path ./Cargo.toml
+RUN cp target/release/stacks-devnet-api /out
 
 FROM gcr.io/distroless/cc
-COPY --from=builder target/release/stacks-devnet-api /
+COPY --from=builder /out/ /bin/
 
-ENTRYPOINT ["./stacks-devnet-api"]
+CMD ["stacks-devnet-api"]

@@ -1,12 +1,14 @@
 use hiro_system_kit::slog;
 use hyper::service::{make_service_fn, service_fn};
 use hyper::{Body, Method, Request, Response, Server};
-use stacks_devnet_api::responder::{Responder, ResponderConfig};
+use stacks_devnet_api::api_config::ApiConfig;
+use stacks_devnet_api::responder::Responder;
 use stacks_devnet_api::routes::{
     get_standardized_path_parts, handle_check_devnet, handle_delete_devnet, handle_get_devnet,
-    handle_new_devnet, handle_try_proxy_service, API_PATH,
+    handle_get_status, handle_new_devnet, handle_try_proxy_service, API_PATH,
 };
 use stacks_devnet_api::{Context, StacksDevnetApiK8sManager};
+use std::env;
 use std::{convert::Infallible, net::SocketAddr};
 
 #[tokio::main]
@@ -22,13 +24,18 @@ async fn main() {
         logger: Some(logger),
         tracer: false,
     };
-    let k8s_manager = StacksDevnetApiK8sManager::default(&ctx).await;
-    let config_path = if cfg!(debug_assertions) {
-        "./Config.toml"
-    } else {
-        "/etc/config/Config.toml"
+    let k8s_manager = StacksDevnetApiK8sManager::new(&ctx).await;
+    let config_path = match env::var("CONFIG_PATH") {
+        Ok(path) => path,
+        Err(_) => {
+            if cfg!(debug_assertions) {
+                "./Config.toml".into()
+            } else {
+                "/etc/config/Config.toml".into()
+            }
+        }
     };
-    let config = ResponderConfig::from_path(config_path);
+    let config = ApiConfig::from_path(&config_path);
 
     let make_svc = make_service_fn(|_| {
         let k8s_manager = k8s_manager.clone();
@@ -53,7 +60,10 @@ async fn main() {
 async fn handle_request(
     request: Request<Body>,
     k8s_manager: StacksDevnetApiK8sManager,
-    config: ResponderConfig,
+    ApiConfig {
+        http_response_config,
+        auth_config,
+    }: ApiConfig,
     ctx: Context,
 ) -> Result<Response<Body>, Infallible> {
     let uri = request.uri();
@@ -67,14 +77,43 @@ async fn handle_request(
             path
         )
     });
-
-    let responder = Responder::new(config, request.headers().clone()).unwrap();
+    let headers = request.headers().clone();
+    let responder = Responder::new(http_response_config, headers.clone(), ctx.clone()).unwrap();
     if method == &Method::OPTIONS {
         return responder.ok();
     }
+    if method == &Method::GET && (path == "/" || path == &format!("{API_PATH}status")) {
+        return handle_get_status(responder, ctx).await;
+    }
+    let auth_header = auth_config
+        .auth_header
+        .unwrap_or("x-auth-request-user".to_string());
+    let user_id = match headers.get(auth_header) {
+        Some(auth_header_value) => match auth_header_value.to_str() {
+            Ok(user_id) => {
+                let user_id = user_id.replace("|", "-");
+                match auth_config.namespace_prefix {
+                    Some(mut prefix) => {
+                        prefix.push_str(&user_id);
+                        prefix
+                    }
+                    None => user_id,
+                }
+            }
+            Err(e) => {
+                let msg = format!("unable to parse auth header: {}", &e);
+                ctx.try_log(|logger| slog::warn!(logger, "{}", msg));
+                return responder.err_bad_request(msg);
+            }
+        },
+        None => return responder.err_bad_request("missing required auth header".into()),
+    };
+
     if path == "/api/v1/networks" {
         return match method {
-            &Method::POST => handle_new_devnet(request, k8s_manager, responder, ctx).await,
+            &Method::POST => {
+                handle_new_devnet(request, &user_id, k8s_manager, responder, ctx).await
+            }
             _ => responder.err_method_not_allowed("network creation must be a POST request".into()),
         };
     } else if path.starts_with(API_PATH) {
@@ -88,6 +127,9 @@ async fn handle_request(
             return responder.err_bad_request("no network id provided".into());
         }
         let network = path_parts.network.unwrap();
+        if network != user_id {
+            return responder.err_bad_request("network id must match authenticated user id".into());
+        }
 
         // verify that we have a valid namespace and the network actually exists
         let exists = match k8s_manager.check_namespace_exists(&network).await {
@@ -98,7 +140,7 @@ async fn handle_request(
         };
         if !exists {
             let msg = format!("network {} does not exist", &network);
-            ctx.try_log(|logger| slog::warn!(logger, "{}", msg));
+            ctx.try_log(|logger| slog::info!(logger, "{}", msg));
             return responder.err_not_found(msg);
         }
 
@@ -106,9 +148,15 @@ async fn handle_request(
         // so it must be a request to DELETE a network or GET network info
         if path_parts.subroute.is_none() {
             return match method {
-                &Method::DELETE => handle_delete_devnet(k8s_manager, &network, responder).await,
-                &Method::GET => handle_get_devnet(k8s_manager, &network, responder, ctx).await,
-                &Method::HEAD => handle_check_devnet(k8s_manager, &network, responder).await,
+                &Method::DELETE => {
+                    handle_delete_devnet(k8s_manager, &network, &user_id, responder).await
+                }
+                &Method::GET => {
+                    handle_get_devnet(k8s_manager, &network, &user_id, responder, ctx).await
+                }
+                &Method::HEAD => {
+                    handle_check_devnet(k8s_manager, &network, &user_id, responder).await
+                }
                 _ => responder
                     .err_method_not_allowed("can only GET/DELETE/HEAD at provided route".into()),
             };
