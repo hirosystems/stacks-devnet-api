@@ -10,4 +10,3 @@ metadata:
     app.kubernetes.io/name: stacks-blockchain
     app.kubernetes.io/component: stacks-blockchain
     argocd.argoproj.io/instance: platform-user-resources.platform
-∑
