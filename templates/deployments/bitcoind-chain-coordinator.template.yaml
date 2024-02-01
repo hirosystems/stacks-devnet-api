@@ -38,7 +38,7 @@ spec:
             - -conf=/etc/bitcoin/bitcoin.conf
             - -nodebuglogfile
             - -pid=/run/bitcoind.pid
-          image: quay.io/hirosystems/bitcoind:devnet-v3
+          image: quay.io/hirosystems/bitcoind:26.0
           imagePullPolicy: IfNotPresent
           name: bitcoind
           ports:
