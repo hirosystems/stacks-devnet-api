@@ -1,7 +1,7 @@
 use std::fmt;
 use strum_macros::EnumIter;
 
-#[derive(EnumIter, Debug)]
+#[derive(EnumIter, Debug, Clone)]
 pub enum StacksDevnetStatefulSet {
     StacksBlockchainApi,
 }

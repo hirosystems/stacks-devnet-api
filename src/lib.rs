@@ -1,5 +1,7 @@
 use chainhook_types::StacksNetwork;
-use clarinet_files::compute_addresses;
+use clarinet_files::{
+    compute_addresses, DEFAULT_STACKS_API_IMAGE_NAKA, DEFAULT_STACKS_NODE_IMAGE_NAKA,
+};
 use futures::future::try_join4;
 use hiro_system_kit::{slog, Logger};
 use hyper::{body::Bytes, Body, Client as HttpClient, Request, Response, Uri};
@@ -45,7 +47,6 @@ use crate::resources::service::{get_service_url, StacksDevnetService};
 const COMPONENT_SELECTOR: &str = "app.kubernetes.io/component";
 const USER_SELECTOR: &str = "app.kubernetes.io/instance";
 const NAME_SELECTOR: &str = "app.kubernetes.io/name";
-
 #[derive(Clone, Debug)]
 pub struct DevNetError {
     pub message: String,
@@ -939,16 +940,19 @@ impl StacksDevnetApiK8sManager {
 
     async fn deploy_deployment(
         &self,
-        deployment: StacksDevnetDeployment,
+        deployment_type: StacksDevnetDeployment,
         namespace: &str,
         user_id: &str,
+        use_nakamoto: bool,
     ) -> Result<(), DevNetError> {
+        let deployment_type_moved = deployment_type.clone();
         let mut deployment: Deployment =
-            self.get_resource_from_file(StacksDevnetResource::Deployment(deployment))?;
+            self.get_resource_from_file(StacksDevnetResource::Deployment(deployment_type_moved))?;
 
         let key = "app.kubernetes.io/instance".to_string();
         let user_id = user_id.to_owned();
 
+        // set deployment metadata labels to include user id
         if let Some(mut labels) = deployment.clone().metadata.labels {
             if let Some(label) = labels.get_mut(&key) {
                 *label = user_id.clone();
@@ -958,6 +962,7 @@ impl StacksDevnetApiK8sManager {
             deployment.metadata.labels = Some(labels);
         }
 
+        // set deployment spec with user-specific data
         if let Some(mut spec) = deployment.clone().spec {
             if let Some(mut match_labels) = spec.selector.match_labels {
                 if let Some(match_label) = match_labels.get_mut(&key) {
@@ -968,7 +973,8 @@ impl StacksDevnetApiK8sManager {
                 spec.selector.match_labels = Some(match_labels);
             }
 
-            if let Some(mut metadata) = spec.template.metadata {
+            let mut template = spec.template;
+            if let Some(mut metadata) = template.metadata {
                 if let Some(mut labels) = metadata.labels {
                     if let Some(label) = labels.get_mut(&key) {
                         *label = user_id.clone();
@@ -977,8 +983,40 @@ impl StacksDevnetApiK8sManager {
                     }
                     metadata.labels = Some(labels);
                 }
-                spec.template.metadata = Some(metadata);
+                template.metadata = Some(metadata);
             }
+
+            if use_nakamoto {
+                match &deployment_type {
+                    StacksDevnetDeployment::StacksBlockchain => {
+                        if let Some(mut pod_spec) = template.spec {
+                            for container in &mut pod_spec.containers {
+                                if container.name == "stacks-blockchain" {
+                                    container.image =
+                                        Some(DEFAULT_STACKS_NODE_IMAGE_NAKA.to_owned());
+                                }
+                            }
+                            template.spec = Some(pod_spec);
+                        } else {
+                            let msg = format!(
+                        "failed to set nakamoto image for RESOURCE: deployment, NAME: {}, NAMESPACE: {}",
+                        deployment_type, namespace
+                    );
+                            self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                            return Err(DevNetError {
+                                message: msg,
+                                code: 500,
+                            });
+                        }
+                    }
+                    // note: initially the plan was to conditionally upgrade the version of clarinet we're using
+                    // however, when the platform sends us a config from `clarinet devnet package`, it will contain
+                    // new fields that the devnet needs to handle; if we have multiple clarinet versions here,
+                    // we need multiple clarinet versions at the platform level, and multiple config types
+                    StacksDevnetDeployment::BitcoindNode => {}
+                }
+            }
+            spec.template = template;
 
             deployment.spec = Some(spec);
         }
@@ -990,12 +1028,14 @@ impl StacksDevnetApiK8sManager {
 
     async fn deploy_stateful_set(
         &self,
-        stateful_set: StacksDevnetStatefulSet,
+        stateful_set_type: StacksDevnetStatefulSet,
         namespace: &str,
         user_id: &str,
+        use_nakamoto: bool,
     ) -> Result<(), DevNetError> {
-        let mut stateful_set: StatefulSet =
-            self.get_resource_from_file(StacksDevnetResource::StatefulSet(stateful_set))?;
+        let stateful_set_type_moved = stateful_set_type.clone();
+        let mut stateful_set: StatefulSet = self
+            .get_resource_from_file(StacksDevnetResource::StatefulSet(stateful_set_type_moved))?;
         let key = "app.kubernetes.io/instance".to_string();
         let user_id = user_id.to_owned();
 
@@ -1018,7 +1058,8 @@ impl StacksDevnetApiK8sManager {
                 spec.selector.match_labels = Some(match_labels);
             }
 
-            if let Some(mut metadata) = spec.template.metadata {
+            let mut template = spec.template;
+            if let Some(mut metadata) = template.metadata {
                 if let Some(mut labels) = metadata.labels {
                     if let Some(label) = labels.get_mut(&key) {
                         *label = user_id.clone();
@@ -1027,9 +1068,32 @@ impl StacksDevnetApiK8sManager {
                     }
                     metadata.labels = Some(labels);
                 }
-                spec.template.metadata = Some(metadata);
+                template.metadata = Some(metadata);
             }
 
+            if use_nakamoto {
+                match &stateful_set_type {
+                    StacksDevnetStatefulSet::StacksBlockchainApi => {
+                        if let Some(mut pod_spec) = template.spec {
+                            for container in &mut pod_spec.containers {
+                                if container.name == "stacks-blockchain-api" {
+                                    container.image =
+                                        Some(DEFAULT_STACKS_API_IMAGE_NAKA.to_owned());
+                                }
+                            }
+                            template.spec = Some(pod_spec);
+                        } else {
+                            let msg = format!("failed to set nakamoto image for RESOURCE: deployment, NAME: {}, NAMESPACE: {}", stateful_set_type, namespace);
+                            self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                            return Err(DevNetError {
+                                message: msg,
+                                code: 500,
+                            });
+                        }
+                    }
+                }
+            }
+            spec.template = template;
             stateful_set.spec = Some(spec);
         }
 
@@ -1185,8 +1249,13 @@ impl StacksDevnetApiK8sManager {
         )
         .await?;
 
-        self.deploy_deployment(StacksDevnetDeployment::BitcoindNode, &namespace, &user_id)
-            .await?;
+        self.deploy_deployment(
+            StacksDevnetDeployment::BitcoindNode,
+            &namespace,
+            &user_id,
+            config.devnet_config.use_nakamoto,
+        )
+        .await?;
 
         self.deploy_service(StacksDevnetService::BitcoindNode, namespace, &user_id)
             .await?;
@@ -1218,12 +1287,15 @@ impl StacksDevnetApiK8sManager {
                     working_dir = "/devnet"
                     rpc_bind = "0.0.0.0:{}"
                     p2p_bind = "0.0.0.0:{}"
+                    data_url = "http://127.0.0.1:{}"
+                    p2p_address = "127.0.0.1:{}"
                     miner = true
                     seed = "{}"
                     local_peer_seed = "{}"
                     pox_sync_sample_secs = 0
                     wait_time_for_blocks = 0
-                    wait_time_for_microblocks = {}
+                    wait_time_for_microblocks = 0
+                    mine_microblocks = false
                     microblock_frequency = 1000
 
                     [connection_options]
@@ -1236,16 +1308,21 @@ impl StacksDevnetApiK8sManager {
                     public_ip_address = "1.1.1.1:1234"
 
                     [miner]
+                    min_tx_fee = 1
                     first_attempt_time_ms = {}
-                    subsequent_attempt_time_ms = {}
+                    second_attempt_time_ms = {}
                     block_reward_recipient = "{}"
-                    # microblock_attempt_time_ms = 15000
+                    wait_for_block_download = false
+                    microblock_attempt_time_ms = 10
+                    self_signing_seed = 1
+                    mining_key = "19ec1c3e31d139c989a23a27eac60d1abfad5277d3ae9604242514c738258efa01"
                 "#,
+                get_service_port(StacksDevnetService::StacksBlockchain, ServicePort::RPC).unwrap(),
+                get_service_port(StacksDevnetService::StacksBlockchain, ServicePort::P2P).unwrap(),
                 get_service_port(StacksDevnetService::StacksBlockchain, ServicePort::RPC).unwrap(),
                 get_service_port(StacksDevnetService::StacksBlockchain, ServicePort::P2P).unwrap(),
                 stacks_miner_secret_key_hex,
                 stacks_miner_secret_key_hex,
-                devnet_config.stacks_node_wait_time_for_microblocks,
                 devnet_config.stacks_node_first_attempt_time_ms,
                 devnet_config.stacks_node_subsequent_attempt_time_ms,
                 miner_coinbase_recipient
@@ -1305,18 +1382,28 @@ impl StacksDevnetApiK8sManager {
                 r#"
                 [burnchain]
                 chain = "bitcoin"
-                mode = "krypton"
+                mode = "{}"
+                magic_bytes = "T3"
+                pox_prepare_length = 4
+                pox_reward_length = 10
+                burn_fee_cap = 20_000
                 poll_time_secs = 1
                 timeout = 30
                 peer_host = "{}" 
                 rpc_ssl = false
-                wallet_name = "devnet"
+                wallet_name = "{}"
                 username = "{}"
                 password = "{}"
                 rpc_port = {}
                 peer_port = {}
                 "#,
+                if devnet_config.use_nakamoto {
+                    "nakamoto-neon"
+                } else {
+                    "krypton"
+                },
                 bitcoind_chain_coordinator_host,
+                devnet_config.miner_wallet_name,
                 devnet_config.bitcoin_node_username,
                 devnet_config.bitcoin_node_password,
                 chain_coordinator_ingestion_port,
@@ -1325,8 +1412,6 @@ impl StacksDevnetApiK8sManager {
 
             stacks_conf.push_str(&format!(
                 r#"
-                pox_2_activation = {}
-
                 [[burnchain.epochs]]
                 epoch_name = "1.0"
                 start_height = 0
@@ -1343,16 +1428,38 @@ impl StacksDevnetApiK8sManager {
                 epoch_name = "2.1"
                 start_height = {}
 
-                # [[burnchain.epochs]]
-                # epoch_name = "2.2"
-                # start_height = {}
+                [[burnchain.epochs]]
+                epoch_name = "2.2"
+                start_height = {}
+
+                [[burnchain.epochs]]
+                epoch_name = "2.3"
+                start_height = {}
+
+                [[burnchain.epochs]]
+                epoch_name = "2.4"
+                start_height = {}
                 "#,
-                devnet_config.pox_2_activation,
                 devnet_config.epoch_2_0,
                 devnet_config.epoch_2_05,
                 devnet_config.epoch_2_1,
                 devnet_config.epoch_2_2,
+                devnet_config.epoch_2_3,
+                devnet_config.epoch_2_4
             ));
+            if devnet_config.use_nakamoto {
+                stacks_conf.push_str(&format!(
+                    r#"
+                    [[burnchain.epochs]]
+                    epoch_name = "2.5"
+                    start_height = {}
+                    [[burnchain.epochs]]
+                    epoch_name = "3.0"
+                    start_height = {}
+                    "#,
+                    devnet_config.epoch_2_5, devnet_config.epoch_3_0,
+                ));
+            }
             stacks_conf
         };
 
@@ -1367,6 +1474,7 @@ impl StacksDevnetApiK8sManager {
             StacksDevnetDeployment::StacksBlockchain,
             &namespace,
             &user_id,
+            config.devnet_config.use_nakamoto,
         )
         .await?;
 
@@ -1434,6 +1542,7 @@ impl StacksDevnetApiK8sManager {
             StacksDevnetStatefulSet::StacksBlockchainApi,
             &namespace,
             user_id,
+            config.devnet_config.use_nakamoto,
         )
         .await?;
 
