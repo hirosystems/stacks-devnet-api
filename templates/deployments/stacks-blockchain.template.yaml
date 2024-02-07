@@ -44,7 +44,7 @@ spec:
               value: "1"
             - name: STACKS_LOG_DEBUG
               value: "0"
-          image: quay.io/hirosystems/stacks-node:devnet-v3
+          image: quay.io/hirosystems/stacks-node:devnet-2.4.0.0.0
           imagePullPolicy: IfNotPresent
           name: stacks-blockchain
           ports:
