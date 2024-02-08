@@ -31,7 +31,7 @@ const PRJ_NAME: &str = env!("CARGO_PKG_NAME");
 fn get_version_info() -> String {
     format!("{{\"version\":\"{PRJ_NAME} v{VERSION}\"}}")
 }
-fn get_template_config() -> StacksDevnetConfig {
+fn get_template_config(use_nakamoto: bool) -> StacksDevnetConfig {
     let file_path = "src/tests/fixtures/stacks-devnet-config.json";
     let file = File::open(file_path)
         .unwrap_or_else(|e| panic!("unable to read file {}\n{:?}", file_path, e));
@@ -41,12 +41,21 @@ fn get_template_config() -> StacksDevnetConfig {
         .read_to_end(&mut file_buffer)
         .unwrap_or_else(|e| panic!("unable to read file {}\n{:?}", file_path, e));
 
-    let config_file: StacksDevnetConfig = match serde_json::from_slice(&file_buffer) {
-        Ok(s) => s,
-        Err(e) => {
-            panic!("Config file malformatted {}", e.to_string());
-        }
-    };
+    let config_file: StacksDevnetConfig =
+        match serde_json::from_slice::<StacksDevnetConfig>(&file_buffer) {
+            Ok(mut s) => {
+                if use_nakamoto {
+                    if let Some(mut devnet) = s.network_manifest.devnet {
+                        devnet.use_nakamoto = true;
+                        s.network_manifest.devnet = Some(devnet);
+                    }
+                };
+                s
+            }
+            Err(e) => {
+                panic!("Config file malformatted {}", e.to_string());
+            }
+        };
     config_file
 }
 
@@ -112,12 +121,13 @@ enum TestBody {
     CreateNetwork,
 }
 
-#[test_case("/api/v1/network/{namespace}", Method::DELETE, None, false => is equal_to (StatusCode::OK, "Ok".to_string()); "200 for network DELETE request")]
-#[test_case("/api/v1/network/{namespace}", Method::DELETE, None, true => using assert_cannot_delete_devnet_multiple_errs; "500 for network DELETE request with multiple errors")]
-#[test_case("/api/v1/networks", Method::POST, Some(TestBody::CreateNetwork), true => using assert_cannot_create_devnet_err; "409 for create network POST request if devnet exists")]
-#[test_case("/api/v1/network/{namespace}", Method::GET, None, true => using assert_get_network; "200 for network GET request to existing network")]
-#[test_case("/api/v1/network/{namespace}", Method::HEAD, None, true => is equal_to (StatusCode::OK, "Ok".to_string()); "200 for network HEAD request to existing network")]
-#[test_case("/api/v1/network/{namespace}/stacks-blockchain/v2/info/", Method::GET, None, true => using assert_failed_proxy; "proxies requests to downstream nodes")]
+#[test_case("/api/v1/network/{namespace}", Method::DELETE, None, false, None => is equal_to (StatusCode::OK, "Ok".to_string()); "200 for network DELETE request")]
+#[test_case("/api/v1/network/{namespace}", Method::DELETE, None, true, None => using assert_cannot_delete_devnet_multiple_errs; "500 for network DELETE request with multiple errors")]
+#[test_case("/api/v1/networks", Method::POST, Some(TestBody::CreateNetwork), true, None => using assert_cannot_create_devnet_err; "409 for create network POST request if devnet exists")]
+#[test_case("/api/v1/network/{namespace}", Method::GET, None, true, None => using assert_get_network; "200 for network GET request to existing network")]
+#[test_case("/api/v1/network/{namespace}", Method::HEAD, None, true, None => is equal_to (StatusCode::OK, "Ok".to_string()); "200 for network HEAD request to existing network")]
+#[test_case("/api/v1/network/{namespace}", Method::HEAD, None, true, Some(true) => is equal_to (StatusCode::OK, "Ok".to_string()); "200 for network HEAD request to existing network; use_nakamoto")]
+#[test_case("/api/v1/network/{namespace}/stacks-blockchain/v2/info/", Method::GET, None, true, None => using assert_failed_proxy; "proxies requests to downstream nodes")]
 #[serial_test::serial]
 #[tokio::test]
 #[cfg_attr(not(feature = "k8s_tests"), ignore)]
@@ -126,6 +136,7 @@ async fn it_responds_to_valid_requests_with_deploy(
     method: Method,
     body: Option<TestBody>,
     tear_down: bool,
+    use_nakamoto: Option<bool>,
 ) -> (StatusCode, String) {
     let namespace = &get_random_namespace();
 
@@ -141,7 +152,7 @@ async fn it_responds_to_valid_requests_with_deploy(
 
     let _ = k8s_manager.deploy_namespace(&namespace).await.unwrap();
 
-    let mut config = get_template_config();
+    let mut config = get_template_config(use_nakamoto.unwrap_or(false));
     config.namespace = namespace.to_owned();
     let validated_config = config.to_validated_config(&namespace, ctx.clone()).unwrap();
     let user_id = &namespace;
@@ -152,7 +163,7 @@ async fn it_responds_to_valid_requests_with_deploy(
     let body = match body {
         None => Body::empty(),
         Some(TestBody::CreateNetwork) => {
-            let mut config = get_template_config();
+            let mut config = get_template_config(use_nakamoto.unwrap_or(false));
             config.namespace = namespace.to_owned();
             Body::from(serde_json::to_string(&config).unwrap())
         }
