@@ -43,7 +43,7 @@ spec:
             - name: BLOCKSTACK_USE_TEST_GENESIS_CHAINSTATE
               value: "1"
             - name: STACKS_LOG_DEBUG
-              value: "0"
+              value: "1"
           image: quay.io/hirosystems/stacks-node:devnet-2.4.0.0.0
           imagePullPolicy: IfNotPresent
           name: stacks-blockchain
