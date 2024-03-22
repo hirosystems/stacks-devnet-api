@@ -21,7 +21,7 @@ use resources::{
     deployment::StacksDevnetDeployment,
     pvc::StacksDevnetPvc,
     service::{get_service_port, ServicePort},
-    stateful_set::StacksDevnetStatefulSet,
+    stateful_set::{SignerIdx, StacksDevnetStatefulSet},
     StacksDevnetResource,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -223,6 +223,21 @@ impl StacksDevnetApiK8sManager {
         sleep(Duration::from_secs(5));
 
         self.deploy_stacks_blockchain(&config).await?;
+        if config.devnet_config.use_nakamoto {
+            self.deploy_stacks_signer(
+                &config,
+                SignerIdx::Signer0,
+                "7287ba251d44a4d3fd9276c88ce34c5c52a038955511cccaf77e61068649c17801",
+            )
+            .await?;
+
+            self.deploy_stacks_signer(
+                &config,
+                SignerIdx::Signer1,
+                "530d9f61984c888536871c6573073bdfc0058896dc1adfe9a6a10dfacadc209101",
+            )
+            .await?;
+        }
 
         if !config.disable_stacks_api {
             self.deploy_stacks_blockchain_api(&config).await?;
@@ -1091,6 +1106,8 @@ impl StacksDevnetApiK8sManager {
                             });
                         }
                     }
+                    StacksDevnetStatefulSet::StacksSigner0
+                    | StacksDevnetStatefulSet::StacksSigner1 => {}
                 }
             }
             spec.template = template;
@@ -1135,6 +1152,7 @@ impl StacksDevnetApiK8sManager {
 
             service.spec = Some(spec);
         }
+
         service.metadata.namespace = Some(namespace.to_owned());
         self.deploy_resource(namespace, service, "service").await
     }
@@ -1306,6 +1324,7 @@ impl StacksDevnetApiK8sManager {
                     disable_inbound_handshakes = true
                     disable_inbound_walks = true
                     public_ip_address = "1.1.1.1:1234"
+                    block_proposal_token = "12345"
 
                     [miner]
                     min_tx_fee = 1
@@ -1377,6 +1396,43 @@ impl StacksDevnetApiK8sManager {
                 get_service_port(StacksDevnetService::StacksBlockchainApi, ServicePort::Event)
                     .unwrap(),
             ));
+
+            if devnet_config.use_nakamoto {
+                for signer_idx in SignerIdx::iter() {
+                    let (url, port) = match signer_idx {
+                        SignerIdx::Signer0 => (
+                            get_service_url(&namespace, StacksDevnetService::StacksSigner0),
+                            get_service_port(
+                                StacksDevnetService::StacksSigner0,
+                                ServicePort::Event,
+                            )
+                            .unwrap(),
+                        ),
+                        SignerIdx::Signer1 => (
+                            get_service_url(&namespace, StacksDevnetService::StacksSigner1),
+                            get_service_port(
+                                StacksDevnetService::StacksSigner1,
+                                ServicePort::Event,
+                            )
+                            .unwrap(),
+                        ),
+                    };
+
+                    stacks_conf.push_str(&format!(
+                        r#"
+                # Add stacks-signer-{} as an event observer
+                [[events_observer]]
+                endpoint = "{}:{}"
+                retry_count = 255
+                include_data_events = false
+                events_keys = ["stackerdb", "block_proposal", "burn_blocks"]
+                "#,
+                        signer_idx.to_string(),
+                        url,
+                        port,
+                    ));
+                }
+            }
 
             stacks_conf.push_str(&format!(
                 r#"
@@ -1552,6 +1608,72 @@ impl StacksDevnetApiK8sManager {
             &user_id,
         )
         .await?;
+
+        Ok(())
+    }
+
+    async fn deploy_stacks_signer(
+        &self,
+        config: &ValidatedStacksDevnetConfig,
+        signer_idx: SignerIdx,
+        signer_key: &str,
+    ) -> Result<(), DevNetError> {
+        let namespace = &config.namespace;
+        let user_id = &config.user_id;
+
+        let signer_port = match signer_idx {
+            SignerIdx::Signer0 => {
+                get_service_port(StacksDevnetService::StacksSigner0, ServicePort::Event).unwrap()
+            }
+            SignerIdx::Signer1 => {
+                get_service_port(StacksDevnetService::StacksSigner1, ServicePort::Event).unwrap()
+            }
+        };
+
+        let configmap = match signer_idx {
+            SignerIdx::Signer0 => StacksDevnetConfigmap::StacksSigner0,
+            SignerIdx::Signer1 => StacksDevnetConfigmap::StacksSigner1,
+        };
+
+        let sts = match signer_idx {
+            SignerIdx::Signer0 => StacksDevnetStatefulSet::StacksSigner0,
+            SignerIdx::Signer1 => StacksDevnetStatefulSet::StacksSigner1,
+        };
+
+        let service = match signer_idx {
+            SignerIdx::Signer0 => StacksDevnetService::StacksSigner0,
+            SignerIdx::Signer1 => StacksDevnetService::StacksSigner1,
+        };
+
+        // configmap env vars for api conatainer
+        let signer_conf = format!(
+            r#"
+                    stacks_private_key = "{}"
+                    node_host = "{}:{}"
+                    # must be added as event_observer in node config:
+                    endpoint =  "0.0.0.0:{}"
+                    network = "testnet"
+                    auth_password = "12345"
+                    db_path = "/chainstate/stacks-signer-{}.sqlite"
+                "#,
+            signer_key,
+            get_service_url(&namespace, StacksDevnetService::StacksBlockchain),
+            get_service_port(StacksDevnetService::StacksBlockchain, ServicePort::RPC).unwrap(),
+            signer_port,
+            signer_idx.to_string()
+        );
+
+        self.deploy_configmap(
+            configmap,
+            &namespace,
+            Some(vec![("Signer.toml".into(), signer_conf)]),
+        )
+        .await?;
+
+        self.deploy_stateful_set(sts, &namespace, user_id, config.devnet_config.use_nakamoto)
+            .await?;
+
+        self.deploy_service(service, &namespace, &user_id).await?;
 
         Ok(())
     }
