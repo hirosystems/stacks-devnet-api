@@ -43,8 +43,10 @@ pub fn get_service_port(service: StacksDevnetService, port_type: ServicePort) ->
         (StacksDevnetService::StacksBlockchainApi, ServicePort::API) => Some("3999".into()),
         (StacksDevnetService::StacksBlockchainApi, ServicePort::Event) => Some("3700".into()),
         (StacksDevnetService::StacksBlockchainApi, ServicePort::DB) => Some("5432".into()),
-        (StacksDevnetService::StacksSigner0, ServicePort::Event) => Some("30002".into()),
-        (StacksDevnetService::StacksSigner1, ServicePort::Event) => Some("30003".into()),
+        (
+            StacksDevnetService::StacksSigner0 | StacksDevnetService::StacksSigner1,
+            ServicePort::Event,
+        ) => Some("30001".into()),
         (_, _) => None,
     }
 }

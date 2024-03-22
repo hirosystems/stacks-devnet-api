@@ -12,9 +12,9 @@ metadata:
 spec:
   ports:
   - name: http-signer-event
-    port: 30002
+    port: 30001
     protocol: TCP
-    targetPort: 30002
+    targetPort: 30001
   selector:
     app.kubernetes.io/component: stacks-signer-0
     app.kubernetes.io/instance: "{user_id}"

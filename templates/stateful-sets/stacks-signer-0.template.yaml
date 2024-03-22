@@ -41,8 +41,8 @@ spec:
             - --config=/src/stacks-signer-0/Signer.toml
           image: quay.io/hirosystems/stacks-node:devnet-with-signer-bet4
           imagePullPolicy: IfNotPresent
-          ports: #todo-verify
-            - containerPort: 30002
+          ports:
+            - containerPort: 30001
               name: signer-event
               protocol: TCP
           resources:
