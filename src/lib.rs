@@ -267,7 +267,25 @@ impl StacksDevnetApiK8sManager {
                 let stateful_sets: Vec<String> = StacksDevnetStatefulSet::iter()
                     .map(|p| p.to_string())
                     .collect();
+
                 for stateful_set in stateful_sets {
+                    // todo: remove once Clarinet removes `use_nakamoto`
+                    // becuase the devnet api is stateless, we don't have access to the config
+                    // that was used to create the devnet originally. So, we don't know if this
+                    // devnet has the nakamoto assets deployed or not.
+                    // So when deleting the signer assets, just skip instead of erroring if they don't exist
+                    if &stateful_set.as_str() == &"stacks-signer-0"
+                        || &stateful_set.as_str() == &"stacks-signer-1"
+                    {
+                        match self
+                            .check_resource_exists::<StatefulSet>(namespace, &stateful_set)
+                            .await
+                        {
+                            Ok(true) | Err(_) => {}
+                            Ok(false) => continue,
+                        }
+                    };
+
                     if let Err(e) = self
                         .delete_resource::<StatefulSet>(namespace, &stateful_set)
                         .await
@@ -280,6 +298,19 @@ impl StacksDevnetApiK8sManager {
                     .map(|c| c.to_string())
                     .collect();
                 for configmap in configmaps {
+                    // todo: remove once Clarinet removes `use_nakamoto`
+                    if &configmap.as_str() == &"stacks-signer-0"
+                        || &configmap.as_str() == &"stacks-signer-1"
+                    {
+                        match self
+                            .check_resource_exists::<ConfigMap>(namespace, &configmap)
+                            .await
+                        {
+                            Ok(true) | Err(_) => {}
+                            Ok(false) => continue,
+                        }
+                    };
+
                     if let Err(e) = self
                         .delete_resource::<ConfigMap>(namespace, &configmap)
                         .await
@@ -291,6 +322,18 @@ impl StacksDevnetApiK8sManager {
                 let services: Vec<String> =
                     StacksDevnetService::iter().map(|s| s.to_string()).collect();
                 for service in services {
+                    // todo: remove once Clarinet removes `use_nakamoto`
+                    if &service.as_str() == &"stacks-signer-0"
+                        || &service.as_str() == &"stacks-signer-1"
+                    {
+                        match self
+                            .check_resource_exists::<Service>(namespace, &service)
+                            .await
+                        {
+                            Ok(true) | Err(_) => {}
+                            Ok(false) => continue,
+                        }
+                    };
                     if let Err(e) = self.delete_resource::<Service>(namespace, &service).await {
                         errors.push(e);
                     }
@@ -299,6 +342,16 @@ impl StacksDevnetApiK8sManager {
                 let pvcs: Vec<String> =
                     StacksDevnetPvc::iter().map(|pvc| pvc.to_string()).collect();
                 for pvc in pvcs {
+                    // todo: remove once Clarinet removes `use_nakamoto`
+                    if &pvc.as_str() == &"stacks-signer-0" || &pvc.as_str() == &"stacks-signer-1" {
+                        match self
+                            .check_resource_exists::<PersistentVolumeClaim>(namespace, &pvc)
+                            .await
+                        {
+                            Ok(true) | Err(_) => {}
+                            Ok(false) => continue,
+                        }
+                    };
                     if let Err(e) = self
                         .delete_resource_by_label::<PersistentVolumeClaim>(namespace, &pvc, user_id)
                         .await
@@ -400,8 +453,13 @@ impl StacksDevnetApiK8sManager {
                 return Ok(true);
             }
         }
-
-        for stateful_set in StacksDevnetStatefulSet::iter() {
+        // todo: we are not checking for assets that are only deployed if use_nakamoto is true (remove filter once `use_nakamoto` is no longer around)
+        for stateful_set in StacksDevnetStatefulSet::iter().filter(|sts| match sts {
+            StacksDevnetStatefulSet::StacksSigner0 | StacksDevnetStatefulSet::StacksSigner1 => {
+                false
+            }
+            _ => true,
+        }) {
             if self
                 .check_resource_exists::<StatefulSet>(namespace, &stateful_set.to_string())
                 .await?
@@ -409,8 +467,11 @@ impl StacksDevnetApiK8sManager {
                 return Ok(true);
             }
         }
-
-        for pod in StacksDevnetPod::iter() {
+        // todo: remove filter when nakamoto is stable
+        for pod in StacksDevnetPod::iter().filter(|pod| match pod {
+            StacksDevnetPod::StacksSigner0 | StacksDevnetPod::StacksSigner1 => false,
+            _ => true,
+        }) {
             if self
                 .check_resource_exists_by_label::<Pod>(namespace, &pod.to_string(), user_id)
                 .await?
@@ -419,7 +480,11 @@ impl StacksDevnetApiK8sManager {
             }
         }
 
-        for configmap in StacksDevnetConfigmap::iter() {
+        // todo: remove filter when nakamoto is stable
+        for configmap in StacksDevnetConfigmap::iter().filter(|c| match c {
+            StacksDevnetConfigmap::StacksSigner0 | StacksDevnetConfigmap::StacksSigner1 => false,
+            _ => true,
+        }) {
             if self
                 .check_resource_exists::<ConfigMap>(namespace, &configmap.to_string())
                 .await?
@@ -428,7 +493,11 @@ impl StacksDevnetApiK8sManager {
             }
         }
 
-        for service in StacksDevnetService::iter() {
+        // todo: remove filter when nakamoto is stable
+        for service in StacksDevnetService::iter().filter(|svc| match svc {
+            StacksDevnetService::StacksSigner0 | StacksDevnetService::StacksSigner1 => false,
+            _ => true,
+        }) {
             if self
                 .check_resource_exists::<Service>(namespace, &service.to_string())
                 .await?
@@ -437,7 +506,11 @@ impl StacksDevnetApiK8sManager {
             }
         }
 
-        for pvc in StacksDevnetPvc::iter() {
+        // todo: remove filter when nakamoto is stable
+        for pvc in StacksDevnetPvc::iter().filter(|pvc| match pvc {
+            StacksDevnetPvc::StacksSigner0 | StacksDevnetPvc::StacksSigner1 => false,
+            _ => true,
+        }) {
             if self
                 .check_resource_exists_by_label::<PersistentVolumeClaim>(
                     namespace,
@@ -471,8 +544,13 @@ impl StacksDevnetApiK8sManager {
                 return Ok(false);
             }
         }
-
-        for stateful_set in StacksDevnetStatefulSet::iter() {
+        // todo: we are not checking for assets that are only deployed if use_nakamoto is true (remove filter once `use_nakamoto` is no longer around)
+        for stateful_set in StacksDevnetStatefulSet::iter().filter(|sts| match sts {
+            StacksDevnetStatefulSet::StacksSigner0 | StacksDevnetStatefulSet::StacksSigner1 => {
+                false
+            }
+            _ => true,
+        }) {
             if !self
                 .check_resource_exists::<StatefulSet>(namespace, &stateful_set.to_string())
                 .await?
@@ -481,7 +559,11 @@ impl StacksDevnetApiK8sManager {
             }
         }
 
-        for configmap in StacksDevnetConfigmap::iter() {
+        // todo: remove filter when nakamoto is stable
+        for configmap in StacksDevnetConfigmap::iter().filter(|c| match c {
+            StacksDevnetConfigmap::StacksSigner0 | StacksDevnetConfigmap::StacksSigner1 => false,
+            _ => true,
+        }) {
             if !self
                 .check_resource_exists::<ConfigMap>(namespace, &configmap.to_string())
                 .await?
@@ -490,7 +572,11 @@ impl StacksDevnetApiK8sManager {
             }
         }
 
-        for service in StacksDevnetService::iter() {
+        // todo: remove filter when nakamoto is stable
+        for service in StacksDevnetService::iter().filter(|svc| match svc {
+            StacksDevnetService::StacksSigner0 | StacksDevnetService::StacksSigner1 => false,
+            _ => true,
+        }) {
             if !self
                 .check_resource_exists::<Service>(namespace, &service.to_string())
                 .await?
