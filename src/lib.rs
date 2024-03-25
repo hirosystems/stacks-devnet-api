@@ -345,7 +345,9 @@ impl StacksDevnetApiK8sManager {
                     // todo: remove once Clarinet removes `use_nakamoto`
                     if &pvc.as_str() == &"stacks-signer-0" || &pvc.as_str() == &"stacks-signer-1" {
                         match self
-                            .check_resource_exists::<PersistentVolumeClaim>(namespace, &pvc)
+                            .check_resource_exists_by_label::<PersistentVolumeClaim>(
+                                namespace, &pvc, user_id,
+                            )
                             .await
                         {
                             Ok(true) | Err(_) => {}
