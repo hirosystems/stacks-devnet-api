@@ -30,7 +30,7 @@ pub struct StacksDevnetConfig {
     disable_bitcoin_explorer: Option<bool>, // todo: currently unused
     disable_stacks_explorer: Option<bool>,  // todo: currently unused
     deployment_plan: DeploymentSpecification,
-    network_manifest: NetworkManifest,
+    pub network_manifest: NetworkManifest,
     project_manifest: ProjectManifest,
 }
 impl StacksDevnetConfig {

@@ -38,7 +38,7 @@ spec:
             - -conf=/etc/bitcoin/bitcoin.conf
             - -nodebuglogfile
             - -pid=/run/bitcoind.pid
-          image: quay.io/hirosystems/bitcoind:devnet-v3
+          image: quay.io/hirosystems/bitcoind:26.0
           imagePullPolicy: IfNotPresent
           name: bitcoind
           ports:
@@ -71,7 +71,7 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: metadata.namespace
-          image: hirosystems/stacks-network-orchestrator@sha256:e9c88e46adb10deba74e29883533de747a2200665f919d1708a5ea0f2638d32a
+          image: hirosystems/stacks-network-orchestrator:clarinet-2.4.0-beta2
           imagePullPolicy: IfNotPresent
           name: chain-coordinator
           ports:

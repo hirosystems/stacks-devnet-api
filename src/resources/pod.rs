@@ -6,6 +6,8 @@ pub enum StacksDevnetPod {
     BitcoindNode,
     StacksBlockchain,
     StacksBlockchainApi,
+    StacksSigner0,
+    StacksSigner1,
 }
 
 impl fmt::Display for StacksDevnetPod {
@@ -14,6 +16,8 @@ impl fmt::Display for StacksDevnetPod {
             StacksDevnetPod::BitcoindNode => write!(f, "bitcoind-chain-coordinator"),
             StacksDevnetPod::StacksBlockchain => write!(f, "stacks-blockchain"),
             StacksDevnetPod::StacksBlockchainApi => write!(f, "stacks-blockchain-api"),
+            StacksDevnetPod::StacksSigner0 => write!(f, "stacks-signer-0"),
+            StacksDevnetPod::StacksSigner1 => write!(f, "stacks-signer-1"),
         }
     }
 }

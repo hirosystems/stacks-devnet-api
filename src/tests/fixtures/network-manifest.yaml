@@ -107,6 +107,7 @@ devnet_settings:
   miner_mnemonic: fragile loan twenty basic net assault jazz absorb diet talk art shock innocent float punch travel gadget embrace caught blossom hockey surround initial reduce
   miner_derivation_path: "m/44'/5757'/0'/0/0"
   miner_coinbase_recipient: ST3Q96TFVE6E0Q91XVX6S8RWAJW5R8XTZ8YEBM8RQ
+  miner_wallet_name: ""
   faucet_stx_address: STNHKEPYEPJ8ET55ZZ0M5A34J0R3N5FM2CMMMAZ6
   faucet_secret_key_hex: de433bdfa14ec43aa1098d5be594c8ffb20a31485ff9de2923b2689471c401b801
   faucet_btc_address: mjSrB3wS4xab3kYqFktwBzfTdPg367ZJ2d
@@ -124,19 +125,23 @@ devnet_settings:
       wallet: wallet_1
       slots: 2
       btc_address: mr1iPkD9N3RJZZxXRk7xF9d36gffa6exNC
+      auto_extend: ~
     - start_at_cycle: 3
       duration: 12
       wallet: wallet_2
       slots: 1
       btc_address: muYdXKmX9bByAueDe6KFfHd5Ff1gdN9ErG
+      auto_extend: ~
     - start_at_cycle: 3
       duration: 12
       wallet: wallet_3
       slots: 1
       btc_address: mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7
+      auto_extend: ~
   execute_script: []
   bitcoin_node_image_url: "quay.io/hirosystems/bitcoind:devnet-v3"
   stacks_node_image_url: "quay.io/hirosystems/stacks-node:devnet-2.4.0.0.0"
+  stacks_signer_image_url: "quay.io/hirosystems/stacks-node:devnet-2.4.0.0.0"
   stacks_api_image_url: "hirosystems/stacks-blockchain-api:latest"
   stacks_explorer_image_url: "hirosystems/explorer:latest"
   postgres_image_url: "postgres:14"
@@ -172,6 +177,8 @@ devnet_settings:
   epoch_2_2: 103
   epoch_2_3: 104
   epoch_2_4: 105
-  pox_2_activation: 102
+  epoch_2_5: 105
+  epoch_3_0: 121
   use_docker_gateway_routing: false
   docker_platform: linux/amd64
+  use_nakamoto: false
