@@ -1,3 +1,28 @@
+## [1.1.0](https://github.com/hirosystems/stacks-devnet-api/compare/v1.0.0...v1.1.0) (2024-03-25)
+
+
+### Features
+
+* allow config path to be configured via env var ([#67](https://github.com/hirosystems/stacks-devnet-api/issues/67)) ([483fb8b](https://github.com/hirosystems/stacks-devnet-api/commit/483fb8b92a4b4b53f3a8169d4b90c989d0757e54))
+* allow configuring k8s context with env var ([#71](https://github.com/hirosystems/stacks-devnet-api/issues/71)) ([f7e6bc3](https://github.com/hirosystems/stacks-devnet-api/commit/f7e6bc3b4708b764a8aa3ea0f9f255577686cc86))
+* check auth header before allowing access ([#47](https://github.com/hirosystems/stacks-devnet-api/issues/47)) ([6dcb36d](https://github.com/hirosystems/stacks-devnet-api/commit/6dcb36d2845993cd322b0c0dd1f6f9ce6d61f218))
+* remove pods; implement deployments/stateful sets ([#75](https://github.com/hirosystems/stacks-devnet-api/issues/75)) ([6399c19](https://github.com/hirosystems/stacks-devnet-api/commit/6399c19231ee12f7f7bdb3ed2fa90ece3c0e4000))
+* status page at `GET /` and `GET /api/v1/status` routes ([#68](https://github.com/hirosystems/stacks-devnet-api/issues/68)) ([d4c2290](https://github.com/hirosystems/stacks-devnet-api/commit/d4c2290580c0866164bbd67a6f3ca6ef7c7e17f3))
+* upgrade clarinet to v2.4.0; enable `use_nakamoto` field to configure stacks chain for nakamoto ([#89](https://github.com/hirosystems/stacks-devnet-api/issues/89)) ([521acd1](https://github.com/hirosystems/stacks-devnet-api/commit/521acd12d61ec6f33c520bd38e4391dc0c09ce4f))
+* upgrade to using clarinet crate to parse config  ([#46](https://github.com/hirosystems/stacks-devnet-api/issues/46)) ([d57d3a1](https://github.com/hirosystems/stacks-devnet-api/commit/d57d3a1ba73e89a84e793e49bb4c85e0ce429e16))
+
+
+### Bug Fixes
+
+* add ACCESS_CONTROL_ALLOW_HEADERS to response header ([#52](https://github.com/hirosystems/stacks-devnet-api/issues/52)) ([225d2c9](https://github.com/hirosystems/stacks-devnet-api/commit/225d2c9d4d200528a64401418922c163a7c45350))
+* add subPath for postgres volume mount ([#73](https://github.com/hirosystems/stacks-devnet-api/issues/73)) ([7812741](https://github.com/hirosystems/stacks-devnet-api/commit/781274127c8fb7d6a8ee95d4d92218e650b9c01e))
+* api container spelling fix ([7b52f93](https://github.com/hirosystems/stacks-devnet-api/commit/7b52f93e82d46d1bb127dcc8f9c8c095f3426dc2))
+* don't require auth on OPTIONS requests; configure user-id prefix to make namespace ([#51](https://github.com/hirosystems/stacks-devnet-api/issues/51)) ([9fe7972](https://github.com/hirosystems/stacks-devnet-api/commit/9fe79725c6f8935222c9f291d6f2e591731d64c8))
+* reduce permissions for cluster role ([#54](https://github.com/hirosystems/stacks-devnet-api/issues/54)) ([2ea50ea](https://github.com/hirosystems/stacks-devnet-api/commit/2ea50eaef6097c582ee103665d8c49e916b45bcd))
+* removing untemplated labels ([#82](https://github.com/hirosystems/stacks-devnet-api/issues/82)) ([e92dcb5](https://github.com/hirosystems/stacks-devnet-api/commit/e92dcb57d1e0ad5b1a11fc1403daf06f10706da9))
+* set img pull policy for stacks blockchain api ([0b959c2](https://github.com/hirosystems/stacks-devnet-api/commit/0b959c2df4ecbe52a4379112eed137031365c251))
+* template ([#85](https://github.com/hirosystems/stacks-devnet-api/issues/85)) ([4399177](https://github.com/hirosystems/stacks-devnet-api/commit/4399177d702d4f8865ebf410cbbc1280a2706f72))
+
 ## 1.0.0 (2023-11-16)
 
 
