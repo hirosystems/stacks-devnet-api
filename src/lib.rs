@@ -1240,7 +1240,6 @@ impl StacksDevnetApiK8sManager {
 
             service.spec = Some(spec);
         }
-
         service.metadata.namespace = Some(namespace.to_owned());
         self.deploy_resource(namespace, service, "service").await
     }
