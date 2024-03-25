@@ -21,3 +21,5 @@ repl:
       trusted_sender: false
       trusted_caller: false
       callee_filter: false
+  clarity_wasm_mode: false
+  show_timings: false

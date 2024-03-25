@@ -36,15 +36,14 @@ spec:
         - command:
             - stacks-node
             - start
-            - --config=/src/stacks-blockchain/Stacks.toml
+            - --config
+            - /src/stacks-blockchain/Stacks.toml
           env:
             - name: STACKS_LOG_PP
               value: "1"
             - name: BLOCKSTACK_USE_TEST_GENESIS_CHAINSTATE
               value: "1"
-            - name: STACKS_LOG_DEBUG
-              value: "0"
-          image: quay.io/hirosystems/stacks-node:devnet-v3
+          image: quay.io/hirosystems/stacks-node:devnet-2.4.0.0.0
           imagePullPolicy: IfNotPresent
           name: stacks-blockchain
           ports:

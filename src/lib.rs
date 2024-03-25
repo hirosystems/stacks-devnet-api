@@ -1,5 +1,7 @@
 use chainhook_types::StacksNetwork;
-use clarinet_files::compute_addresses;
+use clarinet_files::{
+    compute_addresses, DEFAULT_STACKS_API_IMAGE_NAKA, DEFAULT_STACKS_NODE_IMAGE_NAKA,
+};
 use futures::future::try_join4;
 use hiro_system_kit::{slog, Logger};
 use hyper::{body::Bytes, Body, Client as HttpClient, Request, Response, Uri};
@@ -19,7 +21,7 @@ use resources::{
     deployment::StacksDevnetDeployment,
     pvc::StacksDevnetPvc,
     service::{get_service_port, ServicePort},
-    stateful_set::StacksDevnetStatefulSet,
+    stateful_set::{SignerIdx, StacksDevnetStatefulSet},
     StacksDevnetResource,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -45,7 +47,6 @@ use crate::resources::service::{get_service_url, StacksDevnetService};
 const COMPONENT_SELECTOR: &str = "app.kubernetes.io/component";
 const USER_SELECTOR: &str = "app.kubernetes.io/instance";
 const NAME_SELECTOR: &str = "app.kubernetes.io/name";
-
 #[derive(Clone, Debug)]
 pub struct DevNetError {
     pub message: String,
@@ -222,6 +223,21 @@ impl StacksDevnetApiK8sManager {
         sleep(Duration::from_secs(5));
 
         self.deploy_stacks_blockchain(&config).await?;
+        if config.devnet_config.use_nakamoto {
+            self.deploy_stacks_signer(
+                &config,
+                SignerIdx::Signer0,
+                "7287ba251d44a4d3fd9276c88ce34c5c52a038955511cccaf77e61068649c17801",
+            )
+            .await?;
+
+            self.deploy_stacks_signer(
+                &config,
+                SignerIdx::Signer1,
+                "530d9f61984c888536871c6573073bdfc0058896dc1adfe9a6a10dfacadc209101",
+            )
+            .await?;
+        }
 
         if !config.disable_stacks_api {
             self.deploy_stacks_blockchain_api(&config).await?;
@@ -251,7 +267,25 @@ impl StacksDevnetApiK8sManager {
                 let stateful_sets: Vec<String> = StacksDevnetStatefulSet::iter()
                     .map(|p| p.to_string())
                     .collect();
+
                 for stateful_set in stateful_sets {
+                    // todo: remove once Clarinet removes `use_nakamoto`
+                    // becuase the devnet api is stateless, we don't have access to the config
+                    // that was used to create the devnet originally. So, we don't know if this
+                    // devnet has the nakamoto assets deployed or not.
+                    // So when deleting the signer assets, just skip instead of erroring if they don't exist
+                    if &stateful_set.as_str() == &"stacks-signer-0"
+                        || &stateful_set.as_str() == &"stacks-signer-1"
+                    {
+                        match self
+                            .check_resource_exists::<StatefulSet>(namespace, &stateful_set)
+                            .await
+                        {
+                            Ok(true) | Err(_) => {}
+                            Ok(false) => continue,
+                        }
+                    };
+
                     if let Err(e) = self
                         .delete_resource::<StatefulSet>(namespace, &stateful_set)
                         .await
@@ -264,6 +298,19 @@ impl StacksDevnetApiK8sManager {
                     .map(|c| c.to_string())
                     .collect();
                 for configmap in configmaps {
+                    // todo: remove once Clarinet removes `use_nakamoto`
+                    if &configmap.as_str() == &"stacks-signer-0"
+                        || &configmap.as_str() == &"stacks-signer-1"
+                    {
+                        match self
+                            .check_resource_exists::<ConfigMap>(namespace, &configmap)
+                            .await
+                        {
+                            Ok(true) | Err(_) => {}
+                            Ok(false) => continue,
+                        }
+                    };
+
                     if let Err(e) = self
                         .delete_resource::<ConfigMap>(namespace, &configmap)
                         .await
@@ -275,6 +322,18 @@ impl StacksDevnetApiK8sManager {
                 let services: Vec<String> =
                     StacksDevnetService::iter().map(|s| s.to_string()).collect();
                 for service in services {
+                    // todo: remove once Clarinet removes `use_nakamoto`
+                    if &service.as_str() == &"stacks-signer-0"
+                        || &service.as_str() == &"stacks-signer-1"
+                    {
+                        match self
+                            .check_resource_exists::<Service>(namespace, &service)
+                            .await
+                        {
+                            Ok(true) | Err(_) => {}
+                            Ok(false) => continue,
+                        }
+                    };
                     if let Err(e) = self.delete_resource::<Service>(namespace, &service).await {
                         errors.push(e);
                     }
@@ -283,6 +342,18 @@ impl StacksDevnetApiK8sManager {
                 let pvcs: Vec<String> =
                     StacksDevnetPvc::iter().map(|pvc| pvc.to_string()).collect();
                 for pvc in pvcs {
+                    // todo: remove once Clarinet removes `use_nakamoto`
+                    if &pvc.as_str() == &"stacks-signer-0" || &pvc.as_str() == &"stacks-signer-1" {
+                        match self
+                            .check_resource_exists_by_label::<PersistentVolumeClaim>(
+                                namespace, &pvc, user_id,
+                            )
+                            .await
+                        {
+                            Ok(true) | Err(_) => {}
+                            Ok(false) => continue,
+                        }
+                    };
                     if let Err(e) = self
                         .delete_resource_by_label::<PersistentVolumeClaim>(namespace, &pvc, user_id)
                         .await
@@ -384,8 +455,13 @@ impl StacksDevnetApiK8sManager {
                 return Ok(true);
             }
         }
-
-        for stateful_set in StacksDevnetStatefulSet::iter() {
+        // todo: we are not checking for assets that are only deployed if use_nakamoto is true (remove filter once `use_nakamoto` is no longer around)
+        for stateful_set in StacksDevnetStatefulSet::iter().filter(|sts| match sts {
+            StacksDevnetStatefulSet::StacksSigner0 | StacksDevnetStatefulSet::StacksSigner1 => {
+                false
+            }
+            _ => true,
+        }) {
             if self
                 .check_resource_exists::<StatefulSet>(namespace, &stateful_set.to_string())
                 .await?
@@ -393,8 +469,11 @@ impl StacksDevnetApiK8sManager {
                 return Ok(true);
             }
         }
-
-        for pod in StacksDevnetPod::iter() {
+        // todo: remove filter when nakamoto is stable
+        for pod in StacksDevnetPod::iter().filter(|pod| match pod {
+            StacksDevnetPod::StacksSigner0 | StacksDevnetPod::StacksSigner1 => false,
+            _ => true,
+        }) {
             if self
                 .check_resource_exists_by_label::<Pod>(namespace, &pod.to_string(), user_id)
                 .await?
@@ -403,7 +482,11 @@ impl StacksDevnetApiK8sManager {
             }
         }
 
-        for configmap in StacksDevnetConfigmap::iter() {
+        // todo: remove filter when nakamoto is stable
+        for configmap in StacksDevnetConfigmap::iter().filter(|c| match c {
+            StacksDevnetConfigmap::StacksSigner0 | StacksDevnetConfigmap::StacksSigner1 => false,
+            _ => true,
+        }) {
             if self
                 .check_resource_exists::<ConfigMap>(namespace, &configmap.to_string())
                 .await?
@@ -412,7 +495,11 @@ impl StacksDevnetApiK8sManager {
             }
         }
 
-        for service in StacksDevnetService::iter() {
+        // todo: remove filter when nakamoto is stable
+        for service in StacksDevnetService::iter().filter(|svc| match svc {
+            StacksDevnetService::StacksSigner0 | StacksDevnetService::StacksSigner1 => false,
+            _ => true,
+        }) {
             if self
                 .check_resource_exists::<Service>(namespace, &service.to_string())
                 .await?
@@ -421,7 +508,11 @@ impl StacksDevnetApiK8sManager {
             }
         }
 
-        for pvc in StacksDevnetPvc::iter() {
+        // todo: remove filter when nakamoto is stable
+        for pvc in StacksDevnetPvc::iter().filter(|pvc| match pvc {
+            StacksDevnetPvc::StacksSigner0 | StacksDevnetPvc::StacksSigner1 => false,
+            _ => true,
+        }) {
             if self
                 .check_resource_exists_by_label::<PersistentVolumeClaim>(
                     namespace,
@@ -455,8 +546,13 @@ impl StacksDevnetApiK8sManager {
                 return Ok(false);
             }
         }
-
-        for stateful_set in StacksDevnetStatefulSet::iter() {
+        // todo: we are not checking for assets that are only deployed if use_nakamoto is true (remove filter once `use_nakamoto` is no longer around)
+        for stateful_set in StacksDevnetStatefulSet::iter().filter(|sts| match sts {
+            StacksDevnetStatefulSet::StacksSigner0 | StacksDevnetStatefulSet::StacksSigner1 => {
+                false
+            }
+            _ => true,
+        }) {
             if !self
                 .check_resource_exists::<StatefulSet>(namespace, &stateful_set.to_string())
                 .await?
@@ -465,7 +561,11 @@ impl StacksDevnetApiK8sManager {
             }
         }
 
-        for configmap in StacksDevnetConfigmap::iter() {
+        // todo: remove filter when nakamoto is stable
+        for configmap in StacksDevnetConfigmap::iter().filter(|c| match c {
+            StacksDevnetConfigmap::StacksSigner0 | StacksDevnetConfigmap::StacksSigner1 => false,
+            _ => true,
+        }) {
             if !self
                 .check_resource_exists::<ConfigMap>(namespace, &configmap.to_string())
                 .await?
@@ -474,7 +574,11 @@ impl StacksDevnetApiK8sManager {
             }
         }
 
-        for service in StacksDevnetService::iter() {
+        // todo: remove filter when nakamoto is stable
+        for service in StacksDevnetService::iter().filter(|svc| match svc {
+            StacksDevnetService::StacksSigner0 | StacksDevnetService::StacksSigner1 => false,
+            _ => true,
+        }) {
             if !self
                 .check_resource_exists::<Service>(namespace, &service.to_string())
                 .await?
@@ -939,16 +1043,19 @@ impl StacksDevnetApiK8sManager {
 
     async fn deploy_deployment(
         &self,
-        deployment: StacksDevnetDeployment,
+        deployment_type: StacksDevnetDeployment,
         namespace: &str,
         user_id: &str,
+        use_nakamoto: bool,
     ) -> Result<(), DevNetError> {
+        let deployment_type_moved = deployment_type.clone();
         let mut deployment: Deployment =
-            self.get_resource_from_file(StacksDevnetResource::Deployment(deployment))?;
+            self.get_resource_from_file(StacksDevnetResource::Deployment(deployment_type_moved))?;
 
         let key = "app.kubernetes.io/instance".to_string();
         let user_id = user_id.to_owned();
 
+        // set deployment metadata labels to include user id
         if let Some(mut labels) = deployment.clone().metadata.labels {
             if let Some(label) = labels.get_mut(&key) {
                 *label = user_id.clone();
@@ -958,6 +1065,7 @@ impl StacksDevnetApiK8sManager {
             deployment.metadata.labels = Some(labels);
         }
 
+        // set deployment spec with user-specific data
         if let Some(mut spec) = deployment.clone().spec {
             if let Some(mut match_labels) = spec.selector.match_labels {
                 if let Some(match_label) = match_labels.get_mut(&key) {
@@ -968,7 +1076,8 @@ impl StacksDevnetApiK8sManager {
                 spec.selector.match_labels = Some(match_labels);
             }
 
-            if let Some(mut metadata) = spec.template.metadata {
+            let mut template = spec.template;
+            if let Some(mut metadata) = template.metadata {
                 if let Some(mut labels) = metadata.labels {
                     if let Some(label) = labels.get_mut(&key) {
                         *label = user_id.clone();
@@ -977,8 +1086,40 @@ impl StacksDevnetApiK8sManager {
                     }
                     metadata.labels = Some(labels);
                 }
-                spec.template.metadata = Some(metadata);
+                template.metadata = Some(metadata);
             }
+
+            if use_nakamoto {
+                match &deployment_type {
+                    StacksDevnetDeployment::StacksBlockchain => {
+                        if let Some(mut pod_spec) = template.spec {
+                            for container in &mut pod_spec.containers {
+                                if container.name == "stacks-blockchain" {
+                                    container.image =
+                                        Some(DEFAULT_STACKS_NODE_IMAGE_NAKA.to_owned());
+                                }
+                            }
+                            template.spec = Some(pod_spec);
+                        } else {
+                            let msg = format!(
+                        "failed to set nakamoto image for RESOURCE: deployment, NAME: {}, NAMESPACE: {}",
+                        deployment_type, namespace
+                    );
+                            self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                            return Err(DevNetError {
+                                message: msg,
+                                code: 500,
+                            });
+                        }
+                    }
+                    // note: initially the plan was to conditionally upgrade the version of clarinet we're using
+                    // however, when the platform sends us a config from `clarinet devnet package`, it will contain
+                    // new fields that the devnet needs to handle; if we have multiple clarinet versions here,
+                    // we need multiple clarinet versions at the platform level, and multiple config types
+                    StacksDevnetDeployment::BitcoindNode => {}
+                }
+            }
+            spec.template = template;
 
             deployment.spec = Some(spec);
         }
@@ -990,12 +1131,14 @@ impl StacksDevnetApiK8sManager {
 
     async fn deploy_stateful_set(
         &self,
-        stateful_set: StacksDevnetStatefulSet,
+        stateful_set_type: StacksDevnetStatefulSet,
         namespace: &str,
         user_id: &str,
+        use_nakamoto: bool,
     ) -> Result<(), DevNetError> {
-        let mut stateful_set: StatefulSet =
-            self.get_resource_from_file(StacksDevnetResource::StatefulSet(stateful_set))?;
+        let stateful_set_type_moved = stateful_set_type.clone();
+        let mut stateful_set: StatefulSet = self
+            .get_resource_from_file(StacksDevnetResource::StatefulSet(stateful_set_type_moved))?;
         let key = "app.kubernetes.io/instance".to_string();
         let user_id = user_id.to_owned();
 
@@ -1018,7 +1161,8 @@ impl StacksDevnetApiK8sManager {
                 spec.selector.match_labels = Some(match_labels);
             }
 
-            if let Some(mut metadata) = spec.template.metadata {
+            let mut template = spec.template;
+            if let Some(mut metadata) = template.metadata {
                 if let Some(mut labels) = metadata.labels {
                     if let Some(label) = labels.get_mut(&key) {
                         *label = user_id.clone();
@@ -1027,9 +1171,34 @@ impl StacksDevnetApiK8sManager {
                     }
                     metadata.labels = Some(labels);
                 }
-                spec.template.metadata = Some(metadata);
+                template.metadata = Some(metadata);
             }
 
+            if use_nakamoto {
+                match &stateful_set_type {
+                    StacksDevnetStatefulSet::StacksBlockchainApi => {
+                        if let Some(mut pod_spec) = template.spec {
+                            for container in &mut pod_spec.containers {
+                                if container.name == "stacks-blockchain-api" {
+                                    container.image =
+                                        Some(DEFAULT_STACKS_API_IMAGE_NAKA.to_owned());
+                                }
+                            }
+                            template.spec = Some(pod_spec);
+                        } else {
+                            let msg = format!("failed to set nakamoto image for RESOURCE: deployment, NAME: {}, NAMESPACE: {}", stateful_set_type, namespace);
+                            self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                            return Err(DevNetError {
+                                message: msg,
+                                code: 500,
+                            });
+                        }
+                    }
+                    StacksDevnetStatefulSet::StacksSigner0
+                    | StacksDevnetStatefulSet::StacksSigner1 => {}
+                }
+            }
+            spec.template = template;
             stateful_set.spec = Some(spec);
         }
 
@@ -1185,8 +1354,13 @@ impl StacksDevnetApiK8sManager {
         )
         .await?;
 
-        self.deploy_deployment(StacksDevnetDeployment::BitcoindNode, &namespace, &user_id)
-            .await?;
+        self.deploy_deployment(
+            StacksDevnetDeployment::BitcoindNode,
+            &namespace,
+            &user_id,
+            config.devnet_config.use_nakamoto,
+        )
+        .await?;
 
         self.deploy_service(StacksDevnetService::BitcoindNode, namespace, &user_id)
             .await?;
@@ -1218,12 +1392,15 @@ impl StacksDevnetApiK8sManager {
                     working_dir = "/devnet"
                     rpc_bind = "0.0.0.0:{}"
                     p2p_bind = "0.0.0.0:{}"
+                    data_url = "http://127.0.0.1:{}"
+                    p2p_address = "127.0.0.1:{}"
                     miner = true
                     seed = "{}"
                     local_peer_seed = "{}"
                     pox_sync_sample_secs = 0
                     wait_time_for_blocks = 0
-                    wait_time_for_microblocks = {}
+                    wait_time_for_microblocks = 0
+                    mine_microblocks = false
                     microblock_frequency = 1000
 
                     [connection_options]
@@ -1234,18 +1411,24 @@ impl StacksDevnetApiK8sManager {
                     disable_inbound_handshakes = true
                     disable_inbound_walks = true
                     public_ip_address = "1.1.1.1:1234"
+                    block_proposal_token = "12345"
 
                     [miner]
+                    min_tx_fee = 1
                     first_attempt_time_ms = {}
-                    subsequent_attempt_time_ms = {}
+                    second_attempt_time_ms = {}
                     block_reward_recipient = "{}"
-                    # microblock_attempt_time_ms = 15000
+                    wait_for_block_download = false
+                    microblock_attempt_time_ms = 10
+                    self_signing_seed = 1
+                    mining_key = "19ec1c3e31d139c989a23a27eac60d1abfad5277d3ae9604242514c738258efa01"
                 "#,
+                get_service_port(StacksDevnetService::StacksBlockchain, ServicePort::RPC).unwrap(),
+                get_service_port(StacksDevnetService::StacksBlockchain, ServicePort::P2P).unwrap(),
                 get_service_port(StacksDevnetService::StacksBlockchain, ServicePort::RPC).unwrap(),
                 get_service_port(StacksDevnetService::StacksBlockchain, ServicePort::P2P).unwrap(),
                 stacks_miner_secret_key_hex,
                 stacks_miner_secret_key_hex,
-                devnet_config.stacks_node_wait_time_for_microblocks,
                 devnet_config.stacks_node_first_attempt_time_ms,
                 devnet_config.stacks_node_subsequent_attempt_time_ms,
                 miner_coinbase_recipient
@@ -1301,22 +1484,69 @@ impl StacksDevnetApiK8sManager {
                     .unwrap(),
             ));
 
+            if devnet_config.use_nakamoto {
+                for signer_idx in SignerIdx::iter() {
+                    let (url, port) = match signer_idx {
+                        SignerIdx::Signer0 => (
+                            get_service_url(&namespace, StacksDevnetService::StacksSigner0),
+                            get_service_port(
+                                StacksDevnetService::StacksSigner0,
+                                ServicePort::Event,
+                            )
+                            .unwrap(),
+                        ),
+                        SignerIdx::Signer1 => (
+                            get_service_url(&namespace, StacksDevnetService::StacksSigner1),
+                            get_service_port(
+                                StacksDevnetService::StacksSigner1,
+                                ServicePort::Event,
+                            )
+                            .unwrap(),
+                        ),
+                    };
+
+                    stacks_conf.push_str(&format!(
+                        r#"
+                # Add stacks-signer-{} as an event observer
+                [[events_observer]]
+                endpoint = "{}:{}"
+                retry_count = 255
+                include_data_events = false
+                events_keys = ["stackerdb", "block_proposal", "burn_blocks"]
+                "#,
+                        signer_idx.to_string(),
+                        url,
+                        port,
+                    ));
+                }
+            }
+
             stacks_conf.push_str(&format!(
                 r#"
                 [burnchain]
                 chain = "bitcoin"
-                mode = "krypton"
+                mode = "{}"
+                magic_bytes = "T3"
+                pox_prepare_length = 4
+                pox_reward_length = 10
+                burn_fee_cap = 20_000
                 poll_time_secs = 1
                 timeout = 30
                 peer_host = "{}" 
                 rpc_ssl = false
-                wallet_name = "devnet"
+                wallet_name = "{}"
                 username = "{}"
                 password = "{}"
                 rpc_port = {}
                 peer_port = {}
                 "#,
+                if devnet_config.use_nakamoto {
+                    "nakamoto-neon"
+                } else {
+                    "krypton"
+                },
                 bitcoind_chain_coordinator_host,
+                devnet_config.miner_wallet_name,
                 devnet_config.bitcoin_node_username,
                 devnet_config.bitcoin_node_password,
                 chain_coordinator_ingestion_port,
@@ -1325,8 +1555,6 @@ impl StacksDevnetApiK8sManager {
 
             stacks_conf.push_str(&format!(
                 r#"
-                pox_2_activation = {}
-
                 [[burnchain.epochs]]
                 epoch_name = "1.0"
                 start_height = 0
@@ -1343,16 +1571,38 @@ impl StacksDevnetApiK8sManager {
                 epoch_name = "2.1"
                 start_height = {}
 
-                # [[burnchain.epochs]]
-                # epoch_name = "2.2"
-                # start_height = {}
+                [[burnchain.epochs]]
+                epoch_name = "2.2"
+                start_height = {}
+
+                [[burnchain.epochs]]
+                epoch_name = "2.3"
+                start_height = {}
+
+                [[burnchain.epochs]]
+                epoch_name = "2.4"
+                start_height = {}
                 "#,
-                devnet_config.pox_2_activation,
                 devnet_config.epoch_2_0,
                 devnet_config.epoch_2_05,
                 devnet_config.epoch_2_1,
                 devnet_config.epoch_2_2,
+                devnet_config.epoch_2_3,
+                devnet_config.epoch_2_4
             ));
+            if devnet_config.use_nakamoto {
+                stacks_conf.push_str(&format!(
+                    r#"
+                    [[burnchain.epochs]]
+                    epoch_name = "2.5"
+                    start_height = {}
+                    [[burnchain.epochs]]
+                    epoch_name = "3.0"
+                    start_height = {}
+                    "#,
+                    devnet_config.epoch_2_5, devnet_config.epoch_3_0,
+                ));
+            }
             stacks_conf
         };
 
@@ -1367,6 +1617,7 @@ impl StacksDevnetApiK8sManager {
             StacksDevnetDeployment::StacksBlockchain,
             &namespace,
             &user_id,
+            config.devnet_config.use_nakamoto,
         )
         .await?;
 
@@ -1434,6 +1685,7 @@ impl StacksDevnetApiK8sManager {
             StacksDevnetStatefulSet::StacksBlockchainApi,
             &namespace,
             user_id,
+            config.devnet_config.use_nakamoto,
         )
         .await?;
 
@@ -1443,6 +1695,72 @@ impl StacksDevnetApiK8sManager {
             &user_id,
         )
         .await?;
+
+        Ok(())
+    }
+
+    async fn deploy_stacks_signer(
+        &self,
+        config: &ValidatedStacksDevnetConfig,
+        signer_idx: SignerIdx,
+        signer_key: &str,
+    ) -> Result<(), DevNetError> {
+        let namespace = &config.namespace;
+        let user_id = &config.user_id;
+
+        let signer_port = match signer_idx {
+            SignerIdx::Signer0 => {
+                get_service_port(StacksDevnetService::StacksSigner0, ServicePort::Event).unwrap()
+            }
+            SignerIdx::Signer1 => {
+                get_service_port(StacksDevnetService::StacksSigner1, ServicePort::Event).unwrap()
+            }
+        };
+
+        let configmap = match signer_idx {
+            SignerIdx::Signer0 => StacksDevnetConfigmap::StacksSigner0,
+            SignerIdx::Signer1 => StacksDevnetConfigmap::StacksSigner1,
+        };
+
+        let sts = match signer_idx {
+            SignerIdx::Signer0 => StacksDevnetStatefulSet::StacksSigner0,
+            SignerIdx::Signer1 => StacksDevnetStatefulSet::StacksSigner1,
+        };
+
+        let service = match signer_idx {
+            SignerIdx::Signer0 => StacksDevnetService::StacksSigner0,
+            SignerIdx::Signer1 => StacksDevnetService::StacksSigner1,
+        };
+
+        // configmap env vars for api conatainer
+        let signer_conf = format!(
+            r#"
+                    stacks_private_key = "{}"
+                    node_host = "{}:{}"
+                    # must be added as event_observer in node config:
+                    endpoint =  "0.0.0.0:{}"
+                    network = "testnet"
+                    auth_password = "12345"
+                    db_path = "/chainstate/stacks-signer-{}.sqlite"
+                "#,
+            signer_key,
+            get_service_url(&namespace, StacksDevnetService::StacksBlockchain),
+            get_service_port(StacksDevnetService::StacksBlockchain, ServicePort::RPC).unwrap(),
+            signer_port,
+            signer_idx.to_string()
+        );
+
+        self.deploy_configmap(
+            configmap,
+            &namespace,
+            Some(vec![("Signer.toml".into(), signer_conf)]),
+        )
+        .await?;
+
+        self.deploy_stateful_set(sts, &namespace, user_id, config.devnet_config.use_nakamoto)
+            .await?;
+
+        self.deploy_service(service, &namespace, &user_id).await?;
 
         Ok(())
     }

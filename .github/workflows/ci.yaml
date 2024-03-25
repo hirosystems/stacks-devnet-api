@@ -141,6 +141,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          token: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
           persist-credentials: false
 
       - name: Semantic Release
@@ -148,7 +149,7 @@ jobs:
         id: semantic
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
           SEMANTIC_RELEASE_PACKAGE: ${{ github.event.repository.name }}
         with:
           semantic_version: 19
@@ -219,7 +220,7 @@ jobs:
       - name: Deploy Stacks Devnet API
         uses: ./actions/deploy
         with:
-          docker_tag: ${{ needs.build-publish-release.outputs.docker_image_digest }}
+          docker_image_tag_or_digest: ${{ needs.build-publish-release.outputs.docker_image_digest }}
           k8s_repo: k8s-platform
           k8s_branch: main
           file_pattern: manifests/api/stacks-devnet-api/${{ env.DEPLOY_ENV }}/base/kustomization.yaml
@@ -234,9 +235,9 @@ jobs:
       - name: Approve pending deployment
         run: |
           sleep 5
-          ENV_ID=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/hirosystems/stacks-devnet-api/actions/runs/${{ github.run_id }}/pending_deployments" | jq -r '.[0].environment.id // empty')
+          ENV_ID=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/hirosystems/stacks-devnet-api/actions/runs/${{ github.run_id }}/pending_deployments" | jq -r '.[0].environment.id // empty')
           if [[ -n "${ENV_ID}" ]]; then
-            curl -s -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/hirosystems/stacks-devnet-api/actions/runs/${{ github.run_id }}/pending_deployments" -d "{\"environment_ids\":[${ENV_ID}],\"state\":\"approved\",\"comment\":\"auto approve\"}"
+            curl -s -X POST -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/hirosystems/stacks-devnet-api/actions/runs/${{ github.run_id }}/pending_deployments" -d "{\"environment_ids\":[${ENV_ID}],\"state\":\"approved\",\"comment\":\"auto approve\"}"
           fi
 
   deploy-staging:
@@ -261,7 +262,7 @@ jobs:
       - name: Deploy Stacks Devnet API
         uses: ./actions/deploy
         with:
-          docker_tag: ${{ needs.build-publish-release.outputs.docker_image_digest }}
+          docker_image_tag_or_digest: ${{ needs.build-publish-release.outputs.docker_image_digest }}
           k8s_repo: k8s-platform
           k8s_branch: main
           file_pattern: manifests/api/stacks-devnet-api/${{ env.DEPLOY_ENV }}/base/kustomization.yaml
@@ -277,9 +278,9 @@ jobs:
       - name: Approve pending deployment
         run: |
           sleep 5
-          ENV_ID=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/hirosystems/stacks-devnet-api/actions/runs/${{ github.run_id }}/pending_deployments" | jq -r '.[0].environment.id // empty')
+          ENV_ID=$(curl -s -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/hirosystems/stacks-devnet-api/actions/runs/${{ github.run_id }}/pending_deployments" | jq -r '.[0].environment.id // empty')
           if [[ -n "${ENV_ID}" ]]; then
-            curl -s -X POST -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github.v3+json" "https://api.github.com/repos/hirosystems/stacks-devnet-api/actions/runs/${{ github.run_id }}/pending_deployments" -d "{\"environment_ids\":[${ENV_ID}],\"state\":\"approved\",\"comment\":\"auto approve\"}"
+            curl -s -X POST -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/hirosystems/stacks-devnet-api/actions/runs/${{ github.run_id }}/pending_deployments" -d "{\"environment_ids\":[${ENV_ID}],\"state\":\"approved\",\"comment\":\"auto approve\"}"
           fi
 
   deploy-prod:
@@ -304,7 +305,7 @@ jobs:
       - name: Deploy Stacks Devnet API
         uses: ./actions/deploy
         with:
-          docker_tag: ${{ needs.build-publish-release.outputs.docker_image_digest }}
+          docker_image_tag_or_digest: ${{ needs.build-publish-release.outputs.docker_image_digest }}
           k8s_repo: k8s-platform
           k8s_branch: main
           file_pattern: manifests/api/stacks-devnet-api/${{ env.DEPLOY_ENV }}/base/kustomization.yaml
