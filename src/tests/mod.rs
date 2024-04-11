@@ -20,7 +20,10 @@ use stacks_devnet_api::{
         get_service_from_path_part, get_service_port, get_service_url, ServicePort,
         StacksDevnetService,
     },
-    routes::{get_standardized_path_parts, mutate_request_for_proxy, PathParts},
+    routes::{
+        get_standardized_path_parts, mutate_request_for_proxy, PathParts,
+        StacksDevnetInfoWithMetadata,
+    },
     StacksDevnetInfoResponse,
 };
 use test_case::test_case;
@@ -62,7 +65,10 @@ fn get_template_config(use_nakamoto: bool) -> StacksDevnetConfig {
 async fn get_k8s_manager() -> (StacksDevnetApiK8sManager, Context) {
     let logger = hiro_system_kit::log::setup_logger();
     let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
-    let ctx = Context::empty();
+    let ctx = Context {
+        logger: Some(logger),
+        tracer: false,
+    };
     let k8s_manager = StacksDevnetApiK8sManager::new(&ctx).await;
     (k8s_manager, ctx)
 }
@@ -154,7 +160,7 @@ async fn it_responds_to_valid_requests_with_deploy(
 
     let mut config = get_template_config(use_nakamoto.unwrap_or(false));
     config.namespace = namespace.to_owned();
-    let validated_config = config.to_validated_config(&namespace, ctx.clone()).unwrap();
+    let validated_config = config.to_validated_config(&namespace, &ctx).unwrap();
     let user_id = &namespace;
     let _ = k8s_manager.deploy_devnet(validated_config).await.unwrap();
     // short delay to allow assets to start
@@ -170,9 +176,16 @@ async fn it_responds_to_valid_requests_with_deploy(
     };
 
     let request: Request<Body> = request_builder.body(body).unwrap();
-    let mut response = handle_request(request, k8s_manager.clone(), ApiConfig::default(), ctx)
-        .await
-        .unwrap();
+    let request_store = Arc::new(Mutex::new(HashMap::new()));
+    let mut response = handle_request(
+        request,
+        k8s_manager.clone(),
+        ApiConfig::default(),
+        request_store,
+        ctx,
+    )
+    .await
+    .unwrap();
 
     let body = response.body_mut();
     let bytes = body::to_bytes(body).await.unwrap().to_vec();
@@ -223,9 +236,16 @@ async fn it_responds_to_valid_requests(
     }
 
     let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
-    let mut response = handle_request(request, k8s_manager.clone(), ApiConfig::default(), ctx)
-        .await
-        .unwrap();
+    let request_store = Arc::new(Mutex::new(HashMap::new()));
+    let mut response = handle_request(
+        request,
+        k8s_manager.clone(),
+        ApiConfig::default(),
+        request_store,
+        ctx,
+    )
+    .await
+    .unwrap();
 
     let body = response.body_mut();
     let bytes = body::to_bytes(body).await.unwrap().to_vec();
@@ -236,6 +256,200 @@ async fn it_responds_to_valid_requests(
     }
 
     (response.status(), body_str)
+}
+
+async fn deploy_devnet(
+    namespace: &str,
+    k8s_manager: StacksDevnetApiK8sManager,
+    request_store: Arc<Mutex<HashMap<String, u64>>>,
+    ctx: &Context,
+) {
+    let mut config = get_template_config(false);
+    config.namespace = namespace.to_owned();
+    let body = Body::from(serde_json::to_string(&config).unwrap());
+
+    let request: Request<Body> = get_request_builder("/api/v1/networks", Method::POST, &namespace)
+        .body(body)
+        .unwrap();
+    let _ = handle_request(
+        request,
+        k8s_manager.clone(),
+        ApiConfig::default(),
+        request_store.clone(),
+        ctx.clone(),
+    )
+    .await
+    .unwrap();
+}
+
+async fn get_devnet_info(
+    namespace: &str,
+    k8s_manager: StacksDevnetApiK8sManager,
+    request_store: Arc<Mutex<HashMap<String, u64>>>,
+    ctx: &Context,
+) -> StacksDevnetInfoWithMetadata {
+    let request: Request<Body> = get_request_builder(
+        &format!("/api/v1/network/{namespace}"),
+        Method::GET,
+        &namespace,
+    )
+    .body(Body::empty())
+    .unwrap();
+    let mut response = handle_request(
+        request,
+        k8s_manager.clone(),
+        ApiConfig::default(),
+        request_store.clone(),
+        ctx.clone(),
+    )
+    .await
+    .unwrap();
+
+    let body = response.body_mut();
+    let bytes = body::to_bytes(body).await.unwrap().to_vec();
+    serde_json::from_slice(&bytes[..]).unwrap()
+}
+
+async fn delete_devnet(
+    namespace: &str,
+    k8s_manager: StacksDevnetApiK8sManager,
+    request_store: Arc<Mutex<HashMap<String, u64>>>,
+    ctx: &Context,
+) {
+    let request: Request<Body> = get_request_builder(
+        &format!("/api/v1/network/{namespace}"),
+        Method::DELETE,
+        &namespace,
+    )
+    .body(Body::empty())
+    .unwrap();
+    let _ = handle_request(
+        request,
+        k8s_manager.clone(),
+        ApiConfig::default(),
+        request_store.clone(),
+        ctx.clone(),
+    )
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+#[cfg_attr(not(feature = "k8s_tests"), ignore)]
+async fn it_tracks_requests_time_for_user() {
+    let namespace = &get_random_namespace();
+    let namespace2 = &get_random_namespace();
+
+    let (k8s_manager, ctx) = get_k8s_manager().await;
+    let _ = k8s_manager.deploy_namespace(&namespace).await.unwrap();
+    let _ = k8s_manager.deploy_namespace(&namespace2).await.unwrap();
+
+    let request_store = Arc::new(Mutex::new(HashMap::new()));
+    // create one devnet and assert request time is stored
+    let created_time = {
+        deploy_devnet(&namespace, k8s_manager.clone(), request_store.clone(), &ctx).await;
+        let store = request_store.lock().unwrap();
+        store.get(namespace).unwrap().clone()
+    };
+    // create another devnet and assert request time is stored
+    {
+        deploy_devnet(
+            &namespace2,
+            k8s_manager.clone(),
+            request_store.clone(),
+            &ctx,
+        )
+        .await;
+        // after creating a devnet, there should be an entry
+        assert!(request_store.lock().unwrap().get(namespace).is_some());
+    }
+    // wait some time so we have time elapsed since last request
+    sleep(Duration::new(1, 0));
+
+    let secs_after_first_get = {
+        let info =
+            get_devnet_info(&namespace, k8s_manager.clone(), request_store.clone(), &ctx).await;
+        // time should have elapsed since our last request
+        let secs_after_first_get = info.metadata.secs_since_last_request;
+        assert!(secs_after_first_get > 0);
+        // getting the devnet should not update our last request time
+        assert_eq!(
+            &created_time,
+            request_store.lock().unwrap().get(namespace).unwrap()
+        );
+        secs_after_first_get
+    };
+
+    // confirm time has elapsed since our last request
+    {
+        let info = get_devnet_info(
+            &namespace2,
+            k8s_manager.clone(),
+            request_store.clone(),
+            &ctx,
+        )
+        .await;
+        assert!(info.metadata.secs_since_last_request > 0);
+    }
+
+    // send a request that should reset the time since last request
+    {
+        let request: Request<Body> = get_request_builder(
+            &format!("/api/v1/network/{namespace}/some-path"),
+            Method::GET,
+            &namespace,
+        )
+        .body(Body::empty())
+        .unwrap();
+        let _ = handle_request(
+            request,
+            k8s_manager.clone(),
+            ApiConfig::default(),
+            request_store.clone(),
+            ctx.clone(),
+        )
+        .await
+        .unwrap();
+    }
+
+    // immediately make another get request to confirm that the time since last request was updated
+    {
+        let info =
+            get_devnet_info(&namespace, k8s_manager.clone(), request_store.clone(), &ctx).await;
+        assert!(secs_after_first_get > info.metadata.secs_since_last_request);
+    }
+
+    // and verify that the time since the last request wasn't updated for our other namespace
+    {
+        let info = get_devnet_info(
+            &namespace2,
+            k8s_manager.clone(),
+            request_store.clone(),
+            &ctx,
+        )
+        .await;
+        assert!(info.metadata.secs_since_last_request >= secs_after_first_get);
+    }
+
+    // clear out the block store to emulate a service restart
+    let request_store = Arc::new(Mutex::new(HashMap::new()));
+    assert_eq!(request_store.lock().unwrap().keys().len(), 0);
+    // confirm that our infrastructure pinging will insert request times if none exist
+    {
+        let _ = get_devnet_info(&namespace, k8s_manager.clone(), request_store.clone(), &ctx).await;
+        assert_eq!(request_store.lock().unwrap().keys().len(), 1);
+    }
+
+    // confirm that deleting a devnet removes our entry for request times
+    {
+        delete_devnet(namespace, k8s_manager.clone(), request_store.clone(), &ctx).await;
+        assert_eq!(request_store.lock().unwrap().keys().len(), 0);
+    }
+
+    // clean up
+    delete_devnet(namespace2, k8s_manager.clone(), request_store.clone(), &ctx).await;
+    let _ = k8s_manager.delete_namespace(&namespace).await.unwrap();
+    let _ = k8s_manager.delete_namespace(&namespace2).await.unwrap();
 }
 
 async fn mock_k8s_handler(handle: &mut Handle<Request<Body>, Response<Body>>) {
@@ -317,9 +531,16 @@ async fn it_responds_to_invalid_requests(
 
     let request_builder = get_request_builder(request_path, method, &user_id);
     let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
-    let mut response = handle_request(request, k8s_manager.clone(), ApiConfig::default(), ctx)
-        .await
-        .unwrap();
+    let request_store = Arc::new(Mutex::new(HashMap::new()));
+    let mut response = handle_request(
+        request,
+        k8s_manager.clone(),
+        ApiConfig::default(),
+        request_store,
+        ctx,
+    )
+    .await
+    .unwrap();
     let body = response.body_mut();
     let bytes = body::to_bytes(body).await.unwrap().to_vec();
     let body_str = String::from_utf8(bytes).unwrap();
@@ -334,10 +555,12 @@ async fn it_responds_to_invalid_request_header() {
         .uri("/api/v1/network/test")
         .method(Method::GET);
     let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
+    let request_store = Arc::new(Mutex::new(HashMap::new()));
     let mut response = handle_request(
         request,
         k8s_manager.clone(),
         ApiConfig::default(),
+        request_store,
         ctx.clone(),
     )
     .await
@@ -358,10 +581,12 @@ async fn it_ignores_request_header_for_some_requests(request_path: &str, method:
 
     let request_builder = Request::builder().uri(request_path).method(method);
     let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
+    let request_store = Arc::new(Mutex::new(HashMap::new()));
     let mut response = handle_request(
         request,
         k8s_manager.clone(),
         ApiConfig::default(),
+        request_store,
         ctx.clone(),
     )
     .await
@@ -461,9 +686,16 @@ async fn namespace_prefix_config_prepends_header() {
         user_id,
     );
     let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
-    let mut response = handle_request(request, k8s_manager.clone(), api_config, ctx.clone())
-        .await
-        .unwrap();
+    let request_store = Arc::new(Mutex::new(HashMap::new()));
+    let mut response = handle_request(
+        request,
+        k8s_manager.clone(),
+        api_config,
+        request_store,
+        ctx.clone(),
+    )
+    .await
+    .unwrap();
 
     let body = response.body_mut();
     let bytes = body::to_bytes(body).await.unwrap().to_vec();

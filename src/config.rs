@@ -37,7 +37,7 @@ impl StacksDevnetConfig {
     pub fn to_validated_config(
         self,
         user_id: &str,
-        ctx: Context,
+        ctx: &Context,
     ) -> Result<ValidatedStacksDevnetConfig, DevNetError> {
         let context = format!(
             "failed to validate config for NAMESPACE: {}",
@@ -232,7 +232,7 @@ mod tests {
         let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
         let ctx = Context::empty();
         let validated_config = template
-            .to_validated_config(user_id, ctx)
+            .to_validated_config(user_id, &ctx)
             .unwrap_or_else(|e| panic!("config validation test failed: {}", e.message));
 
         let expected_project_manifest = read_file("src/tests/fixtures/project-manifest.yaml");
@@ -278,7 +278,7 @@ mod tests {
         template.network_manifest.devnet = None;
         let user_id = template.clone().namespace;
         template
-            .to_validated_config(&user_id, ctx)
+            .to_validated_config(&user_id, &ctx)
             .unwrap_or_else(|e| panic!("config validation test failed: {}", e.message));
     }
 
@@ -287,7 +287,7 @@ mod tests {
         let template = get_template_config("src/tests/fixtures/stacks-devnet-config.json");
         let namespace = template.namespace.clone();
         let user_id = "wrong";
-        match template.to_validated_config(user_id, Context::empty()) {
+        match template.to_validated_config(user_id, &Context::empty()) {
             Ok(_) => {
                 panic!("config validation with non-matching user_id should have been rejected")
             }
