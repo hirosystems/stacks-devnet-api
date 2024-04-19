@@ -367,7 +367,7 @@ async fn it_tracks_requests_time_for_user() {
     // wait some time so we have time elapsed since last request
     sleep(Duration::new(1, 0));
 
-    let secs_after_first_get = {
+    let secs_after_first_get1 = {
         let info =
             get_devnet_info(&namespace, k8s_manager.clone(), request_store.clone(), &ctx).await;
         // time should have elapsed since our last request
@@ -382,7 +382,7 @@ async fn it_tracks_requests_time_for_user() {
     };
 
     // confirm time has elapsed since our last request
-    {
+    let secs_after_first_get2 = {
         let info = get_devnet_info(
             &namespace2,
             k8s_manager.clone(),
@@ -390,8 +390,10 @@ async fn it_tracks_requests_time_for_user() {
             &ctx,
         )
         .await;
-        assert!(info.metadata.secs_since_last_request > 0);
-    }
+        let secs_after_first_get = info.metadata.secs_since_last_request;
+        assert!(secs_after_first_get > 0);
+        secs_after_first_get
+    };
 
     // send a request that should reset the time since last request
     {
@@ -417,7 +419,7 @@ async fn it_tracks_requests_time_for_user() {
     {
         let info =
             get_devnet_info(&namespace, k8s_manager.clone(), request_store.clone(), &ctx).await;
-        assert!(secs_after_first_get > info.metadata.secs_since_last_request);
+        assert!(secs_after_first_get1 > info.metadata.secs_since_last_request);
     }
 
     // and verify that the time since the last request wasn't updated for our other namespace
@@ -429,7 +431,7 @@ async fn it_tracks_requests_time_for_user() {
             &ctx,
         )
         .await;
-        assert!(info.metadata.secs_since_last_request >= secs_after_first_get);
+        assert!(info.metadata.secs_since_last_request >= secs_after_first_get2);
     }
 
     // clear out the block store to emulate a service restart
