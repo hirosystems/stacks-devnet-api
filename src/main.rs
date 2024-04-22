@@ -8,14 +8,17 @@ use stacks_devnet_api::routes::{
     handle_get_status, handle_new_devnet, handle_try_proxy_service, API_PATH,
 };
 use stacks_devnet_api::{Context, StacksDevnetApiK8sManager};
+use std::collections::HashMap;
 use std::env;
+use std::sync::{Arc, Mutex};
+use std::time::{SystemTime, UNIX_EPOCH};
 use std::{convert::Infallible, net::SocketAddr};
 
 #[tokio::main]
 async fn main() {
     const HOST: &str = "0.0.0.0";
-    const PORT: &str = "8477";
-    let endpoint: String = HOST.to_owned() + ":" + PORT;
+    let port: &str = &env::var("PORT").unwrap_or("8477".to_string());
+    let endpoint: String = HOST.to_owned() + ":" + port;
     let addr: SocketAddr = endpoint.parse().expect("Could not parse ip:port.");
 
     let logger = hiro_system_kit::log::setup_logger();
@@ -36,14 +39,22 @@ async fn main() {
         }
     };
     let config = ApiConfig::from_path(&config_path);
+    let request_store = Arc::new(Mutex::new(HashMap::new()));
 
     let make_svc = make_service_fn(|_| {
         let k8s_manager = k8s_manager.clone();
         let ctx = ctx.clone();
         let config = config.clone();
+        let request_store = request_store.clone();
         async move {
             Ok::<_, Infallible>(service_fn(move |req| {
-                handle_request(req, k8s_manager.clone(), config.clone(), ctx.clone())
+                handle_request(
+                    req,
+                    k8s_manager.clone(),
+                    config.clone(),
+                    request_store.clone(),
+                    ctx.clone(),
+                )
             }))
         }
     });
@@ -64,6 +75,7 @@ async fn handle_request(
         http_response_config,
         auth_config,
     }: ApiConfig,
+    request_store: Arc<Mutex<HashMap<String, u64>>>,
     ctx: Context,
 ) -> Result<Response<Body>, Infallible> {
     let uri = request.uri();
@@ -109,10 +121,23 @@ async fn handle_request(
         None => return responder.err_bad_request("missing required auth header".into()),
     };
 
+    let request_time = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("Could not get current time in secs")
+        .as_secs() as u64;
     if path == "/api/v1/networks" {
         return match method {
             &Method::POST => {
-                handle_new_devnet(request, &user_id, k8s_manager, responder, ctx).await
+                handle_new_devnet(
+                    request,
+                    &user_id,
+                    k8s_manager,
+                    responder,
+                    request_store,
+                    request_time,
+                    &ctx,
+                )
+                .await
             }
             _ => responder.err_method_not_allowed("network creation must be a POST request".into()),
         };
@@ -149,10 +174,25 @@ async fn handle_request(
         if path_parts.subroute.is_none() {
             return match method {
                 &Method::DELETE => {
+                    match request_store.lock() {
+                        Ok(mut store) => {
+                            store.remove(&user_id);
+                        }
+                        Err(_) => {}
+                    }
                     handle_delete_devnet(k8s_manager, &network, &user_id, responder).await
                 }
                 &Method::GET => {
-                    handle_get_devnet(k8s_manager, &network, &user_id, responder, ctx).await
+                    handle_get_devnet(
+                        k8s_manager,
+                        &network,
+                        &user_id,
+                        responder,
+                        request_store,
+                        request_time,
+                        ctx,
+                    )
+                    .await
                 }
                 &Method::HEAD => {
                     handle_check_devnet(k8s_manager, &network, &user_id, responder).await
@@ -161,6 +201,16 @@ async fn handle_request(
                     .err_method_not_allowed("can only GET/DELETE/HEAD at provided route".into()),
             };
         }
+        // the above methods with no subroute are initiated from our infra,
+        // but any remaning requests would come from the actual user, so we'll
+        // track this request as the last time a user made a request
+        match request_store.lock() {
+            Ok(mut store) => {
+                store.insert(user_id.to_string(), request_time);
+            }
+            Err(_) => {}
+        }
+
         let subroute = path_parts.subroute.unwrap();
         if subroute == "commands" {
             return responder.err_not_implemented("commands route in progress".into());

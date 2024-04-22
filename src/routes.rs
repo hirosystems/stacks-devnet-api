@@ -1,13 +1,19 @@
 use hiro_system_kit::slog;
 use hyper::{Body, Client, Request, Response, Uri};
+use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{convert::Infallible, str::FromStr};
+use std::{
+    collections::HashMap,
+    convert::Infallible,
+    str::FromStr,
+    sync::{Arc, Mutex},
+};
 
 use crate::{
     config::StacksDevnetConfig,
     resources::service::{get_service_from_path_part, get_service_url, get_user_facing_port},
     responder::Responder,
-    Context, StacksDevnetApiK8sManager,
+    Context, StacksDevnetApiK8sManager, StacksDevnetInfoResponse,
 };
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -36,7 +42,9 @@ pub async fn handle_new_devnet(
     user_id: &str,
     k8s_manager: StacksDevnetApiK8sManager,
     responder: Responder,
-    ctx: Context,
+    request_store: Arc<Mutex<HashMap<String, u64>>>,
+    request_time: u64,
+    ctx: &Context,
 ) -> Result<Response<Body>, Infallible> {
     let body = hyper::body::to_bytes(request.into_body()).await;
     if body.is_err() {
@@ -49,7 +57,15 @@ pub async fn handle_new_devnet(
     match config {
         Ok(config) => match config.to_validated_config(user_id, ctx) {
             Ok(config) => match k8s_manager.deploy_devnet(config).await {
-                Ok(_) => responder.ok(),
+                Ok(_) => {
+                    match request_store.lock() {
+                        Ok(mut store) => {
+                            store.insert(user_id.to_string(), request_time);
+                        }
+                        Err(_) => {}
+                    }
+                    responder.ok()
+                }
                 Err(e) => responder.respond(e.code, e.message),
             },
             Err(e) => responder.respond(e.code, e.message),
@@ -75,26 +91,58 @@ pub async fn handle_delete_devnet(
     }
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+pub struct DevnetMetadata {
+    pub secs_since_last_request: u64,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct StacksDevnetInfoWithMetadata {
+    #[serde(flatten)]
+    pub data: StacksDevnetInfoResponse,
+    pub metadata: DevnetMetadata,
+}
+
 pub async fn handle_get_devnet(
     k8s_manager: StacksDevnetApiK8sManager,
     network: &str,
     user_id: &str,
     responder: Responder,
+    request_store: Arc<Mutex<HashMap<String, u64>>>,
+    request_time: u64,
     ctx: Context,
 ) -> Result<Response<Body>, Infallible> {
     match k8s_manager.get_devnet_info(&network, user_id).await {
-        Ok(devnet_info) => match serde_json::to_vec(&devnet_info) {
-            Ok(body) => responder.ok_with_json(Body::from(body)),
-            Err(e) => {
-                let msg = format!(
-                    "failed to form response body: NAMESPACE: {}, ERROR: {}",
-                    &network,
-                    e.to_string()
-                );
-                ctx.try_log(|logger: &hiro_system_kit::Logger| slog::error!(logger, "{}", msg));
-                responder.err_internal(msg)
+        Ok(devnet_info) => {
+            let last_request_time = match request_store.lock() {
+                Ok(mut store) => match store.get(user_id) {
+                    Some(last_request_time) => *last_request_time,
+                    None => {
+                        store.insert(user_id.to_string(), request_time);
+                        request_time
+                    }
+                },
+                Err(_) => 0,
+            };
+            let devnet_info_with_metadata = StacksDevnetInfoWithMetadata {
+                data: devnet_info,
+                metadata: DevnetMetadata {
+                    secs_since_last_request: request_time.saturating_sub(last_request_time),
+                },
+            };
+            match serde_json::to_vec(&devnet_info_with_metadata) {
+                Ok(body) => responder.ok_with_json(Body::from(body)),
+                Err(e) => {
+                    let msg = format!(
+                        "failed to form response body: NAMESPACE: {}, ERROR: {}",
+                        &network,
+                        e.to_string()
+                    );
+                    ctx.try_log(|logger: &hiro_system_kit::Logger| slog::error!(logger, "{}", msg));
+                    responder.err_internal(msg)
+                }
             }
-        },
+        }
         Err(e) => responder.respond(e.code, e.message),
     }
 }
