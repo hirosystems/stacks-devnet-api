@@ -57,11 +57,10 @@ fn get_template_config() -> StacksDevnetConfig {
 async fn get_k8s_manager() -> (StacksDevnetApiK8sManager, Context) {
     let logger = hiro_system_kit::log::setup_logger();
     let _guard = hiro_system_kit::log::setup_global_logger(logger.clone());
-    let ctx = Context::empty();
-    // let ctx = Context {
-    //     logger: Some(logger),
-    //     tracer: false,
-    // };
+    let ctx = Context {
+        logger: Some(logger),
+        tracer: false,
+    };
     let k8s_manager = StacksDevnetApiK8sManager::new(&ctx).await;
     (k8s_manager, ctx)
 }
