@@ -1243,11 +1243,13 @@ impl StacksDevnetApiK8sManager {
                     data_url = "http://127.0.0.1:{}"
                     p2p_address = "127.0.0.1:{}"
                     miner = true
+                    stacker = true
                     seed = "{}"
                     local_peer_seed = "{}"
                     pox_sync_sample_secs = 0
                     wait_time_for_blocks = 0
                     wait_time_for_microblocks = 0
+                    next_initiative_delay = 4000
                     mine_microblocks = false
                     microblock_frequency = 1000
 
@@ -1366,8 +1368,9 @@ impl StacksDevnetApiK8sManager {
                 chain = "bitcoin"
                 mode = "nakamoto-neon"
                 magic_bytes = "T3"
-                pox_prepare_length = 4
-                pox_reward_length = 10
+                first_burn_block_height = 100
+                pox_prepare_length = 5
+                pox_reward_length = 20
                 burn_fee_cap = 20_000
                 poll_time_secs = 1
                 timeout = 30
