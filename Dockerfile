@@ -8,7 +8,7 @@ RUN rustup component add rustfmt
 RUN cargo build --release --manifest-path ./Cargo.toml
 RUN cp target/release/stacks-devnet-api /out
 
-FROM gcr.io/distroless/cc
+FROM gcr.io/distroless/cc-debian11
 COPY --from=builder /out/ /bin/
 
 CMD ["stacks-devnet-api"]

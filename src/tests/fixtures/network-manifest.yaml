@@ -181,4 +181,3 @@ devnet_settings:
   epoch_3_0: 121
   use_docker_gateway_routing: false
   docker_platform: linux/amd64
-  use_nakamoto: false
