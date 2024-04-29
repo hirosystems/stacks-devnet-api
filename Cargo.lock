@@ -507,8 +507,9 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "chainhook-types"
-version = "1.3.3"
-source = "git+https://github.com/hirosystems/chainhook.git?branch=chore/update-clarinet-and-clarity#160fd65a66a679efa4cf19cbe33c685eebaa9c2d"
+version = "1.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "63f0d358e5c530dd6888e4678ef4ba3f7782525653a1012d33e96a48020c418d"
 dependencies = [
  "hex",
  "schemars",
@@ -600,8 +601,8 @@ dependencies = [
 
 [[package]]
 name = "clarinet-deployments"
-version = "2.4.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=a5f9fea72230b893a7d1f90bdfda3a68aa48e908#a5f9fea72230b893a7d1f90bdfda3a68aa48e908"
+version = "2.6.0"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=f06d087c5762fa06f7080b5c38994e7437048222#f06d087c5762fa06f7080b5c38994e7437048222"
 dependencies = [
  "base58 0.2.0",
  "base64 0.21.4",
@@ -618,14 +619,15 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_yaml 0.8.26",
+ "stacks-codec",
  "stacks-rpc-client",
  "tiny-hderive",
 ]
 
 [[package]]
 name = "clarinet-files"
-version = "2.4.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=a5f9fea72230b893a7d1f90bdfda3a68aa48e908#a5f9fea72230b893a7d1f90bdfda3a68aa48e908"
+version = "2.6.0"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=f06d087c5762fa06f7080b5c38994e7437048222#f06d087c5762fa06f7080b5c38994e7437048222"
 dependencies = [
  "bip39",
  "bitcoin",
@@ -644,7 +646,7 @@ dependencies = [
 [[package]]
 name = "clarinet-utils"
 version = "1.0.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=a5f9fea72230b893a7d1f90bdfda3a68aa48e908#a5f9fea72230b893a7d1f90bdfda3a68aa48e908"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=f06d087c5762fa06f7080b5c38994e7437048222#f06d087c5762fa06f7080b5c38994e7437048222"
 dependencies = [
  "hmac 0.12.1",
  "pbkdf2",
@@ -675,8 +677,8 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "2.4.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=a5f9fea72230b893a7d1f90bdfda3a68aa48e908#a5f9fea72230b893a7d1f90bdfda3a68aa48e908"
+version = "2.6.0"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=f06d087c5762fa06f7080b5c38994e7437048222#f06d087c5762fa06f7080b5c38994e7437048222"
 dependencies = [
  "ansi_term",
  "atty",
@@ -687,7 +689,7 @@ dependencies = [
  "debug_types",
  "futures",
  "getrandom 0.2.10",
- "hiro-system-kit 0.1.0 (git+https://github.com/hirosystems/clarinet.git?rev=a5f9fea72230b893a7d1f90bdfda3a68aa48e908)",
+ "hiro-system-kit 0.1.0 (git+https://github.com/hirosystems/clarinet.git?rev=f06d087c5762fa06f7080b5c38994e7437048222)",
  "httparse",
  "integer-sqrt",
  "lazy_static",
@@ -705,7 +707,6 @@ dependencies = [
  "sha2 0.10.7",
  "tokio",
  "tokio-util",
- "wsts",
 ]
 
 [[package]]
@@ -1642,11 +1643,12 @@ dependencies = [
 [[package]]
 name = "hiro-system-kit"
 version = "0.1.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=a5f9fea72230b893a7d1f90bdfda3a68aa48e908#a5f9fea72230b893a7d1f90bdfda3a68aa48e908"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=f06d087c5762fa06f7080b5c38994e7437048222#f06d087c5762fa06f7080b5c38994e7437048222"
 dependencies = [
  "ansi_term",
  "atty",
  "lazy_static",
+ "time",
  "tokio",
 ]
 
@@ -3238,8 +3240,9 @@ dependencies = [
 
 [[package]]
 name = "schemars"
-version = "0.8.12"
-source = "git+https://github.com/hirosystems/schemars.git?branch=feat-chainhook-fixes#15fdd4711700114d57c090aad62516593bd4ca6d"
+version = "0.8.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7f55c82c700538496bdc329bb4918a81f87cc8888811bd123cf325a0f2f8d309"
 dependencies = [
  "dyn-clone",
  "schemars_derive",
@@ -3249,13 +3252,14 @@ dependencies = [
 
 [[package]]
 name = "schemars_derive"
-version = "0.8.12"
-source = "git+https://github.com/hirosystems/schemars.git?branch=feat-chainhook-fixes#15fdd4711700114d57c090aad62516593bd4ca6d"
+version = "0.8.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "83263746fe5e32097f06356968a077f96089739c927a61450efa069905eec108"
 dependencies = [
  "proc-macro2",
  "quote",
  "serde_derive_internals",
- "syn 1.0.109",
+ "syn 2.0.53",
 ]
 
 [[package]]
@@ -3342,13 +3346,13 @@ dependencies = [
 
 [[package]]
 name = "serde_derive_internals"
-version = "0.26.0"
+version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85bf8229e7920a9f636479437026331ce11aa132b4dde37d121944a44d6e5f3c"
+checksum = "330f01ce65a3a5fe59a60c82f3c9a024b573b8a6e875bd233fe5f934e71d54e3"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 1.0.109",
+ "syn 2.0.53",
 ]
 
 [[package]]
@@ -3673,6 +3677,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "stacks-codec"
+version = "2.6.0"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=f06d087c5762fa06f7080b5c38994e7437048222#f06d087c5762fa06f7080b5c38994e7437048222"
+dependencies = [
+ "clarity",
+ "serde",
+ "wsts",
+]
+
+[[package]]
 name = "stacks-common"
 version = "0.0.2"
 source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat/clarity-wasm-next#5eb967cf4f58efcffe385c7a6fd2ed82e5f5da58"
@@ -3704,7 +3718,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-devnet-api"
-version = "1.1.0"
+version = "1.2.0"
 dependencies = [
  "chainhook-types",
  "clarinet-deployments",
@@ -3732,10 +3746,9 @@ dependencies = [
 
 [[package]]
 name = "stacks-rpc-client"
-version = "2.4.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=a5f9fea72230b893a7d1f90bdfda3a68aa48e908#a5f9fea72230b893a7d1f90bdfda3a68aa48e908"
+version = "2.6.0"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=f06d087c5762fa06f7080b5c38994e7437048222#f06d087c5762fa06f7080b5c38994e7437048222"
 dependencies = [
- "clarity-repl",
  "hmac 0.12.1",
  "libsecp256k1 0.7.1",
  "pbkdf2",
@@ -3744,6 +3757,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "sha2 0.10.7",
+ "stacks-codec",
  "tiny-hderive",
 ]
 

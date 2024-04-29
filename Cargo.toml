@@ -1,6 +1,6 @@
 [package]
 name = "stacks-devnet-api"
-version = "1.1.0"
+version = "1.2.0"
 edition = "2021"
 authors = ["Micaiah Reid <micaiah@hiro.so>"]
 description = "The Stacks Devnet API runs a server that can be used to deploy, delete, manage, and make requests to Stacks Devnets run on Kubernetes."
@@ -27,15 +27,15 @@ strum_macros = "0.24.3"
 strum = "0.24.1"
 # clarity-repl = "1.8.0"
 # clarity-repl = {version = "2.2.0", path = "../clarinet/components/clarity-repl" }
-clarity-repl = {version = "2.3.1", git = "https://github.com/hirosystems/clarinet.git", rev="a5f9fea72230b893a7d1f90bdfda3a68aa48e908" }
+clarity-repl = {version = "2.3.1", git = "https://github.com/hirosystems/clarinet.git", rev="f06d087c5762fa06f7080b5c38994e7437048222" }
 # clarinet-files = {version = "1.0.3" }
 # clarinet-files = {version = "2.2.0", path = "../clarinet/components/clarinet-files" }
-clarinet-files = {version = "2.3.1", git = "https://github.com/hirosystems/clarinet.git", rev="a5f9fea72230b893a7d1f90bdfda3a68aa48e908" }
+clarinet-files = {version = "2.3.1", git = "https://github.com/hirosystems/clarinet.git", rev="f06d087c5762fa06f7080b5c38994e7437048222" }
 # clarinet-deployments = {version = "1.0.3" }
 # clarinet-deployments = {version = "2.2.0", path = "../clarinet/components/clarinet-deployments" }
-clarinet-deployments = {version = "2.3.1", git = "https://github.com/hirosystems/clarinet.git", rev="a5f9fea72230b893a7d1f90bdfda3a68aa48e908" }
+clarinet-deployments = {version = "2.3.1", git = "https://github.com/hirosystems/clarinet.git", rev="f06d087c5762fa06f7080b5c38994e7437048222" }
 # chainhook-types = "1.0"
-chainhook-types = { version = "1.3",  git = "https://github.com/hirosystems/chainhook.git", branch="chore/update-clarinet-and-clarity" }
+chainhook-types = { version = "1.3" }
 toml = "0.5.9"
 
 [dev-dependencies]

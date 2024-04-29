@@ -39,7 +39,7 @@ spec:
             - stacks-signer
             - run
             - --config=/src/stacks-signer-1/Signer.toml
-          image: quay.io/hirosystems/stacks-node:devnet-with-signer-beta4
+          image: quay.io/hirosystems/stacks-signer:devnet-2.5
           imagePullPolicy: IfNotPresent
           ports: 
             - containerPort: 30001

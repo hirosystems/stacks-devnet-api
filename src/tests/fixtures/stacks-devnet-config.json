@@ -335,8 +335,7 @@
       "epoch_2_5": 105,
       "epoch_3_0": 121,
       "use_docker_gateway_routing": false,
-      "docker_platform": "linux/amd64",
-      "use_nakamoto": false
+      "docker_platform": "linux/amd64"
     }
   },
   "project_manifest": {

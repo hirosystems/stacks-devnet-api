@@ -39,7 +39,7 @@ spec:
             - configMapRef:
                 name: stacks-blockchain-api
                 optional: false
-          image: hirosystems/stacks-blockchain-api
+          image: hirosystems/stacks-blockchain-api:master
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3999
