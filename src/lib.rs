@@ -1506,6 +1506,7 @@ impl StacksDevnetApiK8sManager {
             ("V2_POX_MIN_AMOUNT_USTX".into(), "90000000260".into()),
             ("NODE_ENV".into(), "production".into()),
             ("STACKS_API_LOG_LEVEL".into(), "debug".into()),
+            ("FAUCET_PRIVATE_KEY".into(), config.devnet_config.faucet_secret_key_hex.clone().into()),
         ]);
         self.deploy_configmap(
             StacksDevnetConfigmap::StacksBlockchainApi,
