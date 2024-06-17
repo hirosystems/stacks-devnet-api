@@ -172,7 +172,9 @@ impl StacksDevnetConfig {
                     TransactionSpecification::EmulatedContractCall(_) | TransactionSpecification::EmulatedContractPublish(_) => {
                         return Err(format!("devnet deployment plans do not support emulated-contract-calls or emulated-contract-publish types"))
                     }
-                    _ => {}
+                    TransactionSpecification::ContractCall(_) => {},
+                    TransactionSpecification::BtcTransfer(_) => {},
+                    TransactionSpecification::StxTransfer(_) => {},
                 }
             }
         }
