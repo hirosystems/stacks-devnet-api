@@ -3718,7 +3718,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-devnet-api"
-version = "1.2.0"
+version = "1.2.1"
 dependencies = [
  "chainhook-types",
  "clarinet-deployments",
