@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/hirosystems/stacks-devnet-api/compare/v1.2.0...v1.2.1) (2024-06-17)
+
+
+### Bug Fixes
+
+* pass faucet address env var to stacks network ([#97](https://github.com/hirosystems/stacks-devnet-api/issues/97)) ([a543e86](https://github.com/hirosystems/stacks-devnet-api/commit/a543e86579f686dbaba2c93e94fd9bbb2c16971b))
+
 ## [1.2.0](https://github.com/hirosystems/stacks-devnet-api/compare/v1.1.0...v1.2.0) (2024-04-29)
 
 
