@@ -11,7 +11,14 @@ metadata:
   name: stacks-devnet-api
 rules:
   - apiGroups: [""]
-    resources: ["pods", "pods/status", "services", "configmaps", "persistentvolumeclaims"]
+    resources:
+      [
+        "pods",
+        "pods/status",
+        "services",
+        "configmaps",
+        "persistentvolumeclaims",
+      ]
     verbs: ["get", "delete", "create", "list", "deletecollection"]
   - apiGroups: ["apps"]
     resources: ["deployments", "statefulsets"]
@@ -19,7 +26,6 @@ rules:
   - apiGroups: [""]
     resources: ["namespaces"]
     verbs: ["get"]
-  
 
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -35,8 +41,7 @@ roleRef:
   name: stacks-devnet-api
   apiGroup: rbac.authorization.k8s.io
 
----  
-
+---
 apiVersion: v1
 kind: Pod
 metadata:
@@ -47,17 +52,19 @@ metadata:
 spec:
   serviceAccountName: stacks-devnet-api
   containers:
-  - command: ["stacks-devnet-api"]
-    name: stacks-devnet-api
-    image: hirosystems/stacks-devnet-api:latest
-    imagePullPolicy: IfNotPresent
-    ports:
-    - containerPort: 8477
-      name: api
-      protocol: TCP
-    volumeMounts:
-    - name: config-volume
-      mountPath: /etc/config
+    - command: ["stacks-devnet-api"]
+      name: stacks-devnet-api
+      # image: hirosystems/stacks-devnet-api:latest
+      # imagePullPolicy: IfNotPresent
+      image: stacks-devnet-api:latest
+      imagePullPolicy: Never
+      ports:
+        - containerPort: 8477
+          name: api
+          protocol: TCP
+      volumeMounts:
+        - name: config-volume
+          mountPath: /etc/config
   volumes:
     - name: config-volume
       configMap:
@@ -71,12 +78,11 @@ metadata:
   namespace: devnet
 spec:
   ports:
-  - name: api
-    port: 8477
-    protocol: TCP
-    targetPort: 8477
-    nodePort: 30000
+    - name: api
+      port: 8477
+      protocol: TCP
+      targetPort: 8477
+      nodePort: 30000
   selector:
     name: stacks-devnet-api
   type: NodePort
-

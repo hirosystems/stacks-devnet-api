@@ -1,6 +1,6 @@
 use chainhook_types::StacksNetwork;
 use clarinet_files::compute_addresses;
-use futures::future::try_join4;
+use futures::future::try_join3;
 use hiro_system_kit::{slog, Logger};
 use hyper::{body::Bytes, Body, Client as HttpClient, Request, Response, Uri};
 use k8s_openapi::{
@@ -560,72 +560,67 @@ impl StacksDevnetApiK8sManager {
         namespace: &str,
     ) -> Result<StacksV2InfoResponse, DevNetError> {
         let client = HttpClient::new();
+        
+        // Log the constructed service URL and port
         let url = get_service_url(namespace, StacksDevnetService::StacksBlockchain);
-        let port =
-            get_service_port(StacksDevnetService::StacksBlockchain, ServicePort::RPC).unwrap();
+        let port = get_service_port(StacksDevnetService::StacksBlockchain, ServicePort::RPC).unwrap();
         let url = format!("http://{}:{}/v2/info", url, port);
-
+    
         let context = format!("NAMESPACE: {}", namespace);
+        
         self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
-            slog::info!(
-                logger,
-                "requesting /v2/info route of stacks node {}",
-                context
-            )
+            slog::info!(logger, "Requesting URL: {}", url);  // Log the full URL
         });
-
+        
+        self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
+            slog::info!(logger, "requesting /v2/info route of stacks node {}", context);
+        });
+    
         match Uri::from_str(&url) {
             Ok(uri) => match client.get(uri).await {
-                Ok(response) => match hyper::body::to_bytes(response.into_body()).await {
-                    Ok(body) => match serde_json::from_slice::<StacksV2InfoResponse>(&body) {
-                        Ok(config) => {
+                Ok(response) => {
+                    match hyper::body::to_bytes(response.into_body()).await {
+                        Ok(body) => {
+                            let body_str = String::from_utf8_lossy(&body);
                             self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
-                                slog::info!(
-                                    logger,
-                                    "successfully requested /v2/info route of stacks node {}",
-                                    context
-                                )
+                                slog::info!(logger, "Raw response body: {}", body_str);
                             });
-                            Ok(config)
+    
+                            match serde_json::from_slice::<StacksV2InfoResponse>(&body) {
+                                Ok(config) => {
+                                    self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
+                                        slog::info!(logger, "Successfully requested /v2/info route of stacks node {}", context);
+                                    });
+                                    Ok(config)
+                                }
+                                Err(e) => {
+                                    let msg = format!("failed to parse JSON response: {}, ERROR: {}, Raw body: {}", context, e.to_string(), body_str);
+                                    self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
+                                    Err(DevNetError {
+                                        message: msg,
+                                        code: 500,
+                                    })
+                                }
+                            }
                         }
                         Err(e) => {
-                            let msg = format!(
-                                "failed to parse response: {}, ERROR: {}",
-                                context,
-                                e.to_string()
-                            );
+                            let msg = format!("failed to parse response bytes: {}, ERROR: {}", context, e.to_string());
                             self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
                             Err(DevNetError {
                                 message: msg,
                                 code: 500,
                             })
                         }
-                    },
-                    Err(e) => {
-                        let msg = format!(
-                            "failed to parse response: {}, ERROR: {}",
-                            context,
-                            e.to_string()
-                        );
-                        self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
-                        Err(DevNetError {
-                            message: msg,
-                            code: 500,
-                        })
                     }
-                },
+                }
                 Err(e) => {
-                    let msg = format!(
-                        "failed to query stacks node: {}, ERROR: {}",
-                        context,
-                        e.to_string()
-                    );
+                    let msg = format!("failed to query stacks node: {}, ERROR: {}", context, e.to_string());
                     self.ctx.try_log(|logger| slog::warn!(logger, "{}", msg));
-                    Ok(StacksV2InfoResponse::default())
+                    Ok(StacksV2InfoResponse::default()) // Return default response on error
                 }
             },
             Err(e) => {
-                let msg = format!("failed to parse url: {} ERROR: {}", context, e.to_string());
+                let msg = format!("failed to parse url: {} ERROR: {}", url, e.to_string());
                 self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
                 Err(DevNetError {
                     message: msg,
@@ -641,7 +636,7 @@ impl StacksDevnetApiK8sManager {
         user_id: &str,
     ) -> Result<StacksDevnetInfoResponse, DevNetError> {
         let context = format!("NAMESPACE: {}", namespace);
-
+    
         match self.check_all_devnet_assets_exist(&namespace).await? {
             false => {
                 let msg = format!("not all devnet assets exist {}", context);
@@ -656,7 +651,8 @@ impl StacksDevnetApiK8sManager {
                 self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
                     slog::info!(logger, "getting devnet info {}", context)
                 });
-
+    
+                // Fetch the pod status information
                 let (
                     PodStatusResponse {
                         status: bitcoind_node_status,
@@ -669,9 +665,8 @@ impl StacksDevnetApiK8sManager {
                     PodStatusResponse {
                         status: stacks_api_status,
                         start_time: stacks_api_started_at,
-                    },
-                    chain_info,
-                ) = try_join4(
+                    }
+                ) = try_join3(
                     self.get_pod_status_info(&namespace, user_id, StacksDevnetPod::BitcoindNode),
                     self.get_pod_status_info(
                         &namespace,
@@ -683,10 +678,23 @@ impl StacksDevnetApiK8sManager {
                         user_id,
                         StacksDevnetPod::StacksBlockchainApi,
                     ),
-                    self.get_stacks_v2_info(&namespace),
                 )
                 .await?;
-
+    
+                // Try to fetch chain info, but handle errors by using default values for the chain tips
+                let chain_info = match self.get_stacks_v2_info(&namespace).await {
+                    Ok(info) => info,
+                    Err(e) => {
+                        self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
+                            slog::warn!(logger, "Failed to get chain info: {}", e.message);
+                        });
+                        StacksV2InfoResponse {
+                            stacks_tip_height: 0,
+                            burn_block_height: 0,
+                        }
+                    }
+                };
+    
                 Ok(StacksDevnetInfoResponse {
                     bitcoind_node_status,
                     stacks_node_status,

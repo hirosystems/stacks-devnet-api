@@ -244,9 +244,21 @@
       "stacks_node_subsequent_attempt_time_ms": 1000,
       "stacks_node_events_observers": ["host.docker.internal:20455"],
       "stacks_node_env_vars": [],
+      "stacks_node_next_initiative_delay": 4000,
       "stacks_api_port": 3999,
       "stacks_api_events_port": 3700,
       "stacks_api_env_vars": [],
+      "stacks_signers_keys": [
+        {
+          "key": "7287ba251d44a4d3fd9276c88ce34c5c52a038955511cccaf77e61068649c178",
+          "compress_public": true
+        },
+        {
+          "key": "530d9f61984c888536871c6573073bdfc0058896dc1adfe9a6a10dfacadc2091",
+          "compress_public": true
+        }
+      ],
+      "stacks_signers_env_vars": [],
       "stacks_explorer_port": 8000,
       "stacks_explorer_env_vars": [],
       "bitcoin_explorer_port": 8001,
@@ -264,6 +276,7 @@
       "faucet_btc_address": "mjSrB3wS4xab3kYqFktwBzfTdPg367ZJ2d",
       "faucet_mnemonic": "shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform",
       "faucet_derivation_path": "m/44'/5757'/0'/0/0",
+      "pre_nakamoto_mock_signing": false,
       "working_dir": "/Users/micaiahreid/work/stx-px/tmp",
       "postgres_port": 5432,
       "postgres_username": "postgres",
@@ -296,7 +309,7 @@
       "execute_script": [],
       "bitcoin_node_image_url": "quay.io/hirosystems/bitcoind:devnet-v3",
       "stacks_node_image_url": "quay.io/hirosystems/stacks-node:devnet-2.4.0.0.0",
-      "stacks_signer_image_url": "quay.io/hirosystems/stacks-node:devnet-2.4.0.0.0",
+      "stacks_signers_image_url": "quay.io/hirosystems/stacks-node:devnet-2.4.0.0.0",
       "stacks_api_image_url": "hirosystems/stacks-blockchain-api:latest",
       "stacks_explorer_image_url": "hirosystems/explorer:latest",
       "postgres_image_url": "postgres:14",
@@ -304,6 +317,7 @@
       "disable_bitcoin_explorer": true,
       "disable_stacks_explorer": true,
       "disable_stacks_api": false,
+      "disable_postgres": false,
       "bind_containers_volumes": false,
       "enable_subnet_node": false,
       "subnet_node_image_url": "hirosystems/stacks-subnets:0.8.1",
