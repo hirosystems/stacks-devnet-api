@@ -1,3 +1,18 @@
+## [1.2.1](https://github.com/hirosystems/stacks-devnet-api/compare/v1.2.0...v1.2.1) (2024-06-17)
+
+
+### Bug Fixes
+
+* pass faucet address env var to stacks network ([#97](https://github.com/hirosystems/stacks-devnet-api/issues/97)) ([a543e86](https://github.com/hirosystems/stacks-devnet-api/commit/a543e86579f686dbaba2c93e94fd9bbb2c16971b))
+
+## [1.2.0](https://github.com/hirosystems/stacks-devnet-api/compare/v1.1.0...v1.2.0) (2024-04-29)
+
+
+### Features
+
+* track last request time for each user id ([#93](https://github.com/hirosystems/stacks-devnet-api/issues/93)) ([71e070e](https://github.com/hirosystems/stacks-devnet-api/commit/71e070e818cd2774deb3a01380d4cc399a061da3))
+* upgrade to clarinet 2.6.0; remove `use_nakamoto` ([#94](https://github.com/hirosystems/stacks-devnet-api/issues/94)) ([9495b13](https://github.com/hirosystems/stacks-devnet-api/commit/9495b1366db05c6b87496f58a456ae89da3836db))
+
 ## [1.1.0](https://github.com/hirosystems/stacks-devnet-api/compare/v1.0.0...v1.1.0) (2024-03-25)
 
 
