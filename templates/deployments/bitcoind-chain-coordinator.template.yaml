@@ -71,7 +71,7 @@ spec:
                 fieldRef:
                   apiVersion: v1
                   fieldPath: metadata.namespace
-          image: hirosystems/stacks-network-orchestrator:clarinet-2.6.0
+          image: hirosystems/stacks-network-orchestrator:clarinet-2.9.0
           imagePullPolicy: IfNotPresent
           name: chain-coordinator
           ports:
