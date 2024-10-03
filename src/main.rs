@@ -31,7 +31,11 @@ async fn main() {
     let config_path = match env::var("CONFIG_PATH") {
         Ok(path) => path,
         Err(_) => {
-            if cfg!(debug_assertions) { "./Config.toml".into() } else { "/etc/config/Config.toml".into() }
+            if cfg!(debug_assertions) {
+                "./Config.toml".into()
+            } else {
+                "/etc/config/Config.toml".into()
+            }
         }
     };
     let config = ApiConfig::from_path(&config_path);
