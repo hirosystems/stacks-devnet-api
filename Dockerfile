@@ -5,7 +5,6 @@ COPY . /src
 
 RUN mkdir /out
 RUN rustup component add rustfmt
-RUN cargo update
 RUN cargo build --release --manifest-path ./Cargo.toml
 RUN cp target/release/stacks-devnet-api /out
 
