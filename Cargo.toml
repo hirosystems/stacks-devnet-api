@@ -25,7 +25,6 @@ http-body = "0.4.5"
 hiro-system-kit = {version = "0.1.0", features = ["log"]}
 strum_macros = "0.24.3"
 strum = "0.24.1"
-time = "0.3.35"
 # clarity-repl = "1.8.0"
 # clarity-repl = {version = "2.2.0", path = "../clarinet/components/clarity-repl" }
 clarity-repl = {version = "2.9.0", git = "https://github.com/hirosystems/clarinet.git", rev="7085b877cdb9d533ccbf24cd947c5b4ee04bcc5b" }
