@@ -561,7 +561,6 @@ impl StacksDevnetApiK8sManager {
     ) -> Result<StacksV2InfoResponse, DevNetError> {
         let client = HttpClient::new();
 
-        // Log the constructed service URL and port
         let url = get_service_url(namespace, StacksDevnetService::StacksBlockchain);
         let port =
             get_service_port(StacksDevnetService::StacksBlockchain, ServicePort::RPC).unwrap();
