@@ -42,7 +42,7 @@ impl ApiConfig {
         let config_file: ApiConfig = match toml::from_slice(&file_buffer) {
             Ok(s) => s,
             Err(e) => {
-                panic!("Config file malformatted {}", e.to_string());
+                panic!("Config file malformatted {}", e);
             }
         };
         config_file
