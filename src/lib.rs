@@ -1,8 +1,10 @@
-use chainhook_types::StacksNetwork;
-use clarinet_files::compute_addresses;
+use clarinet_files::{compute_addresses, StacksNetwork};
 use futures::future::try_join3;
 use hiro_system_kit::{slog, Logger};
-use hyper::{body::Bytes, Body, Client as HttpClient, Request, Response, Uri};
+use hyper::{
+    body::{Bytes, HttpBody},
+    Body, Client as HttpClient, Request, Response, Uri,
+};
 use k8s_openapi::{
     api::{
         apps::v1::{Deployment, StatefulSet},
@@ -165,7 +167,7 @@ impl StacksDevnetApiK8sManager {
         S: tower::Service<Request<Body>, Response = Response<B>> + Send + 'static,
         S::Future: Send + 'static,
         S::Error: Into<BoxError>,
-        B: http_body::Body<Data = Bytes> + Send + 'static,
+        B: HttpBody<Data = Bytes> + Send + 'static,
         B::Error: Into<BoxError>,
         T: Into<String>,
     {
@@ -1170,7 +1172,7 @@ impl StacksDevnetApiK8sManager {
                 rpcserialversion=1
                 disablewallet=0
                 fallbackfee=0.00001
-                
+
                 [regtest]
                 bind=0.0.0.0:{}
                 rpcbind=0.0.0.0:{}
@@ -1394,7 +1396,7 @@ impl StacksDevnetApiK8sManager {
                 burn_fee_cap = 20_000
                 poll_time_secs = 1
                 timeout = 30
-                peer_host = "{}" 
+                peer_host = "{}"
                 rpc_ssl = false
                 wallet_name = "{}"
                 username = "{}"
