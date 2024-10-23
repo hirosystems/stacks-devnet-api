@@ -214,6 +214,7 @@ mod tests {
         file_buffer
     }
 
+    #[track_caller]
     fn get_template_config(file_path: &str) -> StacksDevnetConfig {
         let file_buffer = read_file(file_path);
 
