@@ -24,11 +24,11 @@ pub enum SignerIdx {
     Signer1,
 }
 
-impl SignerIdx {
-    pub fn to_string(&self) -> String {
-        match &self {
-            SignerIdx::Signer0 => String::from("0"),
-            SignerIdx::Signer1 => String::from("1"),
+impl fmt::Display for SignerIdx {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SignerIdx::Signer0 => write!(f, "0"),
+            SignerIdx::Signer1 => write!(f, "1"),
         }
     }
 }
