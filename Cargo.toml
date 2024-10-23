@@ -14,29 +14,20 @@ repository = "https://github.com/hirosystems/stacks-devnet-api"
 [dependencies]
 kube = { version="0.82.2", features = ["client", "runtime"] }
 k8s-openapi = { version = "0.18.0", features = ["v1_25"] }
-futures = "0.3.28"
+futures = "0.3.31"
 tokio = { version = "1.35.1", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0.114"
+serde_json = "1.0.132"
 serde_yaml = "0.8.23"
 hyper = { version = "0.14", features = ["full"] }
 tower = "0.4.13"
-http-body = "0.4.5"
-hiro-system-kit = {version = "0.1.0", features = ["log"]}
+hiro-system-kit = { version = "0.1.0", features = ["log"] }
 strum_macros = "0.24.3"
 strum = "0.24.1"
-# clarity-repl = "1.8.0"
-# clarity-repl = {version = "2.2.0", path = "../clarinet/components/clarity-repl" }
-clarity-repl = {version = "2.9.0", git = "https://github.com/hirosystems/clarinet.git", rev="7085b877cdb9d533ccbf24cd947c5b4ee04bcc5b" }
-# clarinet-files = {version = "1.0.3" }
-# clarinet-files = {version = "2.2.0", path = "../clarinet/components/clarinet-files" }
-clarinet-files = {version = "2.9.0", git = "https://github.com/hirosystems/clarinet.git", rev="7085b877cdb9d533ccbf24cd947c5b4ee04bcc5b" }
-# clarinet-deployments = {version = "1.0.3" }
-# clarinet-deployments = {version = "2.2.0", path = "../clarinet/components/clarinet-deployments" }
-clarinet-deployments = {version = "2.9.0", git = "https://github.com/hirosystems/clarinet.git", rev="7085b877cdb9d533ccbf24cd947c5b4ee04bcc5b" }
-# chainhook-types = "1.0"
-chainhook-types = { version = "1.3" }
 toml = "0.5.9"
+
+clarinet-files = "2"
+clarinet-deployments = "2"
 
 [dev-dependencies]
 tower-test = "0.4.0"
@@ -46,3 +37,7 @@ serial_test = "2.0.0"
 
 [features]
 k8s_tests = []
+
+[patch.crates-io]
+clarinet-files = { version = "2",git = "https://github.com/hirosystems/clarinet.git", rev = "323e24844cbec88b488c89c61fe8649bddc9bda9" }
+clarinet-deployments = { version = "2",git = "https://github.com/hirosystems/clarinet.git", rev = "323e24844cbec88b488c89c61fe8649bddc9bda9" }
