@@ -1283,14 +1283,11 @@ impl StacksDevnetApiK8sManager {
                     disable_inbound_handshakes = true
                     disable_inbound_walks = true
                     public_ip_address = "1.1.1.1:1234"
-                    block_proposal_token = "12345"
+                    auth_token = "12345"
 
                     [miner]
-                    min_tx_fee = 1
                     first_attempt_time_ms = {}
-                    second_attempt_time_ms = {}
                     block_reward_recipient = "{}"
-                    wait_for_block_download = false
                     microblock_attempt_time_ms = 10
                     mining_key = "19ec1c3e31d139c989a23a27eac60d1abfad5277d3ae9604242514c738258efa01"
                 "#,
@@ -1301,7 +1298,6 @@ impl StacksDevnetApiK8sManager {
                 stacks_miner_secret_key_hex,
                 stacks_miner_secret_key_hex,
                 devnet_config.stacks_node_first_attempt_time_ms,
-                devnet_config.stacks_node_subsequent_attempt_time_ms,
                 miner_coinbase_recipient
             );
 

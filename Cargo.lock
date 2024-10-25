@@ -420,7 +420,7 @@ dependencies = [
 [[package]]
 name = "clarinet-deployments"
 version = "2.10.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=323e24844cbec88b488c89c61fe8649bddc9bda9#323e24844cbec88b488c89c61fe8649bddc9bda9"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=e7c6f1de28b305af1e240039fc62834caf927355#e7c6f1de28b305af1e240039fc62834caf927355"
 dependencies = [
  "base58 0.2.0",
  "base64 0.21.7",
@@ -446,7 +446,7 @@ dependencies = [
 [[package]]
 name = "clarinet-files"
 version = "2.10.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=323e24844cbec88b488c89c61fe8649bddc9bda9#323e24844cbec88b488c89c61fe8649bddc9bda9"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=e7c6f1de28b305af1e240039fc62834caf927355#e7c6f1de28b305af1e240039fc62834caf927355"
 dependencies = [
  "bip39",
  "bitcoin",
@@ -466,7 +466,7 @@ dependencies = [
 [[package]]
 name = "clarinet-utils"
 version = "1.0.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=323e24844cbec88b488c89c61fe8649bddc9bda9#323e24844cbec88b488c89c61fe8649bddc9bda9"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=e7c6f1de28b305af1e240039fc62834caf927355#e7c6f1de28b305af1e240039fc62834caf927355"
 dependencies = [
  "hmac 0.12.1",
  "pbkdf2",
@@ -497,7 +497,7 @@ dependencies = [
 [[package]]
 name = "clarity-repl"
 version = "2.10.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=323e24844cbec88b488c89c61fe8649bddc9bda9#323e24844cbec88b488c89c61fe8649bddc9bda9"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=e7c6f1de28b305af1e240039fc62834caf927355#e7c6f1de28b305af1e240039fc62834caf927355"
 dependencies = [
  "ansi_term",
  "atty",
@@ -505,7 +505,7 @@ dependencies = [
  "clarity",
  "colored",
  "getrandom 0.2.15",
- "hiro-system-kit 0.1.0 (git+https://github.com/hirosystems/clarinet.git?rev=323e24844cbec88b488c89c61fe8649bddc9bda9)",
+ "hiro-system-kit 0.1.0 (git+https://github.com/hirosystems/clarinet.git?rev=e7c6f1de28b305af1e240039fc62834caf927355)",
  "lazy_static",
  "pox-locking",
  "prettytable-rs",
@@ -1313,7 +1313,7 @@ dependencies = [
 [[package]]
 name = "hiro-system-kit"
 version = "0.1.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=323e24844cbec88b488c89c61fe8649bddc9bda9#323e24844cbec88b488c89c61fe8649bddc9bda9"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=e7c6f1de28b305af1e240039fc62834caf927355#e7c6f1de28b305af1e240039fc62834caf927355"
 dependencies = [
  "ansi_term",
  "atty",
@@ -3148,7 +3148,7 @@ dependencies = [
 [[package]]
 name = "stacks-codec"
 version = "2.10.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=323e24844cbec88b488c89c61fe8649bddc9bda9#323e24844cbec88b488c89c61fe8649bddc9bda9"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=e7c6f1de28b305af1e240039fc62834caf927355#e7c6f1de28b305af1e240039fc62834caf927355"
 dependencies = [
  "clarity",
  "serde",
@@ -3211,7 +3211,7 @@ dependencies = [
 [[package]]
 name = "stacks-rpc-client"
 version = "2.10.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=323e24844cbec88b488c89c61fe8649bddc9bda9#323e24844cbec88b488c89c61fe8649bddc9bda9"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=e7c6f1de28b305af1e240039fc62834caf927355#e7c6f1de28b305af1e240039fc62834caf927355"
 dependencies = [
  "clarity",
  "hmac 0.12.1",
