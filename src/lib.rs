@@ -1330,8 +1330,6 @@ impl StacksDevnetApiK8sManager {
                 # Add orchestrator (docker-host) as an event observer
                 [[events_observer]]
                 endpoint = "{}:{}"
-                retry_count = 255
-                include_data_events = true
                 events_keys = ["*"]
                 "#,
                 bitcoind_chain_coordinator_host, chain_coordinator_ingestion_port
@@ -1342,8 +1340,6 @@ impl StacksDevnetApiK8sManager {
             # Add stacks-blockchain-api as an event observer
             [[events_observer]]
             endpoint = "{}:{}"
-            retry_count = 255
-            include_data_events = false
             events_keys = ["*"]
             "#,
                 get_service_url(&namespace, StacksDevnetService::StacksBlockchainApi),
@@ -1370,8 +1366,6 @@ impl StacksDevnetApiK8sManager {
                 # Add stacks-signer-{} as an event observer
                 [[events_observer]]
                 endpoint = "{}:{}"
-                retry_count = 255
-                include_data_events = false
                 events_keys = ["stackerdb", "block_proposal", "burn_blocks"]
                 "#,
                     signer_idx.to_string(),
