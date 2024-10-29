@@ -595,7 +595,7 @@ impl StacksDevnetApiK8sManager {
                             match serde_json::from_slice::<StacksV2InfoResponse>(&body) {
                                 Ok(config) => {
                                     self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
-                                        slog::info!(logger, "Successfully requested /v2/info route of stacks node {}", context);
+                                        slog::info!(logger, "successfully requested /v2/info route of stacks node {}", context);
                                     });
                                     Ok(config)
                                 }
