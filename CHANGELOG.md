@@ -1,3 +1,11 @@
+## [1.3.0](https://github.com/hirosystems/stacks-devnet-api/compare/v1.2.1...v1.3.0) (2024-10-03)
+
+
+### Features
+
+* 1.3.0 ([#105](https://github.com/hirosystems/stacks-devnet-api/issues/105)) ([35dde55](https://github.com/hirosystems/stacks-devnet-api/commit/35dde552b5c9aa0644aaa343ae077e758ac61df2))
+* force semver ([bbd8416](https://github.com/hirosystems/stacks-devnet-api/commit/bbd84167f61e48b567bc924bb99176dd27ca0337))
+
 ## [1.2.1](https://github.com/hirosystems/stacks-devnet-api/compare/v1.2.0...v1.2.1) (2024-06-17)
 
 
