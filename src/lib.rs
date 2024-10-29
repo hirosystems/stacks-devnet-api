@@ -1,8 +1,10 @@
-use chainhook_types::StacksNetwork;
-use clarinet_files::compute_addresses;
+use clarinet_files::{compute_addresses, StacksNetwork};
 use futures::future::try_join3;
 use hiro_system_kit::{slog, Logger};
-use hyper::{body::Bytes, Body, Client as HttpClient, Request, Response, Uri};
+use hyper::{
+    body::{Bytes, HttpBody},
+    Body, Client as HttpClient, Request, Response, Uri,
+};
 use k8s_openapi::{
     api::{
         apps::v1::{Deployment, StatefulSet},
@@ -165,7 +167,7 @@ impl StacksDevnetApiK8sManager {
         S: tower::Service<Request<Body>, Response = Response<B>> + Send + 'static,
         S::Future: Send + 'static,
         S::Error: Into<BoxError>,
-        B: http_body::Body<Data = Bytes> + Send + 'static,
+        B: HttpBody<Data = Bytes> + Send + 'static,
         B::Error: Into<BoxError>,
         T: Into<String>,
     {
@@ -1170,7 +1172,7 @@ impl StacksDevnetApiK8sManager {
                 rpcserialversion=1
                 disablewallet=0
                 fallbackfee=0.00001
-                
+
                 [regtest]
                 bind=0.0.0.0:{}
                 rpcbind=0.0.0.0:{}
@@ -1281,14 +1283,11 @@ impl StacksDevnetApiK8sManager {
                     disable_inbound_handshakes = true
                     disable_inbound_walks = true
                     public_ip_address = "1.1.1.1:1234"
-                    block_proposal_token = "12345"
+                    auth_token = "12345"
 
                     [miner]
-                    min_tx_fee = 1
                     first_attempt_time_ms = {}
-                    second_attempt_time_ms = {}
                     block_reward_recipient = "{}"
-                    wait_for_block_download = false
                     microblock_attempt_time_ms = 10
                     mining_key = "19ec1c3e31d139c989a23a27eac60d1abfad5277d3ae9604242514c738258efa01"
                 "#,
@@ -1299,7 +1298,6 @@ impl StacksDevnetApiK8sManager {
                 stacks_miner_secret_key_hex,
                 stacks_miner_secret_key_hex,
                 devnet_config.stacks_node_first_attempt_time_ms,
-                devnet_config.stacks_node_subsequent_attempt_time_ms,
                 miner_coinbase_recipient
             );
 
@@ -1332,8 +1330,6 @@ impl StacksDevnetApiK8sManager {
                 # Add orchestrator (docker-host) as an event observer
                 [[events_observer]]
                 endpoint = "{}:{}"
-                retry_count = 255
-                include_data_events = true
                 events_keys = ["*"]
                 "#,
                 bitcoind_chain_coordinator_host, chain_coordinator_ingestion_port
@@ -1344,8 +1340,6 @@ impl StacksDevnetApiK8sManager {
             # Add stacks-blockchain-api as an event observer
             [[events_observer]]
             endpoint = "{}:{}"
-            retry_count = 255
-            include_data_events = false
             events_keys = ["*"]
             "#,
                 get_service_url(&namespace, StacksDevnetService::StacksBlockchainApi),
@@ -1372,8 +1366,6 @@ impl StacksDevnetApiK8sManager {
                 # Add stacks-signer-{} as an event observer
                 [[events_observer]]
                 endpoint = "{}:{}"
-                retry_count = 255
-                include_data_events = false
                 events_keys = ["stackerdb", "block_proposal", "burn_blocks"]
                 "#,
                     signer_idx.to_string(),
@@ -1394,7 +1386,7 @@ impl StacksDevnetApiK8sManager {
                 burn_fee_cap = 20_000
                 poll_time_secs = 1
                 timeout = 30
-                peer_host = "{}" 
+                peer_host = "{}"
                 rpc_ssl = false
                 wallet_name = "{}"
                 username = "{}"
