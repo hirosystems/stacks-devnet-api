@@ -3189,7 +3189,7 @@ dependencies = [
 
 [[package]]
 name = "stacks-devnet-api"
-version = "1.4.0"
+version = "1.4.1"
 dependencies = [
  "clarinet-deployments",
  "clarinet-files",
