@@ -1,4 +1,4 @@
----
+"---
 network:
   name: devnet
   stacks_node_rpc_address: ~
@@ -8,70 +8,70 @@ network:
 accounts:
   - label: deployer
     mnemonic: twice kind fence tip hidden tilt action fragile skin nothing glory cousin green tomorrow spring wrist shed math olympic multiply hip blue scout claw
-    derivation: "m/44'/5757'/0'/0/0"
+    derivation: \"m/44'/5757'/0'/0/0\"
     balance: 100000000000000
     stx_address: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
     btc_address: mqVnk6NPRdhntvfm4hh9vvjiRkFDUuSYsH
     is_mainnet: false
   - label: faucet
     mnemonic: shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform
-    derivation: "m/44'/5757'/0'/0/0"
+    derivation: \"m/44'/5757'/0'/0/0\"
     balance: 100000000000000
     stx_address: STNHKEPYEPJ8ET55ZZ0M5A34J0R3N5FM2CMMMAZ6
     btc_address: mjSrB3wS4xab3kYqFktwBzfTdPg367ZJ2d
     is_mainnet: false
   - label: wallet_1
     mnemonic: crazy vibrant runway diagram beach language above aerobic maze coral this gas mirror output vehicle cover usage ecology unfold room feel file rocket expire
-    derivation: "m/44'/5757'/0'/0/0"
+    derivation: \"m/44'/5757'/0'/0/0\"
     balance: 100000000000000
     stx_address: STB8E0SMACY4A6DCCH4WE48YGX3P877407QW176V
     btc_address: mha4u7F3e93P9Xy1WQgVvGtYtynnJtT22x
     is_mainnet: false
   - label: wallet_2
     mnemonic: hold excess usual excess ring elephant install account glad dry fragile donkey gaze humble truck breeze nation gasp vacuum limb head keep delay hospital
-    derivation: "m/44'/5757'/0'/0/0"
+    derivation: \"m/44'/5757'/0'/0/0\"
     balance: 100000000000000
     stx_address: ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG
     btc_address: muYdXKmX9bByAueDe6KFfHd5Ff1gdN9ErG
     is_mainnet: false
   - label: wallet_3
     mnemonic: cycle puppy glare enroll cost improve round trend wrist mushroom scorpion tower claim oppose clever elephant dinosaur eight problem before frozen dune wagon high
-    derivation: "m/44'/5757'/0'/0/0"
+    derivation: \"m/44'/5757'/0'/0/0\"
     balance: 100000000000000
     stx_address: ST2JHG361ZXG51QTKY2NQCVBPPRRE2KZB1HR05NNC
     btc_address: mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7
     is_mainnet: false
   - label: wallet_4
     mnemonic: board list obtain sugar hour worth raven scout denial thunder horse logic fury scorpion fold genuine phrase wealth news aim below celery when cabin
-    derivation: "m/44'/5757'/0'/0/0"
+    derivation: \"m/44'/5757'/0'/0/0\"
     balance: 100000000000000
     stx_address: ST2NEB84ASENDXKYGJPQW86YXQCEFEX2ZQPG87ND
     btc_address: mg1C76bNTutiCDV3t9nWhZs3Dc8LzUufj8
     is_mainnet: false
   - label: wallet_5
     mnemonic: hurry aunt blame peanut heavy update captain human rice crime juice adult scale device promote vast project quiz unit note reform update climb purchase
-    derivation: "m/44'/5757'/0'/0/0"
+    derivation: \"m/44'/5757'/0'/0/0\"
     balance: 100000000000000
     stx_address: ST2REHHS5J3CERCRBEPMGH7921Q6PYKAADT7JP2VB
     btc_address: mweN5WVqadScHdA81aATSdcVr4B6dNokqx
     is_mainnet: false
   - label: wallet_6
     mnemonic: area desk dutch sign gold cricket dawn toward giggle vibrant indoor bench warfare wagon number tiny universe sand talk dilemma pottery bone trap buddy
-    derivation: "m/44'/5757'/0'/0/0"
+    derivation: \"m/44'/5757'/0'/0/0\"
     balance: 100000000000000
     stx_address: ST3AM1A56AK2C1XAFJ4115ZSV26EB49BVQ10MGCS0
     btc_address: mzxXgV6e4BZSsz8zVHm3TmqbECt7mbuErt
     is_mainnet: false
   - label: wallet_7
     mnemonic: prevent gallery kind limb income control noise together echo rival record wedding sense uncover school version force bleak nuclear include danger skirt enact arrow
-    derivation: "m/44'/5757'/0'/0/0"
+    derivation: \"m/44'/5757'/0'/0/0\"
     balance: 100000000000000
     stx_address: ST3PF13W7Z0RRM42A8VZRVFQ75SV1K26RXEP8YGKJ
     btc_address: n37mwmru2oaVosgfuvzBwgV2ysCQRrLko7
     is_mainnet: false
   - label: wallet_8
     mnemonic: female adjust gallery certain visit token during great side clown fitness like hurt clip knife warm bench start reunion globe detail dream depend fortune
-    derivation: "m/44'/5757'/0'/0/0"
+    derivation: \"m/44'/5757'/0'/0/0\"
     balance: 100000000000000
     stx_address: ST3NBRSFKX28FQ2ZJ1MAKX58HKHSDGNV5N7R21XCP
     btc_address: n2v875jbJ4RjBnTjgbfikDfnwsDV5iUByw
@@ -90,7 +90,7 @@ devnet_settings:
   stacks_node_wait_time_for_microblocks: 50
   stacks_node_first_attempt_time_ms: 500
   stacks_node_events_observers:
-    - "host.docker.internal:20455"
+    - \"host.docker.internal:20455\"
   stacks_node_env_vars: []
   stacks_node_next_initiative_delay: 4000
   stacks_api_port: 3999
@@ -111,16 +111,14 @@ devnet_settings:
   miner_secret_key_hex: 3b68e410cc7f9b8bae76f2f2991b69ecd0627c95da22a904065dfb2a73d0585f01
   miner_btc_address: n3GRiDLKWuKLCw1DZmV75W1mE35qmW2tQm
   miner_mnemonic: fragile loan twenty basic net assault jazz absorb diet talk art shock innocent float punch travel gadget embrace caught blossom hockey surround initial reduce
-  miner_derivation_path: "m/44'/5757'/0'/0/0"
+  miner_derivation_path: \"m/44'/5757'/0'/0/0\"
   miner_coinbase_recipient: ST3Q96TFVE6E0Q91XVX6S8RWAJW5R8XTZ8YEBM8RQ
-  miner_wallet_name: ""
+  miner_wallet_name: \"\"
   faucet_stx_address: STNHKEPYEPJ8ET55ZZ0M5A34J0R3N5FM2CMMMAZ6
   faucet_secret_key_hex: de433bdfa14ec43aa1098d5be594c8ffb20a31485ff9de2923b2689471c401b801
   faucet_btc_address: mjSrB3wS4xab3kYqFktwBzfTdPg367ZJ2d
   faucet_mnemonic: shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform
-  faucet_derivation_path: "m/44'/5757'/0'/0/0"
-  stacker_mnemonic: empty lens any direct brother then drop fury rule pole win claim scissors list rescue horn rent inform relief jump sword weekend half legend
-  stacker_derivation_path: "m/44'/5757'/0'/0/0"
+  faucet_derivation_path: \"m/44'/5757'/0'/0/0\"
   pre_nakamoto_mock_signing: false
   working_dir: /Users/micaiahreid/work/stx-px/tmp
   postgres_port: 5432
@@ -148,25 +146,25 @@ devnet_settings:
       btc_address: mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7
       auto_extend: ~
   execute_script: []
-  bitcoin_node_image_url: "quay.io/hirosystems/bitcoind:devnet-v3"
-  stacks_node_image_url: "quay.io/hirosystems/stacks-node:devnet-3.0"
-  stacks_signer_image_url: "quay.io/hirosystems/stacks-node:devnet-3.0"
-  stacks_api_image_url: "hirosystems/stacks-blockchain-api:latest"
-  stacks_explorer_image_url: "hirosystems/explorer:latest"
-  postgres_image_url: "postgres:14"
-  bitcoin_explorer_image_url: "quay.io/hirosystems/bitcoin-explorer:devnet"
+  bitcoin_node_image_url: \"quay.io/hirosystems/bitcoind:devnet-v3\"
+  stacks_node_image_url: \"quay.io/hirosystems/stacks-node:devnet-3.0\"
+  stacks_signer_image_url: \"quay.io/hirosystems/stacks-node:devnet-3.0\"
+  stacks_api_image_url: \"hirosystems/stacks-blockchain-api:latest\"
+  stacks_explorer_image_url: \"hirosystems/explorer:latest\"
+  postgres_image_url: \"postgres:14\"
+  bitcoin_explorer_image_url: \"quay.io/hirosystems/bitcoin-explorer:devnet\"
   disable_bitcoin_explorer: true
   disable_stacks_explorer: true
   disable_stacks_api: false
   disable_postgres: false
   bind_containers_volumes: false
   enable_subnet_node: false
-  subnet_node_image_url: "hirosystems/stacks-subnets:0.8.1"
+  subnet_node_image_url: \"hirosystems/stacks-subnets:0.8.1\"
   subnet_leader_stx_address: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
   subnet_leader_secret_key_hex: 753b7cc01a1a2e86221266a154af739463fce51219d97e4f856cd7200c3bd2a601
   subnet_leader_btc_address: mqVnk6NPRdhntvfm4hh9vvjiRkFDUuSYsH
   subnet_leader_mnemonic: twice kind fence tip hidden tilt action fragile skin nothing glory cousin green tomorrow spring wrist shed math olympic multiply hip blue scout claw
-  subnet_leader_derivation_path: "m/44'/5757'/0'/0/0"
+  subnet_leader_derivation_path: \"m/44'/5757'/0'/0/0\"
   subnet_node_p2p_port: 30444
   subnet_node_rpc_port: 30443
   subnet_events_ingestion_port: 30445
@@ -174,12 +172,12 @@ devnet_settings:
   subnet_contract_id: ST173JK7NZBA4BS05ZRATQH1K89YJMTGEH1Z5J52E.subnet-v3-0-1
   remapped_subnet_contract_id: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM.subnet-v3-0-1
   subnet_node_env_vars: []
-  subnet_api_image_url: "hirosystems/stacks-blockchain-api:latest"
+  subnet_api_image_url: \"hirosystems/stacks-blockchain-api:latest\"
   subnet_api_port: 13999
   subnet_api_events_port: 13700
   subnet_api_env_vars: []
   disable_subnet_api: true
-  docker_host: "unix:///var/run/docker.sock"
+  docker_host: \"unix:///var/run/docker.sock\"
   components_host: 127.0.0.1
   epoch_2_0: 100
   epoch_2_05: 100
@@ -191,3 +189,4 @@ devnet_settings:
   epoch_3_0: 121
   use_docker_gateway_routing: false
   docker_platform: linux/amd64
+"
