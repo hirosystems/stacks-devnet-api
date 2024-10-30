@@ -1,3 +1,11 @@
+## [1.5.0](https://github.com/hirosystems/stacks-devnet-api/compare/v1.4.0...v1.5.0) (2024-10-30)
+
+
+### Features
+
+* force semver ([c3188cc](https://github.com/hirosystems/stacks-devnet-api/commit/c3188cc76dc5bc2d43ce31b2bccd7decc4eff697))
+* update clarinet 2.11.2 ([#112](https://github.com/hirosystems/stacks-devnet-api/issues/112)) ([daa5b6f](https://github.com/hirosystems/stacks-devnet-api/commit/daa5b6f2c9cd1669a8b166fff211eaea17a0e62e))
+
 ## [1.4.0](https://github.com/hirosystems/stacks-devnet-api/compare/v1.3.0...v1.4.0) (2024-10-29)
 
 
