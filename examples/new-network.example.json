@@ -260,6 +260,8 @@
       "faucet_btc_address": "mjSrB3wS4xab3kYqFktwBzfTdPg367ZJ2d",
       "faucet_mnemonic": "shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform",
       "faucet_derivation_path": "m/44'/5757'/0'/0/0",
+      "stacker_mnemonic": "empty lens any direct brother then drop fury rule pole win claim scissors list rescue horn rent inform relief jump sword weekend half legend",
+      "stacker_derivation_path": "m/44'/5757'/0'/0/0",
       "working_dir": "/tmp",
       "postgres_port": 5432,
       "postgres_username": "postgres",
