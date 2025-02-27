@@ -39,5 +39,5 @@ serial_test = "2.0.0"
 k8s_tests = []
 
 [patch.crates-io]
-clarinet-files = { version = "2",git = "https://github.com/hirosystems/clarinet.git", rev = "e8907ac178dbb03544afbe5ec01d93797591c01f" }
-clarinet-deployments = { version = "2",git = "https://github.com/hirosystems/clarinet.git", rev = "e8907ac178dbb03544afbe5ec01d93797591c01f" }
+clarinet-files = { version = "2",git = "https://github.com/hirosystems/clarinet.git", rev = "a60695eb209d60e13f4e50c56ce3d4d34c499a5d" }
+clarinet-deployments = { version = "2",git = "https://github.com/hirosystems/clarinet.git", rev = "a60695eb209d60e13f4e50c56ce3d4d34c499a5d" }
