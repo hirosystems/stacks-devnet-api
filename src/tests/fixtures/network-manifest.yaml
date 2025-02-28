@@ -10,6 +10,7 @@ accounts:
     mnemonic: twice kind fence tip hidden tilt action fragile skin nothing glory cousin green tomorrow spring wrist shed math olympic multiply hip blue scout claw
     derivation: "m/44'/5757'/0'/0/0"
     balance: 100000000000000
+    sbtc_balance: 100000000
     stx_address: ST1PQHQKV0RJXZFY1DGX8MNSNYVE3VGZJSRTPGZGM
     btc_address: mqVnk6NPRdhntvfm4hh9vvjiRkFDUuSYsH
     is_mainnet: false
@@ -17,6 +18,7 @@ accounts:
     mnemonic: shadow private easily thought say logic fault paddle word top book during ignore notable orange flight clock image wealth health outside kitten belt reform
     derivation: "m/44'/5757'/0'/0/0"
     balance: 100000000000000
+    sbtc_balance: 100000000
     stx_address: STNHKEPYEPJ8ET55ZZ0M5A34J0R3N5FM2CMMMAZ6
     btc_address: mjSrB3wS4xab3kYqFktwBzfTdPg367ZJ2d
     is_mainnet: false
@@ -24,6 +26,7 @@ accounts:
     mnemonic: crazy vibrant runway diagram beach language above aerobic maze coral this gas mirror output vehicle cover usage ecology unfold room feel file rocket expire
     derivation: "m/44'/5757'/0'/0/0"
     balance: 100000000000000
+    sbtc_balance: 100000000
     stx_address: STB8E0SMACY4A6DCCH4WE48YGX3P877407QW176V
     btc_address: mha4u7F3e93P9Xy1WQgVvGtYtynnJtT22x
     is_mainnet: false
@@ -31,6 +34,7 @@ accounts:
     mnemonic: hold excess usual excess ring elephant install account glad dry fragile donkey gaze humble truck breeze nation gasp vacuum limb head keep delay hospital
     derivation: "m/44'/5757'/0'/0/0"
     balance: 100000000000000
+    sbtc_balance: 100000000
     stx_address: ST2CY5V39NHDPWSXMW9QDT3HC3GD6Q6XX4CFRK9AG
     btc_address: muYdXKmX9bByAueDe6KFfHd5Ff1gdN9ErG
     is_mainnet: false
@@ -38,6 +42,7 @@ accounts:
     mnemonic: cycle puppy glare enroll cost improve round trend wrist mushroom scorpion tower claim oppose clever elephant dinosaur eight problem before frozen dune wagon high
     derivation: "m/44'/5757'/0'/0/0"
     balance: 100000000000000
+    sbtc_balance: 100000000
     stx_address: ST2JHG361ZXG51QTKY2NQCVBPPRRE2KZB1HR05NNC
     btc_address: mvZtbibDAAA3WLpY7zXXFqRa3T4XSknBX7
     is_mainnet: false
@@ -45,6 +50,7 @@ accounts:
     mnemonic: board list obtain sugar hour worth raven scout denial thunder horse logic fury scorpion fold genuine phrase wealth news aim below celery when cabin
     derivation: "m/44'/5757'/0'/0/0"
     balance: 100000000000000
+    sbtc_balance: 100000000
     stx_address: ST2NEB84ASENDXKYGJPQW86YXQCEFEX2ZQPG87ND
     btc_address: mg1C76bNTutiCDV3t9nWhZs3Dc8LzUufj8
     is_mainnet: false
@@ -52,6 +58,7 @@ accounts:
     mnemonic: hurry aunt blame peanut heavy update captain human rice crime juice adult scale device promote vast project quiz unit note reform update climb purchase
     derivation: "m/44'/5757'/0'/0/0"
     balance: 100000000000000
+    sbtc_balance: 100000000
     stx_address: ST2REHHS5J3CERCRBEPMGH7921Q6PYKAADT7JP2VB
     btc_address: mweN5WVqadScHdA81aATSdcVr4B6dNokqx
     is_mainnet: false
@@ -59,6 +66,7 @@ accounts:
     mnemonic: area desk dutch sign gold cricket dawn toward giggle vibrant indoor bench warfare wagon number tiny universe sand talk dilemma pottery bone trap buddy
     derivation: "m/44'/5757'/0'/0/0"
     balance: 100000000000000
+    sbtc_balance: 100000000
     stx_address: ST3AM1A56AK2C1XAFJ4115ZSV26EB49BVQ10MGCS0
     btc_address: mzxXgV6e4BZSsz8zVHm3TmqbECt7mbuErt
     is_mainnet: false
@@ -66,6 +74,7 @@ accounts:
     mnemonic: prevent gallery kind limb income control noise together echo rival record wedding sense uncover school version force bleak nuclear include danger skirt enact arrow
     derivation: "m/44'/5757'/0'/0/0"
     balance: 100000000000000
+    sbtc_balance: 100000000
     stx_address: ST3PF13W7Z0RRM42A8VZRVFQ75SV1K26RXEP8YGKJ
     btc_address: n37mwmru2oaVosgfuvzBwgV2ysCQRrLko7
     is_mainnet: false
@@ -73,6 +82,7 @@ accounts:
     mnemonic: female adjust gallery certain visit token during great side clown fitness like hurt clip knife warm bench start reunion globe detail dream depend fortune
     derivation: "m/44'/5757'/0'/0/0"
     balance: 100000000000000
+    sbtc_balance: 100000000
     stx_address: ST3NBRSFKX28FQ2ZJ1MAKX58HKHSDGNV5N7R21XCP
     btc_address: n2v875jbJ4RjBnTjgbfikDfnwsDV5iUByw
     is_mainnet: false
@@ -189,5 +199,6 @@ devnet_settings:
   epoch_2_4: 105
   epoch_2_5: 105
   epoch_3_0: 121
+  epoch_3_1: 122
   use_docker_gateway_routing: false
   docker_platform: linux/amd64
