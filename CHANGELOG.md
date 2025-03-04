@@ -1,3 +1,19 @@
+## [1.6.0](https://github.com/hirosystems/stacks-devnet-api/compare/v1.5.0...v1.6.0) (2025-03-04)
+
+
+### Features
+
+* upgrade clarinet to 2.15.0 ([09d5687](https://github.com/hirosystems/stacks-devnet-api/commit/09d5687c83123e1f3d05a30bf722d2580f2790de))
+* upgrade clarinet to 2.15.0 ([ca25308](https://github.com/hirosystems/stacks-devnet-api/commit/ca25308beee13f6c8ed10668bd94d2343730cd5c))
+* upgrade clarinet to 2.15.0 ([346c57e](https://github.com/hirosystems/stacks-devnet-api/commit/346c57e4d8b8b102e9687001edf2582fecac33fa))
+* upgrade clarinet to 2.15.1 ([#115](https://github.com/hirosystems/stacks-devnet-api/issues/115)) ([bd411b0](https://github.com/hirosystems/stacks-devnet-api/commit/bd411b0cd955bad03e4a976447c53146422e0a77))
+
+
+### Bug Fixes
+
+* update dependencies ([253ab8b](https://github.com/hirosystems/stacks-devnet-api/commit/253ab8bad670de333e78e863d275482fa5b018bd))
+* update stacks-core dependencies and update tests ([69bcaf5](https://github.com/hirosystems/stacks-devnet-api/commit/69bcaf50ac6a68adc24e3cba9fe3c34b91bc35ff))
+
 ## [1.5.0](https://github.com/hirosystems/stacks-devnet-api/compare/v1.4.0...v1.5.0) (2024-10-30)
 
 
