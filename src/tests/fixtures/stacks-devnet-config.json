@@ -1,6 +1,5 @@
 {
   "namespace": "test-namespace",
-  "remote_data": {},
   "disable_stacks_api": false,
   "deployment_plan": {
     "id": 0,

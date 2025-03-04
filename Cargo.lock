@@ -410,8 +410,8 @@ dependencies = [
 
 [[package]]
 name = "clarinet-deployments"
-version = "2.15.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=a60695eb209d60e13f4e50c56ce3d4d34c499a5d#a60695eb209d60e13f4e50c56ce3d4d34c499a5d"
+version = "2.15.1"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=a90a93ff686e9fcf9ad81d9bc9764328a8d52341#a90a93ff686e9fcf9ad81d9bc9764328a8d52341"
 dependencies = [
  "base58",
  "base64 0.21.7",
@@ -436,8 +436,8 @@ dependencies = [
 
 [[package]]
 name = "clarinet-files"
-version = "2.15.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=a60695eb209d60e13f4e50c56ce3d4d34c499a5d#a60695eb209d60e13f4e50c56ce3d4d34c499a5d"
+version = "2.15.1"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=a90a93ff686e9fcf9ad81d9bc9764328a8d52341#a90a93ff686e9fcf9ad81d9bc9764328a8d52341"
 dependencies = [
  "bitcoin",
  "clarinet-utils",
@@ -455,7 +455,7 @@ dependencies = [
 [[package]]
 name = "clarinet-utils"
 version = "1.0.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=a60695eb209d60e13f4e50c56ce3d4d34c499a5d#a60695eb209d60e13f4e50c56ce3d4d34c499a5d"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=a90a93ff686e9fcf9ad81d9bc9764328a8d52341#a90a93ff686e9fcf9ad81d9bc9764328a8d52341"
 dependencies = [
  "bip32",
  "libsecp256k1",
@@ -464,9 +464,9 @@ dependencies = [
 [[package]]
 name = "clarity"
 version = "2.3.0"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#90ff09ec2fc4aef4c9fc4cb38bd4bb73a1f2b073"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#86f41a47f8216e6e0b5d138a9780756305e21b49"
 dependencies = [
- "hashbrown 0.14.5",
+ "hashbrown 0.15.2",
  "integer-sqrt",
  "lazy_static",
  "rand",
@@ -484,8 +484,8 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "2.15.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=a60695eb209d60e13f4e50c56ce3d4d34c499a5d#a60695eb209d60e13f4e50c56ce3d4d34c499a5d"
+version = "2.15.1"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=a90a93ff686e9fcf9ad81d9bc9764328a8d52341#a90a93ff686e9fcf9ad81d9bc9764328a8d52341"
 dependencies = [
  "chrono",
  "clarity",
@@ -1052,6 +1052,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 
 [[package]]
+name = "foldhash"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a0d2fde1f7b3d48b8395d5f2de76c18a528bd6a9cdde438df747bfcba3e05d6f"
+
+[[package]]
 name = "foreign-types"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1297,8 +1303,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
 dependencies = [
  "ahash",
- "allocator-api2",
- "serde",
 ]
 
 [[package]]
@@ -1306,6 +1310,12 @@ name = "hashbrown"
 version = "0.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "bf151400ff0baff5465007dd2f3e717f3fe502074ca563069ce3a6629d07b289"
+dependencies = [
+ "allocator-api2",
+ "equivalent",
+ "foldhash",
+ "serde",
+]
 
 [[package]]
 name = "hashlink"
@@ -1377,7 +1387,7 @@ dependencies = [
 [[package]]
 name = "hiro-system-kit"
 version = "0.3.5"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=a60695eb209d60e13f4e50c56ce3d4d34c499a5d#a60695eb209d60e13f4e50c56ce3d4d34c499a5d"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=a90a93ff686e9fcf9ad81d9bc9764328a8d52341#a90a93ff686e9fcf9ad81d9bc9764328a8d52341"
 dependencies = [
  "colored",
  "time",
@@ -2324,7 +2334,7 @@ checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
 [[package]]
 name = "pox-locking"
 version = "2.4.0"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#90ff09ec2fc4aef4c9fc4cb38bd4bb73a1f2b073"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#86f41a47f8216e6e0b5d138a9780756305e21b49"
 dependencies = [
  "clarity",
  "slog",
@@ -3171,8 +3181,8 @@ dependencies = [
 
 [[package]]
 name = "stacks-codec"
-version = "2.15.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=a60695eb209d60e13f4e50c56ce3d4d34c499a5d#a60695eb209d60e13f4e50c56ce3d4d34c499a5d"
+version = "2.15.1"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=a90a93ff686e9fcf9ad81d9bc9764328a8d52341#a90a93ff686e9fcf9ad81d9bc9764328a8d52341"
 dependencies = [
  "clarity",
  "serde",
@@ -3181,12 +3191,12 @@ dependencies = [
 [[package]]
 name = "stacks-common"
 version = "0.0.2"
-source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#90ff09ec2fc4aef4c9fc4cb38bd4bb73a1f2b073"
+source = "git+https://github.com/stacks-network/stacks-core.git?branch=feat%2Fclarity-wasm-develop#86f41a47f8216e6e0b5d138a9780756305e21b49"
 dependencies = [
  "chrono",
  "curve25519-dalek 2.0.0",
  "ed25519-dalek",
- "hashbrown 0.14.5",
+ "hashbrown 0.15.2",
  "lazy_static",
  "libc",
  "nix",
@@ -3204,6 +3214,7 @@ dependencies = [
  "slog-json",
  "slog-term",
  "time",
+ "toml",
  "winapi",
 ]
 
@@ -3235,8 +3246,8 @@ dependencies = [
 
 [[package]]
 name = "stacks-rpc-client"
-version = "2.15.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=a60695eb209d60e13f4e50c56ce3d4d34c499a5d#a60695eb209d60e13f4e50c56ce3d4d34c499a5d"
+version = "2.15.1"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=a90a93ff686e9fcf9ad81d9bc9764328a8d52341#a90a93ff686e9fcf9ad81d9bc9764328a8d52341"
 dependencies = [
  "clarinet-utils",
  "clarity",
