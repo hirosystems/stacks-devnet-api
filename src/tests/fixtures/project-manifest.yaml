@@ -21,3 +21,7 @@ repl:
       trusted_sender: false
       trusted_caller: false
       callee_filter: false
+  remote_data:
+    enabled: false
+    api_url: "https://api.hiro.so"
+    initial_height: 1

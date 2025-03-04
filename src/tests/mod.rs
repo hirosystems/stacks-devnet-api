@@ -94,6 +94,9 @@ fn assert_cannot_delete_devnet_multiple_errs((code, body): (StatusCode, String))
 }
 
 fn assert_cannot_create_devnet_err((code, body): (StatusCode, String)) {
+    println!("ACTUAL STATUS: {:?}", code);
+    println!("ACTUAL BODY: {}", body);
+
     assert_eq!(code, StatusCode::CONFLICT);
     assert!(
         body.starts_with("cannot create devnet because assets already exist NAMESPACE: test-ns-")

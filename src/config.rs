@@ -229,6 +229,7 @@ mod tests {
 
     #[test]
     fn it_converts_config_to_yaml() {
+        use pretty_assertions::assert_eq;
         let template = get_template_config("src/tests/fixtures/stacks-devnet-config.json");
         let user_id = &template.namespace.clone();
         let logger = hiro_system_kit::log::setup_logger();
@@ -239,10 +240,10 @@ mod tests {
             .unwrap_or_else(|e| panic!("config validation test failed: {}", e.message));
 
         let expected_project_manifest = read_file("src/tests/fixtures/project-manifest.yaml");
-        let expected_project_mainfest = from_utf8(&expected_project_manifest).unwrap();
+        let expected_project_manifest = from_utf8(&expected_project_manifest).unwrap();
 
-        let expected_network_mainfest = read_file("src/tests/fixtures/network-manifest.yaml");
-        let expected_network_mainfest = from_utf8(&expected_network_mainfest).unwrap();
+        let expected_network_manifest = read_file("src/tests/fixtures/network-manifest.yaml");
+        let expected_network_manifest = from_utf8(&expected_network_manifest).unwrap();
 
         let expected_deployment_plan = read_file("src/tests/fixtures/deployment-plan.yaml");
         let expected_deployment_plan = from_utf8(&expected_deployment_plan).unwrap();
@@ -251,11 +252,11 @@ mod tests {
         let expected_contract_source = from_utf8(&expected_contract_source).unwrap();
 
         assert_eq!(
-            expected_project_mainfest,
+            expected_project_manifest,
             validated_config.project_manifest_yaml_string
         );
         assert_eq!(
-            expected_network_mainfest,
+            expected_network_manifest,
             validated_config.network_manifest_yaml_string
         );
         assert_eq!(

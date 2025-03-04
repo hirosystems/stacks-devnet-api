@@ -6,7 +6,7 @@ on:
       - main
       - develop
     paths-ignore:
-      - '**/CHANGELOG.md'
+      - "**/CHANGELOG.md"
   pull_request:
   workflow_dispatch:
 
@@ -65,7 +65,7 @@ jobs:
           outputs: type=docker,dest=/tmp/artifacts/myimage.tar
 
       - name: Save docker artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: docker-image
           path: /tmp/artifacts/myimage.tar
@@ -92,7 +92,7 @@ jobs:
           k3d-args: "--no-lb --no-rollback --k3s-arg --disable=traefik,servicelb,metrics-server@server:*"
 
       - name: Pull docker image artifact from previous docker job
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: docker-image
           path: /tmp/artifacts
