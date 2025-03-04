@@ -4,6 +4,7 @@ WORKDIR /src
 COPY . /src
 
 RUN mkdir /out
+RUN rustup toolchain install stable-x86_64-unknown-linux-gnu
 RUN cargo build --release --manifest-path ./Cargo.toml
 RUN cp target/release/stacks-devnet-api /out
 
