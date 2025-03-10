@@ -94,9 +94,6 @@ fn assert_cannot_delete_devnet_multiple_errs((code, body): (StatusCode, String))
 }
 
 fn assert_cannot_create_devnet_err((code, body): (StatusCode, String)) {
-    println!("ACTUAL STATUS: {:?}", code);
-    println!("ACTUAL BODY: {}", body);
-
     assert_eq!(code, StatusCode::CONFLICT);
     assert!(
         body.starts_with("cannot create devnet because assets already exist NAMESPACE: test-ns-")
@@ -498,23 +495,23 @@ async fn get_mock_k8s_manager() -> (StacksDevnetApiK8sManager, Context) {
 #[test_case("/api", Method::GET, "some-user" => is equal_to (StatusCode::BAD_REQUEST, "invalid request path".to_string()) ; "400 for invalid requet path /api")]
 #[test_case("/api/v1", Method::GET, "some-user" => is equal_to (StatusCode::BAD_REQUEST, "invalid request path".to_string()) ; "400 for invalid requet path /api/v1")]
 #[test_case("/api/v1/network2", Method::GET, "some-user" => is equal_to (StatusCode::BAD_REQUEST, "invalid request path".to_string()) ; "400 for invalid requet path /api/v1/network2")]
-#[test_case("/api/v1/network/undeployed", Method::GET, "undeployed" => 
+#[test_case("/api/v1/network/undeployed", Method::GET, "undeployed" =>
         is equal_to (StatusCode::NOT_FOUND, "network undeployed does not exist".to_string()); "404 for undeployed namespace")]
-#[test_case("/api/v1/network/500_err", Method::GET, "500_err" => 
+#[test_case("/api/v1/network/500_err", Method::GET, "500_err" =>
     is equal_to (StatusCode::INTERNAL_SERVER_ERROR, "error getting namespace 500_err: \"\"".to_string()); "forwarded error if fetching namespace returns error")]
-#[test_case("/api/v1/network/test", Method::POST, "test" => 
+#[test_case("/api/v1/network/test", Method::POST, "test" =>
     is equal_to (StatusCode::METHOD_NOT_ALLOWED, "can only GET/DELETE/HEAD at provided route".to_string()); "405 for network route with POST request")]
-#[test_case("/api/v1/network/test/commands", Method::GET, "test" => 
+#[test_case("/api/v1/network/test/commands", Method::GET, "test" =>
 is equal_to (StatusCode::NOT_FOUND, "commands route in progress".to_string()); "404 for network commands route")]
-#[test_case("/api/v1/network/", Method::GET, "test" => 
+#[test_case("/api/v1/network/", Method::GET, "test" =>
         is equal_to (StatusCode::BAD_REQUEST, "no network id provided".to_string()); "400 for missing namespace")]
-#[test_case("/api/v1/networks", Method::GET, "test" => 
+#[test_case("/api/v1/networks", Method::GET, "test" =>
         is equal_to (StatusCode::METHOD_NOT_ALLOWED, "network creation must be a POST request".to_string()); "405 for network creation request with GET method")]
-#[test_case("/api/v1/networks", Method::DELETE, "test" => 
+#[test_case("/api/v1/networks", Method::DELETE, "test" =>
         is equal_to (StatusCode::METHOD_NOT_ALLOWED, "network creation must be a POST request".to_string()); "405 for network creation request with DELETE method")]
-#[test_case("/api/v1/networks", Method::POST, "test" => 
+#[test_case("/api/v1/networks", Method::POST, "test" =>
         is equal_to (StatusCode::BAD_REQUEST, "invalid configuration to create network: EOF while parsing a value at line 1 column 0".to_string()); "400 for network creation request invalid config")]
-#[test_case("/api/v1/network/test", Method::GET, "wrong-id" => 
+#[test_case("/api/v1/network/test", Method::GET, "wrong-id" =>
         is equal_to (StatusCode::BAD_REQUEST, "network id must match authenticated user id".to_string()); "400 for request with non-matching user")]
 #[tokio::test]
 async fn it_responds_to_invalid_requests(
