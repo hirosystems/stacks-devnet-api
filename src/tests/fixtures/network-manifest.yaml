@@ -159,8 +159,8 @@ devnet_settings:
       auto_extend: ~
   execute_script: []
   bitcoin_node_image_url: "quay.io/hirosystems/bitcoind:devnet-v3"
-  stacks_node_image_url: "quay.io/hirosystems/stacks-node:devnet-3.0"
-  stacks_signer_image_url: "quay.io/hirosystems/stacks-node:devnet-3.0"
+  stacks_node_image_url: "quay.io/hirosystems/stacks-node:devnet-3.1"
+  stacks_signer_image_url: "quay.io/hirosystems/stacks-signer:devnet-3.1"
   stacks_api_image_url: "hirosystems/stacks-blockchain-api:latest"
   stacks_explorer_image_url: "hirosystems/explorer:latest"
   postgres_image_url: "postgres:14"
