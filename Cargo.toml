@@ -1,6 +1,6 @@
 [package]
 name = "stacks-devnet-api"
-version = "1.5.0"
+version = "1.5.1"
 edition = "2021"
 authors = ["Micaiah Reid <micaiah@hiro.so>"]
 description = "The Stacks Devnet API runs a server that can be used to deploy, delete, manage, and make requests to Stacks Devnets run on Kubernetes."
