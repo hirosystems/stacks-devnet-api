@@ -250,8 +250,11 @@ jobs:
         id: generate_actions_token
         uses: actions/create-github-app-token@v1
         with:
+          owner: ${{ github.repository_owner }}
           app-id: ${{ secrets.HIROSYSTEMS_ACTIONS_BOT_ID }}
           private-key: ${{ secrets.HIROSYSTEMS_ACTIONS_BOT_PEM }}
+          repositories: |
+            actions
 
       - name: Get bot user ID
         id: bot-user-id
@@ -266,6 +269,7 @@ jobs:
           ref: main
           token: ${{ steps.generate_actions_token.outputs.token }}
           repository: ${{ vars.DEVOPS_ACTIONS_REPO }}
+          persist-credentials: false
 
       - name: Deploy Stacks Devnet API
         uses: ./actions/deploy
@@ -322,6 +326,7 @@ jobs:
           ref: main
           token: ${{ steps.generate_actions_token.outputs.token }}
           repository: ${{ secrets.DEVOPS_ACTIONS_REPO }}
+          persist-credentials: false
 
       - name: Deploy Stacks Devnet API
         uses: ./actions/deploy
@@ -379,6 +384,7 @@ jobs:
           ref: main
           token: ${{ steps.generate_actions_token.outputs.token }}
           repository: ${{ secrets.DEVOPS_ACTIONS_REPO }}
+          persist-credentials: false
 
       - name: Deploy Stacks Devnet API
         uses: ./actions/deploy
