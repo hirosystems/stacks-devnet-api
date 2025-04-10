@@ -262,7 +262,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: main
-          token: ${{ secrets.DEVOPS_ACTIONS_REPO_PAT }}
+          token: ${{ steps.generate_actions_token.outputs.token }}
           repository: ${{ secrets.DEVOPS_ACTIONS_REPO }}
 
       - name: Deploy Stacks Devnet API
@@ -318,7 +318,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: main
-          token: ${{ secrets.DEVOPS_ACTIONS_REPO_PAT }}
+          token: ${{ steps.generate_actions_token.outputs.token }}
           repository: ${{ secrets.DEVOPS_ACTIONS_REPO }}
 
       - name: Deploy Stacks Devnet API
@@ -375,7 +375,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: main
-          token: ${{ secrets.DEVOPS_ACTIONS_REPO_PAT }}
+          token: ${{ steps.generate_actions_token.outputs.token }}
           repository: ${{ secrets.DEVOPS_ACTIONS_REPO }}
 
       - name: Deploy Stacks Devnet API
