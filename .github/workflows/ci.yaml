@@ -224,11 +224,25 @@ jobs:
       name: Development
       url: https://platform.dev.hiro.so/
     steps:
+      - name: Generate actions bot app token
+        id: generate_actions_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.HIROSYSTEMS_ACTIONS_BOT_ID }}
+          private-key: ${{ secrets.HIROSYSTEMS_ACTIONS_BOT_PEM }}
+
+      - name: Get bot user ID
+        id: bot-user-id
+        run: |
+          echo "user-id=$(gh api "/users/${{ steps.generate_actions_token.outputs.app-slug }}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ steps.generate_actions_token.outputs.token }}
+
       - name: Checkout actions repo
         uses: actions/checkout@v4
         with:
           ref: main
-          token: ${{ secrets.GH_TOKEN }}
+          token: ${{ steps.generate_actions_token.outputs.token }}
           repository: ${{ secrets.DEVOPS_ACTIONS_REPO }}
 
       - name: Deploy Stacks Devnet API
@@ -266,11 +280,25 @@ jobs:
       name: Staging
       url: https://platform.stg.hiro.so/
     steps:
+      - name: Generate actions bot app token
+        id: generate_actions_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.HIROSYSTEMS_ACTIONS_BOT_ID }}
+          private-key: ${{ secrets.HIROSYSTEMS_ACTIONS_BOT_PEM }}
+
+      - name: Get bot user ID
+        id: bot-user-id
+        run: |
+          echo "user-id=$(gh api "/users/${{ steps.generate_actions_token.outputs.app-slug }}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ steps.generate_actions_token.outputs.token }}
+
       - name: Checkout actions repo
         uses: actions/checkout@v4
         with:
           ref: main
-          token: ${{ secrets.GH_TOKEN }}
+          token: ${{ steps.generate_actions_token.outputs.token }}
           repository: ${{ secrets.DEVOPS_ACTIONS_REPO }}
 
       - name: Deploy Stacks Devnet API
@@ -309,11 +337,25 @@ jobs:
       name: Production
       url: https://platform.hiro.so/
     steps:
+      - name: Generate actions bot app token
+        id: generate_actions_token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.HIROSYSTEMS_ACTIONS_BOT_ID }}
+          private-key: ${{ secrets.HIROSYSTEMS_ACTIONS_BOT_PEM }}
+
+      - name: Get bot user ID
+        id: bot-user-id
+        run: |
+          echo "user-id=$(gh api "/users/${{ steps.generate_actions_token.outputs.app-slug }}[bot]" --jq .id)" >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ steps.generate_actions_token.outputs.token }}
+
       - name: Checkout actions repo
         uses: actions/checkout@v4
         with:
           ref: main
-          token: ${{ secrets.GH_TOKEN }}
+          token: ${{ steps.generate_actions_token.outputs.token }}
           repository: ${{ secrets.DEVOPS_ACTIONS_REPO }}
 
       - name: Deploy Stacks Devnet API
