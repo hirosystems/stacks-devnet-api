@@ -235,7 +235,7 @@ jobs:
 
   deploy-dev:
     permissions:
-      contents: read
+      contents: write
     runs-on: ubuntu-latest
     needs:
       - build-publish-release
@@ -255,6 +255,7 @@ jobs:
           private-key: ${{ secrets.HIROSYSTEMS_ACTIONS_BOT_PEM }}
           repositories: |
             actions
+            k8s-platform
 
       - name: Get bot user ID
         id: bot-user-id
@@ -268,7 +269,7 @@ jobs:
         with:
           ref: main
           token: ${{ steps.generate_actions_token.outputs.token }}
-          repository: ${{ vars.DEVOPS_ACTIONS_REPO }}
+          repository: ${{ secrets.DEVOPS_ACTIONS_REPO }}
           persist-credentials: false
 
       - name: Deploy Stacks Devnet API
@@ -278,7 +279,7 @@ jobs:
           k8s_repo: k8s-platform
           k8s_branch: main
           file_pattern: manifests/api/stacks-devnet-api/${{ env.DEPLOY_ENV }}/base/kustomization.yaml
-          gh_token: ${{ secrets.GH_TOKEN }}
+          gh_token: ${{ steps.generate_actions_token.outputs.token }}
 
   auto-approve-dev:
     runs-on: ubuntu-latest
