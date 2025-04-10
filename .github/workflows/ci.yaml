@@ -263,7 +263,7 @@ jobs:
         with:
           ref: main
           token: ${{ steps.generate_actions_token.outputs.token }}
-          repository: ${{ secrets.DEVOPS_ACTIONS_REPO }}
+          repository: ${{ {{ vars.DEVOPS_ACTIONS_REPO }} }}
 
       - name: Deploy Stacks Devnet API
         uses: ./actions/deploy
