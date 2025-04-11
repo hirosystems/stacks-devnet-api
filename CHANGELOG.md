@@ -1,3 +1,19 @@
+## [1.7.0](https://github.com/hirosystems/stacks-devnet-api/compare/v1.6.0...v1.7.0) (2025-04-11)
+
+
+### Features
+
+* bump version ([93dcc30](https://github.com/hirosystems/stacks-devnet-api/commit/93dcc3082a27f49990f76bf366795fe2ed5b3405))
+* upgrade clarinet 2.15.2 ([#122](https://github.com/hirosystems/stacks-devnet-api/issues/122)) ([2c93427](https://github.com/hirosystems/stacks-devnet-api/commit/2c9342775baeb5bf2d4bd8fe87b45f9ea4675886))
+
+
+### Bug Fixes
+
+* try use env var ([f198b0a](https://github.com/hirosystems/stacks-devnet-api/commit/f198b0ae0f74fb06673319d7c927e09c7a13c084))
+* try using gh app again ([b6ef31f](https://github.com/hirosystems/stacks-devnet-api/commit/b6ef31f8d28fe2d8941de603250ffad8367b91de))
+* update actions checkout token to GH Apps token ([#125](https://github.com/hirosystems/stacks-devnet-api/issues/125)) ([6d3eb2f](https://github.com/hirosystems/stacks-devnet-api/commit/6d3eb2f55c6952229c55b5ea9440c8a0b0d59645))
+* working auto-deploy with GH App token ([f3a8f58](https://github.com/hirosystems/stacks-devnet-api/commit/f3a8f58d41d71cdcdf6f2a7d783b084b9f850898))
+
 ## [1.6.0](https://github.com/hirosystems/stacks-devnet-api/compare/v1.5.0...v1.6.0) (2025-03-04)
 
 
