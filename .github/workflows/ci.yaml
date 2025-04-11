@@ -296,6 +296,8 @@ jobs:
           fi
 
   deploy-staging:
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     needs:
       - build-publish-release
@@ -311,8 +313,12 @@ jobs:
         id: generate_actions_token
         uses: actions/create-github-app-token@v1
         with:
+          owner: ${{ github.repository_owner }}
           app-id: ${{ secrets.HIROSYSTEMS_ACTIONS_BOT_ID }}
           private-key: ${{ secrets.HIROSYSTEMS_ACTIONS_BOT_PEM }}
+          repositories: |
+            actions
+            k8s-platform
 
       - name: Get bot user ID
         id: bot-user-id
@@ -336,7 +342,7 @@ jobs:
           k8s_repo: k8s-platform
           k8s_branch: main
           file_pattern: manifests/api/stacks-devnet-api/${{ env.DEPLOY_ENV }}/base/kustomization.yaml
-          gh_token: ${{ secrets.GH_TOKEN }}
+          gh_token: ${{ steps.generate_actions_token.outputs.token }}
 
   auto-approve-staging:
     runs-on: ubuntu-latest
@@ -354,6 +360,8 @@ jobs:
           fi
 
   deploy-prod:
+    permissions:
+      contents: write
     runs-on: ubuntu-latest
     if: needs.build-publish-release.outputs.new_release_published == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     needs:
@@ -369,8 +377,12 @@ jobs:
         id: generate_actions_token
         uses: actions/create-github-app-token@v1
         with:
+          owner: ${{ github.repository_owner }}
           app-id: ${{ secrets.HIROSYSTEMS_ACTIONS_BOT_ID }}
           private-key: ${{ secrets.HIROSYSTEMS_ACTIONS_BOT_PEM }}
+          repositories: |
+            actions
+            k8s-platform
 
       - name: Get bot user ID
         id: bot-user-id
@@ -394,4 +406,4 @@ jobs:
           k8s_repo: k8s-platform
           k8s_branch: main
           file_pattern: manifests/api/stacks-devnet-api/${{ env.DEPLOY_ENV }}/base/kustomization.yaml
-          gh_token: ${{ secrets.GH_TOKEN }}
+          gh_token: ${{ steps.generate_actions_token.outputs.token }}
