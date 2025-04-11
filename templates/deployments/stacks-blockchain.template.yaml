@@ -43,7 +43,7 @@ spec:
               value: "1"
             - name: BLOCKSTACK_USE_TEST_GENESIS_CHAINSTATE
               value: "1"
-          image: quay.io/hirosystems/stacks-node:devnet-3.0
+          image: quay.io/hirosystems/stacks-node:devnet-3.1
           imagePullPolicy: IfNotPresent
           name: stacks-blockchain
           ports:
