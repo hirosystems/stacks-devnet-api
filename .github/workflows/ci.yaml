@@ -280,6 +280,9 @@ jobs:
           k8s_branch: main
           file_pattern: manifests/api/stacks-devnet-api/${{ env.DEPLOY_ENV }}/base/kustomization.yaml
           gh_token: ${{ steps.generate_actions_token.outputs.token }}
+          gpg_key: ${{ secrets.HIRO_DEVOPS_GPG_KEY }}
+          gpg_key_passphrase: ${{ secrets.HIRO_DEVOPS_GPG_KEY_PASSPHRASE }}
+          gpg_key_id: ${{ secrets.HIRO_DEVOPS_GPG_KEY_ID }}
 
   auto-approve-dev:
     runs-on: ubuntu-latest
@@ -343,6 +346,9 @@ jobs:
           k8s_branch: main
           file_pattern: manifests/api/stacks-devnet-api/${{ env.DEPLOY_ENV }}/base/kustomization.yaml
           gh_token: ${{ steps.generate_actions_token.outputs.token }}
+          gpg_key: ${{ secrets.HIRO_DEVOPS_GPG_KEY }}
+          gpg_key_passphrase: ${{ secrets.HIRO_DEVOPS_GPG_KEY_PASSPHRASE }}
+          gpg_key_id: ${{ secrets.HIRO_DEVOPS_GPG_KEY_ID }}
 
   auto-approve-staging:
     runs-on: ubuntu-latest
@@ -407,3 +413,6 @@ jobs:
           k8s_branch: main
           file_pattern: manifests/api/stacks-devnet-api/${{ env.DEPLOY_ENV }}/base/kustomization.yaml
           gh_token: ${{ steps.generate_actions_token.outputs.token }}
+          gpg_key: ${{ secrets.HIRO_DEVOPS_GPG_KEY }}
+          gpg_key_passphrase: ${{ secrets.HIRO_DEVOPS_GPG_KEY_PASSPHRASE }}
+          gpg_key_id: ${{ secrets.HIRO_DEVOPS_GPG_KEY_ID }}
