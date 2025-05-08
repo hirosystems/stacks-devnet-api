@@ -445,12 +445,6 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "cfg_aliases"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd16c4719339c4530435d38e511904438d07cce7950afa3718a84ac36c10e89e"
-
-[[package]]
-name = "cfg_aliases"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
@@ -530,8 +524,8 @@ dependencies = [
 
 [[package]]
 name = "clarinet-deployments"
-version = "2.15.2"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=ba722d22ed93cfd790b57c32152610eec176e4e4#ba722d22ed93cfd790b57c32152610eec176e4e4"
+version = "3.0.1"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=a2570690549df7bf710645ab538af3deee309a01#a2570690549df7bf710645ab538af3deee309a01"
 dependencies = [
  "base58",
  "base64 0.21.7",
@@ -556,8 +550,8 @@ dependencies = [
 
 [[package]]
 name = "clarinet-files"
-version = "2.15.2"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=ba722d22ed93cfd790b57c32152610eec176e4e4#ba722d22ed93cfd790b57c32152610eec176e4e4"
+version = "3.0.1"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=a2570690549df7bf710645ab538af3deee309a01#a2570690549df7bf710645ab538af3deee309a01"
 dependencies = [
  "bitcoin",
  "clarinet-utils",
@@ -580,7 +574,7 @@ dependencies = [
 [[package]]
 name = "clarinet-utils"
 version = "1.0.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=ba722d22ed93cfd790b57c32152610eec176e4e4#ba722d22ed93cfd790b57c32152610eec176e4e4"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=a2570690549df7bf710645ab538af3deee309a01#a2570690549df7bf710645ab538af3deee309a01"
 dependencies = [
  "bip32",
  "libsecp256k1 0.7.1",
@@ -612,19 +606,19 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "2.15.2"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=ba722d22ed93cfd790b57c32152610eec176e4e4#ba722d22ed93cfd790b57c32152610eec176e4e4"
+version = "3.0.1"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=a2570690549df7bf710645ab538af3deee309a01#a2570690549df7bf710645ab538af3deee309a01"
 dependencies = [
  "chrono",
  "clar2wasm",
  "clarity",
  "colored",
+ "comfy-table",
  "getrandom 0.2.15",
  "hiro-system-kit 0.3.5",
  "js-sys",
  "pico-args",
  "pox-locking",
- "prettytable-rs",
  "regex",
  "reqwest",
  "rustyline",
@@ -659,6 +653,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fde0e0ec90c9dfb3b4b1a0891a7dcd0e2bffde2f7efed5fe7c9bb00e5bfb915e"
 dependencies = [
  "windows-sys 0.59.0",
+]
+
+[[package]]
+name = "comfy-table"
+version = "7.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4a65ebfec4fb190b6f90e944a817d60499ee0744e582530e2c9900a22e591d9a"
+dependencies = [
+ "crossterm",
+ "unicode-segmentation",
+ "unicode-width 0.2.0",
 ]
 
 [[package]]
@@ -844,6 +849,28 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "22ec99545bb0ed0ea7bb9b8e1e9122ea386ff8a48c0922e43f36d45ab09e0e80"
 
 [[package]]
+name = "crossterm"
+version = "0.28.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "829d955a0bb380ef178a640b91779e3987da38c9aea133b20614cfed8cdea9c6"
+dependencies = [
+ "bitflags 2.6.0",
+ "crossterm_winapi",
+ "parking_lot",
+ "rustix 0.38.38",
+ "winapi",
+]
+
+[[package]]
+name = "crossterm_winapi"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "acdd7c62a3665c7f6830a51635d9ac9b23ed385797f70a83bb8bafe9c572ab2b"
+dependencies = [
+ "winapi",
+]
+
+[[package]]
 name = "crunchy"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -879,27 +906,6 @@ checksum = "b584a330336237c1eecd3e94266efb216c56ed91225d634cb2991c5f3fd1aeab"
 dependencies = [
  "generic-array 0.14.7",
  "subtle",
-]
-
-[[package]]
-name = "csv"
-version = "1.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac574ff4d437a7b5ad237ef331c17ccca63c46479e5b5453eb8e10bb99a759fe"
-dependencies = [
- "csv-core",
- "itoa",
- "ryu",
- "serde",
-]
-
-[[package]]
-name = "csv-core"
-version = "0.1.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5efa2b3d7902f4b634a20cae3c9c4e6209dc4779feb6863329607560143efa70"
-dependencies = [
- "memchr",
 ]
 
 [[package]]
@@ -1145,12 +1151,6 @@ dependencies = [
  "subtle",
  "zeroize",
 ]
-
-[[package]]
-name = "encode_unicode"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34aa73646ffb006b8f5147f3dc182bd4bcb190227ce861fc4a4844bf8e3cb2c0"
 
 [[package]]
 name = "endian-type"
@@ -1601,7 +1601,7 @@ dependencies = [
 [[package]]
 name = "hiro-system-kit"
 version = "0.3.5"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=ba722d22ed93cfd790b57c32152610eec176e4e4#ba722d22ed93cfd790b57c32152610eec176e4e4"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=a2570690549df7bf710645ab538af3deee309a01#a2570690549df7bf710645ab538af3deee309a01"
 dependencies = [
  "colored",
  "time",
@@ -2417,13 +2417,13 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.28.0"
+version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab2156c4fce2f8df6c499cc1c763e4394b7482525bf2a9701c9d79d215f519e4"
+checksum = "71e2746dc3a24dd78b3cfcb7be93368c6de9963d30f43a6a73998a9cf4b17b46"
 dependencies = [
  "bitflags 2.6.0",
  "cfg-if",
- "cfg_aliases 0.1.1",
+ "cfg_aliases",
  "libc",
 ]
 
@@ -2672,20 +2672,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "prettytable-rs"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eea25e07510aa6ab6547308ebe3c036016d162b8da920dbb079e3ba8acf3d95a"
-dependencies = [
- "csv",
- "encode_unicode",
- "is-terminal",
- "lazy_static",
- "term",
- "unicode-width",
-]
-
-[[package]]
 name = "proc-macro2"
 version = "1.0.93"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2744,7 +2730,7 @@ version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e346e016eacfff12233c243718197ca12f148c84e1e84268a896699b41c71780"
 dependencies = [
- "cfg_aliases 0.2.1",
+ "cfg_aliases",
  "libc",
  "once_cell",
  "socket2",
@@ -3166,9 +3152,9 @@ checksum = "0e819f2bc632f285be6d7cd36e25940d45b2391dd6d9b939e79de557f7014248"
 
 [[package]]
 name = "rustyline"
-version = "14.0.0"
+version = "15.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7803e8936da37efd9b6d4478277f4b2b9bb5cdb37a113e8d63222e58da647e63"
+checksum = "2ee1e066dc922e513bda599c6ccb5f3bb2b0ea5870a579448f2622993f0a9a2f"
 dependencies = [
  "bitflags 2.6.0",
  "cfg-if",
@@ -3178,12 +3164,12 @@ dependencies = [
  "libc",
  "log",
  "memchr",
- "nix 0.28.0",
+ "nix 0.29.0",
  "radix_trie",
  "unicode-segmentation",
- "unicode-width",
+ "unicode-width 0.2.0",
  "utf8parse",
- "windows-sys 0.52.0",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -3618,11 +3604,12 @@ dependencies = [
 
 [[package]]
 name = "stacks-codec"
-version = "2.15.2"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=ba722d22ed93cfd790b57c32152610eec176e4e4#ba722d22ed93cfd790b57c32152610eec176e4e4"
+version = "3.0.1"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=a2570690549df7bf710645ab538af3deee309a01#a2570690549df7bf710645ab538af3deee309a01"
 dependencies = [
  "clarity",
  "serde",
+ "stacks-common",
 ]
 
 [[package]]
@@ -3685,8 +3672,8 @@ dependencies = [
 
 [[package]]
 name = "stacks-rpc-client"
-version = "2.15.2"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=ba722d22ed93cfd790b57c32152610eec176e4e4#ba722d22ed93cfd790b57c32152610eec176e4e4"
+version = "3.0.1"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=a2570690549df7bf710645ab538af3deee309a01#a2570690549df7bf710645ab538af3deee309a01"
 dependencies = [
  "clarinet-utils",
  "clarity",
@@ -4161,6 +4148,12 @@ name = "unicode-width"
 version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7dd6e30e90baa6f72411720665d41d89b9a3d039dc45b8faea1ddd07f617f6af"
+
+[[package]]
+name = "unicode-width"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1fc81956842c57dac11422a97c3b8195a1ff727f06e85c84ed2e8aa277c9a0fd"
 
 [[package]]
 name = "unicode-xid"
@@ -4683,7 +4676,7 @@ dependencies = [
  "bumpalo",
  "leb128",
  "memchr",
- "unicode-width",
+ "unicode-width 0.1.14",
  "wasm-encoder 0.219.1",
 ]
 
