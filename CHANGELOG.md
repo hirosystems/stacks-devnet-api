@@ -1,3 +1,11 @@
+## [1.8.0](https://github.com/hirosystems/stacks-devnet-api/compare/v1.7.0...v1.8.0) (2025-05-09)
+
+
+### Features
+
+* sign bot commits ([#126](https://github.com/hirosystems/stacks-devnet-api/issues/126)) ([ef9abe4](https://github.com/hirosystems/stacks-devnet-api/commit/ef9abe4acb4a42f3bc9cefb41d9c28aa85ed6f16))
+* upgrade clarinet version to 3.0.1 ([#127](https://github.com/hirosystems/stacks-devnet-api/issues/127)) ([777b66d](https://github.com/hirosystems/stacks-devnet-api/commit/777b66dffc0a226504813bc7429c680fd4e96aa7))
+
 ## [1.7.0](https://github.com/hirosystems/stacks-devnet-api/compare/v1.6.0...v1.7.0) (2025-04-11)
 
 
