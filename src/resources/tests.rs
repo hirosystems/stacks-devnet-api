@@ -6,45 +6,45 @@ use super::{
 };
 use test_case::test_case;
 
-#[test_case(StacksDevnetConfigmap::BitcoindNode => is equal_to  "bitcoind".to_string(); "for BitcoinNode")]
-#[test_case(StacksDevnetConfigmap::StacksBlockchain => is equal_to  "stacks-blockchain".to_string(); "for StacksBlockchain")]
-#[test_case(StacksDevnetConfigmap::StacksBlockchainApi => is equal_to  "stacks-blockchain-api".to_string(); "for StacksBlockchainApi")]
-#[test_case(StacksDevnetConfigmap::StacksBlockchainApiPg => is equal_to  "stacks-blockchain-api-pg".to_string(); "for StacksBlockchainApiPg")]
-#[test_case(StacksDevnetConfigmap::StacksSigner0 => is equal_to  "stacks-signer-0".to_string(); "for StacksSigner0")]
-#[test_case(StacksDevnetConfigmap::StacksSigner1 => is equal_to  "stacks-signer-1".to_string(); "for StacksSigner1")]
-#[test_case(StacksDevnetConfigmap::DeploymentPlan => is equal_to  "deployment-plan".to_string(); "for DeploymentPlan")]
-#[test_case(StacksDevnetConfigmap::Devnet => is equal_to  "devnet".to_string(); "for Devnet")]
-#[test_case(StacksDevnetConfigmap::ProjectDir => is equal_to  "project-dir".to_string(); "for ProjectDir")]
-#[test_case(StacksDevnetConfigmap::ProjectManifest => is equal_to  "project-manifest".to_string(); "for ProjectManifest")]
+#[test_case(StacksDevnetConfigmap::BitcoindNode => is equal_to "bitcoind"; "for BitcoinNode")]
+#[test_case(StacksDevnetConfigmap::StacksBlockchain => is equal_to "stacks-blockchain"; "for StacksBlockchain")]
+#[test_case(StacksDevnetConfigmap::StacksBlockchainApi => is equal_to "stacks-blockchain-api"; "for StacksBlockchainApi")]
+#[test_case(StacksDevnetConfigmap::StacksBlockchainApiPg => is equal_to "stacks-blockchain-api-pg"; "for StacksBlockchainApiPg")]
+#[test_case(StacksDevnetConfigmap::StacksSigner0 => is equal_to "stacks-signer-0"; "for StacksSigner0")]
+#[test_case(StacksDevnetConfigmap::StacksSigner1 => is equal_to "stacks-signer-1"; "for StacksSigner1")]
+#[test_case(StacksDevnetConfigmap::DeploymentPlan => is equal_to "deployment-plan"; "for DeploymentPlan")]
+#[test_case(StacksDevnetConfigmap::Devnet => is equal_to "devnet"; "for Devnet")]
+#[test_case(StacksDevnetConfigmap::ProjectDir => is equal_to "project-dir"; "for ProjectDir")]
+#[test_case(StacksDevnetConfigmap::ProjectManifest => is equal_to "project-manifest"; "for ProjectManifest")]
 fn it_prints_correct_name_for_configmap(configmap: StacksDevnetConfigmap) -> String {
     configmap.to_string()
 }
 
-#[test_case(StacksDevnetPod::BitcoindNode => is equal_to  "bitcoind-chain-coordinator".to_string(); "for BitcoindNode")]
-#[test_case(StacksDevnetPod::StacksBlockchain => is equal_to  "stacks-blockchain".to_string(); "for StacksBlockchain")]
-#[test_case(StacksDevnetPod::StacksBlockchainApi => is equal_to  "stacks-blockchain-api".to_string(); "for StacksBlockchainApi")]
+#[test_case(StacksDevnetPod::BitcoindNode => is equal_to "bitcoind-chain-coordinator"; "for BitcoindNode")]
+#[test_case(StacksDevnetPod::StacksBlockchain => is equal_to "stacks-blockchain"; "for StacksBlockchain")]
+#[test_case(StacksDevnetPod::StacksBlockchainApi => is equal_to "stacks-blockchain-api"; "for StacksBlockchainApi")]
 fn it_prints_correct_name_for_pod(pod: StacksDevnetPod) -> String {
     pod.to_string()
 }
 
-#[test_case(StacksDevnetDeployment::BitcoindNode => is equal_to  "bitcoind-chain-coordinator".to_string(); "for BitcoindNode")]
-#[test_case(StacksDevnetDeployment::StacksBlockchain => is equal_to  "stacks-blockchain".to_string(); "for StacksBlockchain")]
+#[test_case(StacksDevnetDeployment::BitcoindNode => is equal_to "bitcoind-chain-coordinator"; "for BitcoindNode")]
+#[test_case(StacksDevnetDeployment::StacksBlockchain => is equal_to "stacks-blockchain"; "for StacksBlockchain")]
 fn it_prints_correct_name_for_deployment(deployment: StacksDevnetDeployment) -> String {
     deployment.to_string()
 }
 
-#[test_case(StacksDevnetStatefulSet::StacksBlockchainApi => is equal_to  "stacks-blockchain-api".to_string(); "for StacksBlockchainApi")]
-#[test_case(StacksDevnetStatefulSet::StacksSigner0 => is equal_to  "stacks-signer-0".to_string(); "for StacksSigner0")]
-#[test_case(StacksDevnetStatefulSet::StacksSigner1 => is equal_to  "stacks-signer-1".to_string(); "for StacksSigner1")]
+#[test_case(StacksDevnetStatefulSet::StacksBlockchainApi => is equal_to  "stacks-blockchain-api"; "for StacksBlockchainApi")]
+#[test_case(StacksDevnetStatefulSet::StacksSigner0 => is equal_to  "stacks-signer-0"; "for StacksSigner0")]
+#[test_case(StacksDevnetStatefulSet::StacksSigner1 => is equal_to  "stacks-signer-1"; "for StacksSigner1")]
 fn it_prints_correct_name_for_stateful_set(pod: StacksDevnetStatefulSet) -> String {
     pod.to_string()
 }
 
-#[test_case(StacksDevnetService::BitcoindNode => is equal_to  "bitcoind-chain-coordinator".to_string(); "for BitcoindNode")]
-#[test_case(StacksDevnetService::StacksBlockchain => is equal_to  "stacks-blockchain".to_string(); "for StacksBlockchain")]
-#[test_case(StacksDevnetService::StacksBlockchainApi => is equal_to  "stacks-blockchain-api".to_string(); "for StacksBlockchainApi")]
-#[test_case(StacksDevnetService::StacksSigner0 => is equal_to  "stacks-signer-0".to_string(); "for StacksSigner0")]
-#[test_case(StacksDevnetService::StacksSigner1 => is equal_to  "stacks-signer-1".to_string(); "for StacksSigner1")]
+#[test_case(StacksDevnetService::BitcoindNode => is equal_to  "bitcoind-chain-coordinator"; "for BitcoindNode")]
+#[test_case(StacksDevnetService::StacksBlockchain => is equal_to  "stacks-blockchain"; "for StacksBlockchain")]
+#[test_case(StacksDevnetService::StacksBlockchainApi => is equal_to  "stacks-blockchain-api"; "for StacksBlockchainApi")]
+#[test_case(StacksDevnetService::StacksSigner0 => is equal_to  "stacks-signer-0"; "for StacksSigner0")]
+#[test_case(StacksDevnetService::StacksSigner1 => is equal_to  "stacks-signer-1"; "for StacksSigner1")]
 fn it_prints_correct_name_for_service(service: StacksDevnetService) -> String {
     service.to_string()
 }
