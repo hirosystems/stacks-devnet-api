@@ -1,6 +1,6 @@
 [package]
 name = "stacks-devnet-api"
-version = "1.5.1"
+version = "1.5.2"
 edition = "2021"
 authors = ["Micaiah Reid <micaiah@hiro.so>"]
 description = "The Stacks Devnet API runs a server that can be used to deploy, delete, manage, and make requests to Stacks Devnets run on Kubernetes."
@@ -26,8 +26,8 @@ strum = "0.24.1"
 toml = "0.5.9"
 
 hiro-system-kit = { version = "0.1.0", features = ["log"] }
-clarinet-files = "2"
-clarinet-deployments = "2"
+clarinet-files = "3"
+clarinet-deployments = "3"
 
 [dev-dependencies]
 tower-test = "0.4.0"
@@ -40,6 +40,6 @@ serial_test = "2.0.0"
 k8s_tests = []
 
 [patch.crates-io]
-clarinet-files = { git = "https://github.com/hirosystems/clarinet.git", rev = "ba722d22ed93cfd790b57c32152610eec176e4e4" }
-clarinet-deployments = { git = "https://github.com/hirosystems/clarinet.git", rev = "ba722d22ed93cfd790b57c32152610eec176e4e4" }
-hiro-system-kit = { git = "https://github.com/hirosystems/clarinet.git", rev = "ba722d22ed93cfd790b57c32152610eec176e4e4" }
+clarinet-files = { git = "https://github.com/hirosystems/clarinet.git", rev = "a2570690549df7bf710645ab538af3deee309a01" }
+clarinet-deployments = { git = "https://github.com/hirosystems/clarinet.git", rev = "a2570690549df7bf710645ab538af3deee309a01" }
+hiro-system-kit = { git = "https://github.com/hirosystems/clarinet.git", rev = "a2570690549df7bf710645ab538af3deee309a01" }
