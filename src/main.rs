@@ -91,10 +91,10 @@ async fn handle_request(
     });
     let headers = request.headers().clone();
     let responder = Responder::new(http_response_config, headers.clone(), ctx.clone()).unwrap();
-    if method == &Method::OPTIONS {
+    if method == Method::OPTIONS {
         return responder.ok();
     }
-    if method == &Method::GET && (path == "/" || path == &format!("{API_PATH}status")) {
+    if method == Method::GET && (path == "/" || path == format!("{API_PATH}status")) {
         return handle_get_status(responder, ctx).await;
     }
     let auth_header = auth_config
@@ -124,10 +124,10 @@ async fn handle_request(
     let request_time = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("Could not get current time in secs")
-        .as_secs() as u64;
+        .as_secs();
     if path == "/api/v1/networks" {
-        return match method {
-            &Method::POST => {
+        return match *method {
+            Method::POST => {
                 handle_new_devnet(
                     request,
                     &user_id,
@@ -172,17 +172,14 @@ async fn handle_request(
         // the path only contained the network path and network id,
         // so it must be a request to DELETE a network or GET network info
         if path_parts.subroute.is_none() {
-            return match method {
-                &Method::DELETE => {
-                    match request_store.lock() {
-                        Ok(mut store) => {
-                            store.remove(&user_id);
-                        }
-                        Err(_) => {}
+            return match *method {
+                Method::DELETE => {
+                    if let Ok(mut store) = request_store.lock() {
+                        store.remove(&user_id);
                     }
                     handle_delete_devnet(k8s_manager, &network, &user_id, responder).await
                 }
-                &Method::GET => {
+                Method::GET => {
                     handle_get_devnet(
                         k8s_manager,
                         &network,
@@ -194,7 +191,7 @@ async fn handle_request(
                     )
                     .await
                 }
-                &Method::HEAD => {
+                Method::HEAD => {
                     handle_check_devnet(k8s_manager, &network, &user_id, responder).await
                 }
                 _ => responder
@@ -204,18 +201,15 @@ async fn handle_request(
         // the above methods with no subroute are initiated from our infra,
         // but any remaning requests would come from the actual user, so we'll
         // track this request as the last time a user made a request
-        match request_store.lock() {
-            Ok(mut store) => {
-                store.insert(user_id.to_string(), request_time);
-            }
-            Err(_) => {}
+        if let Ok(mut store) = request_store.lock() {
+            store.insert(user_id.to_string(), request_time);
         }
 
         let subroute = path_parts.subroute.unwrap();
         if subroute == "commands" {
             return responder.err_not_implemented("commands route in progress".into());
         } else {
-            let remaining_path = path_parts.remainder.unwrap_or(String::new());
+            let remaining_path = path_parts.remainder.unwrap_or_default();
             return handle_try_proxy_service(
                 &remaining_path,
                 &subroute,

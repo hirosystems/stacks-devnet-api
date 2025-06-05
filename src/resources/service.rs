@@ -62,7 +62,7 @@ pub fn get_user_facing_port(service: StacksDevnetService) -> Option<String> {
 }
 
 pub fn get_service_url(namespace: &str, service: StacksDevnetService) -> String {
-    format!("{}.{}.svc.cluster.local", service.to_string(), namespace)
+    format!("{}.{}.svc.cluster.local", service, namespace)
 }
 
 pub fn get_service_from_path_part(path_part: &str) -> Option<StacksDevnetService> {

@@ -14,19 +14,26 @@ concurrency:
   group: ${{ github.workflow }} @ ${{ github.event.pull_request.head.label || github.head_ref || github.ref }}
   cancel-in-progress: true
 
+# Make sure CI fails on all warnings, including Clippy lints
+env:
+  RUSTFLAGS: "-Dwarnings"
+
 jobs:
   format:
-    name: Format check
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        run: rustup toolchain install stable --profile minimal --component rustfmt
-
+      - uses: actions/checkout@v4
       - name: Run rustfmt
         run: cargo fmt --all -- --check
+
+  clippy_check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: test
+        run: cargo --version
+      - name: Run Clippy
+        run: cargo clippy --all-targets --all-features
 
   build:
     runs-on: ubuntu-latest

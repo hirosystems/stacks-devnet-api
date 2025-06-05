@@ -48,7 +48,7 @@ fn get_template_config() -> StacksDevnetConfig {
         match serde_json::from_slice::<StacksDevnetConfig>(&file_buffer) {
             Ok(s) => s,
             Err(e) => {
-                panic!("Config file malformatted {}", e.to_string());
+                panic!("Config file malformatted {}", e);
             }
         };
     config_file
@@ -138,21 +138,21 @@ async fn it_responds_to_valid_requests_with_deploy(
 
     let new_path: String;
     if request_path.contains("{namespace}") {
-        new_path = request_path.replace("{namespace}", &namespace);
+        new_path = request_path.replace("{namespace}", namespace);
         request_path = &new_path;
     }
 
     let (k8s_manager, ctx) = get_k8s_manager().await;
 
-    let request_builder = get_request_builder(request_path, method, &namespace);
+    let request_builder = get_request_builder(request_path, method, namespace);
 
-    let _ = k8s_manager.deploy_namespace(&namespace).await.unwrap();
+    k8s_manager.deploy_namespace(namespace).await.unwrap();
 
     let mut config = get_template_config();
     config.namespace = namespace.to_owned();
-    let validated_config = config.to_validated_config(&namespace, &ctx).unwrap();
+    let validated_config = config.to_validated_config(namespace, &ctx).unwrap();
     let user_id = &namespace;
-    let _ = k8s_manager.deploy_devnet(validated_config).await.unwrap();
+    k8s_manager.deploy_devnet(validated_config).await.unwrap();
     // short delay to allow assets to start
     sleep(Duration::new(5, 0));
 
@@ -191,7 +191,7 @@ async fn it_responds_to_valid_requests_with_deploy(
             }
         }
     }
-    let _ = k8s_manager.delete_namespace(&namespace).await.unwrap();
+    k8s_manager.delete_namespace(namespace).await.unwrap();
     (status, body_str)
 }
 
@@ -213,16 +213,16 @@ async fn it_responds_to_valid_requests(
 
     let new_path: String;
     if request_path.contains("{namespace}") {
-        new_path = request_path.replace("{namespace}", &namespace);
+        new_path = request_path.replace("{namespace}", namespace);
         request_path = &new_path;
     }
 
     let (k8s_manager, ctx) = get_k8s_manager().await;
 
-    let request_builder = get_request_builder(request_path, method, &namespace);
+    let request_builder = get_request_builder(request_path, method, namespace);
 
     if set_up {
-        let _ = k8s_manager.deploy_namespace(&namespace).await.unwrap();
+        k8s_manager.deploy_namespace(namespace).await.unwrap();
     }
 
     let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
@@ -242,7 +242,7 @@ async fn it_responds_to_valid_requests(
     let body_str = String::from_utf8(bytes).unwrap();
 
     if set_up {
-        let _ = k8s_manager.delete_namespace(&namespace).await.unwrap();
+        k8s_manager.delete_namespace(namespace).await.unwrap();
     }
 
     (response.status(), body_str)
@@ -258,7 +258,7 @@ async fn deploy_devnet(
     config.namespace = namespace.to_owned();
     let body = Body::from(serde_json::to_string(&config).unwrap());
 
-    let request: Request<Body> = get_request_builder("/api/v1/networks", Method::POST, &namespace)
+    let request: Request<Body> = get_request_builder("/api/v1/networks", Method::POST, namespace)
         .body(body)
         .unwrap();
     let _ = handle_request(
@@ -281,7 +281,7 @@ async fn get_devnet_info(
     let request: Request<Body> = get_request_builder(
         &format!("/api/v1/network/{namespace}"),
         Method::GET,
-        &namespace,
+        namespace,
     )
     .body(Body::empty())
     .unwrap();
@@ -309,7 +309,7 @@ async fn delete_devnet(
     let request: Request<Body> = get_request_builder(
         &format!("/api/v1/network/{namespace}"),
         Method::DELETE,
-        &namespace,
+        namespace,
     )
     .body(Body::empty())
     .unwrap();
@@ -331,25 +331,19 @@ async fn it_tracks_requests_time_for_user() {
     let namespace2 = &get_random_namespace();
 
     let (k8s_manager, ctx) = get_k8s_manager().await;
-    let _ = k8s_manager.deploy_namespace(&namespace).await.unwrap();
-    let _ = k8s_manager.deploy_namespace(&namespace2).await.unwrap();
+    k8s_manager.deploy_namespace(namespace).await.unwrap();
+    k8s_manager.deploy_namespace(namespace2).await.unwrap();
 
     let request_store = Arc::new(Mutex::new(HashMap::new()));
     // create one devnet and assert request time is stored
     let created_time = {
-        deploy_devnet(&namespace, k8s_manager.clone(), request_store.clone(), &ctx).await;
+        deploy_devnet(namespace, k8s_manager.clone(), request_store.clone(), &ctx).await;
         let store = request_store.lock().unwrap();
-        store.get(namespace).unwrap().clone()
+        *store.get(namespace).unwrap()
     };
     // create another devnet and assert request time is stored
     {
-        deploy_devnet(
-            &namespace2,
-            k8s_manager.clone(),
-            request_store.clone(),
-            &ctx,
-        )
-        .await;
+        deploy_devnet(namespace2, k8s_manager.clone(), request_store.clone(), &ctx).await;
         // after creating a devnet, there should be an entry
         assert!(request_store.lock().unwrap().get(namespace).is_some());
     }
@@ -358,7 +352,7 @@ async fn it_tracks_requests_time_for_user() {
 
     let secs_after_first_get1 = {
         let info =
-            get_devnet_info(&namespace, k8s_manager.clone(), request_store.clone(), &ctx).await;
+            get_devnet_info(namespace, k8s_manager.clone(), request_store.clone(), &ctx).await;
         // time should have elapsed since our last request
         let secs_after_first_get = info.metadata.secs_since_last_request;
         assert!(secs_after_first_get > 0);
@@ -372,13 +366,8 @@ async fn it_tracks_requests_time_for_user() {
 
     // confirm time has elapsed since our last request
     let secs_after_first_get2 = {
-        let info = get_devnet_info(
-            &namespace2,
-            k8s_manager.clone(),
-            request_store.clone(),
-            &ctx,
-        )
-        .await;
+        let info =
+            get_devnet_info(namespace2, k8s_manager.clone(), request_store.clone(), &ctx).await;
         let secs_after_first_get = info.metadata.secs_since_last_request;
         assert!(secs_after_first_get > 0);
         secs_after_first_get
@@ -389,7 +378,7 @@ async fn it_tracks_requests_time_for_user() {
         let request: Request<Body> = get_request_builder(
             &format!("/api/v1/network/{namespace}/some-path"),
             Method::GET,
-            &namespace,
+            namespace,
         )
         .body(Body::empty())
         .unwrap();
@@ -407,19 +396,14 @@ async fn it_tracks_requests_time_for_user() {
     // immediately make another get request to confirm that the time since last request was updated
     {
         let info =
-            get_devnet_info(&namespace, k8s_manager.clone(), request_store.clone(), &ctx).await;
+            get_devnet_info(namespace, k8s_manager.clone(), request_store.clone(), &ctx).await;
         assert!(secs_after_first_get1 > info.metadata.secs_since_last_request);
     }
 
     // and verify that the time since the last request wasn't updated for our other namespace
     {
-        let info = get_devnet_info(
-            &namespace2,
-            k8s_manager.clone(),
-            request_store.clone(),
-            &ctx,
-        )
-        .await;
+        let info =
+            get_devnet_info(namespace2, k8s_manager.clone(), request_store.clone(), &ctx).await;
         assert!(info.metadata.secs_since_last_request >= secs_after_first_get2);
     }
 
@@ -428,7 +412,7 @@ async fn it_tracks_requests_time_for_user() {
     assert_eq!(request_store.lock().unwrap().keys().len(), 0);
     // confirm that our infrastructure pinging will insert request times if none exist
     {
-        let _ = get_devnet_info(&namespace, k8s_manager.clone(), request_store.clone(), &ctx).await;
+        let _ = get_devnet_info(namespace, k8s_manager.clone(), request_store.clone(), &ctx).await;
         assert_eq!(request_store.lock().unwrap().keys().len(), 1);
     }
 
@@ -440,8 +424,8 @@ async fn it_tracks_requests_time_for_user() {
 
     // clean up
     delete_devnet(namespace2, k8s_manager.clone(), request_store.clone(), &ctx).await;
-    let _ = k8s_manager.delete_namespace(&namespace).await.unwrap();
-    let _ = k8s_manager.delete_namespace(&namespace2).await.unwrap();
+    k8s_manager.delete_namespace(namespace).await.unwrap();
+    k8s_manager.delete_namespace(namespace2).await.unwrap();
 }
 
 async fn mock_k8s_handler(handle: &mut Handle<Request<Body>, Response<Body>>) {
@@ -521,7 +505,7 @@ async fn it_responds_to_invalid_requests(
 ) -> (StatusCode, String) {
     let (k8s_manager, ctx) = get_mock_k8s_manager().await;
 
-    let request_builder = get_request_builder(request_path, method, &user_id);
+    let request_builder = get_request_builder(request_path, method, user_id);
     let request: Request<Body> = request_builder.body(Body::empty()).unwrap();
     let request_store = Arc::new(Mutex::new(HashMap::new()));
     let mut response = handle_request(
@@ -564,7 +548,7 @@ async fn it_responds_to_invalid_request_header() {
     assert_eq!(body_str, "missing required auth header".to_string());
 }
 
-#[test_case("/api/v1/network/test", Method::OPTIONS => is equal_to "Ok".to_string())]
+#[test_case("/api/v1/network/test", Method::OPTIONS => is equal_to *"Ok")]
 #[test_case("/api/v1/status", Method::GET => is equal_to get_version_info() )]
 #[test_case("/", Method::GET => is equal_to get_version_info())]
 #[tokio::test]
@@ -586,8 +570,7 @@ async fn it_ignores_request_header_for_some_requests(request_path: &str, method:
     assert_eq!(response.status(), 200);
     let body = response.body_mut();
     let bytes = body::to_bytes(body).await.unwrap().to_vec();
-    let body_str = String::from_utf8(bytes).unwrap();
-    body_str
+    String::from_utf8(bytes).unwrap()
 }
 
 #[test_case("" => is equal_to PathParts { route: String::new(), ..Default::default() }; "for empty path")]
@@ -598,9 +581,9 @@ async fn it_ignores_request_header_for_some_requests(request_path: &str, method:
 #[test_case("/api/v1/some-route/some-network/" => is equal_to PathParts { route: String::from("some-route"), network: Some(String::from("some-network")), ..Default::default() }; "for /api/v1/some-route/some-network/ path trailing slash")]
 #[test_case("/api/v1/some-route/some-network/some-subroute" => is equal_to PathParts { route: String::from("some-route"), network: Some(String::from("some-network")), subroute: Some(String::from("some-subroute")), ..Default::default() }; "for /api/v1/some-route/some-network/some-subroute path")]
 #[test_case("/api/v1/some-route/some-network/some-subroute/" => is equal_to PathParts { route: String::from("some-route"), network: Some(String::from("some-network")), subroute: Some(String::from("some-subroute")), ..Default::default() }; "for /api/v1/some-route/some-network/some-subroute/ path trailing slash")]
-#[test_case("/api/v1/some-route/some-network/some-subroute/the/remaining/path" => is equal_to PathParts { route: String::from("some-route"), network: Some(String::from("some-network")), subroute: Some(String::from("some-subroute")), remainder: Some(String::from("the/remaining/path")), ..Default::default() }; "for /api/v1/some-route/some-network/some-subroute/the/remaining/path path ")]
-#[test_case("/api/v1/some-route/some-network/some-subroute/the/remaining/path/" => is equal_to PathParts { route: String::from("some-route"), network: Some(String::from("some-network")), subroute: Some(String::from("some-subroute")), remainder: Some(String::from("the/remaining/path")), ..Default::default() }; "for /api/v1/some-route/some-network/some-subroute/the/remaining/path/ path trailing slash")]
-#[test_case("/api/v1/some-route/some-network/some-subroute/the//remaining//path/" => is equal_to PathParts { route: String::from("some-route"), network: Some(String::from("some-network")), subroute: Some(String::from("some-subroute")), remainder: Some(String::from("the//remaining//path")), ..Default::default() }; "for /api/v1/some-route/some-network/some-subroute/the//remaining//path/ path extra internal slash")]
+#[test_case("/api/v1/some-route/some-network/some-subroute/the/remaining/path" => is equal_to PathParts { route: String::from("some-route"), network: Some(String::from("some-network")), subroute: Some(String::from("some-subroute")), remainder: Some(String::from("the/remaining/path")) }; "for /api/v1/some-route/some-network/some-subroute/the/remaining/path path ")]
+#[test_case("/api/v1/some-route/some-network/some-subroute/the/remaining/path/" => is equal_to PathParts { route: String::from("some-route"), network: Some(String::from("some-network")), subroute: Some(String::from("some-subroute")), remainder: Some(String::from("the/remaining/path")) }; "for /api/v1/some-route/some-network/some-subroute/the/remaining/path/ path trailing slash")]
+#[test_case("/api/v1/some-route/some-network/some-subroute/the//remaining//path/" => is equal_to PathParts { route: String::from("some-route"), network: Some(String::from("some-network")), subroute: Some(String::from("some-subroute")), remainder: Some(String::from("the//remaining//path")) }; "for /api/v1/some-route/some-network/some-subroute/the//remaining//path/ path extra internal slash")]
 fn request_paths_are_parsed_correctly(path: &str) -> PathParts {
     get_standardized_path_parts(path)
 }
@@ -661,7 +644,7 @@ async fn namespace_prefix_config_prepends_header() {
     // using the ApiConfig's `namespace_prefix` field will add the prefix
     // before the `user_id` as the authenticated user, which should match the request path
     let namespace = &get_random_namespace();
-    let _ = k8s_manager.deploy_namespace(&namespace).await.unwrap();
+    k8s_manager.deploy_namespace(namespace).await.unwrap();
 
     let (namespace_prefix, user_id) = namespace.split_at(4);
     let api_config = ApiConfig {
