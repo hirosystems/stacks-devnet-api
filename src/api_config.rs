@@ -32,17 +32,17 @@ pub struct AuthConfig {
 impl ApiConfig {
     pub fn from_path(config_path: &str) -> ApiConfig {
         let file = File::open(config_path)
-            .unwrap_or_else(|e| panic!("unable to read file {}\n{:?}", config_path, e));
+            .unwrap_or_else(|e| panic!("unable to read file {config_path}\n{e:?}"));
         let mut file_reader = BufReader::new(file);
         let mut file_buffer = vec![];
         file_reader
             .read_to_end(&mut file_buffer)
-            .unwrap_or_else(|e| panic!("unable to read file {}\n{:?}", config_path, e));
+            .unwrap_or_else(|e| panic!("unable to read file {config_path}\n{e:?}"));
 
         let config_file: ApiConfig = match toml::from_slice(&file_buffer) {
             Ok(s) => s,
             Err(e) => {
-                panic!("Config file malformatted {}", e);
+                panic!("Config file malformatted {e}");
             }
         };
         config_file

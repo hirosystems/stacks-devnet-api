@@ -36,19 +36,19 @@ fn get_version_info() -> String {
 }
 fn get_template_config() -> StacksDevnetConfig {
     let file_path = "src/tests/fixtures/stacks-devnet-config.json";
-    let file = File::open(file_path)
-        .unwrap_or_else(|e| panic!("unable to read file {}\n{:?}", file_path, e));
+    let file =
+        File::open(file_path).unwrap_or_else(|e| panic!("unable to read file {file_path}\n{e:?}"));
     let mut file_reader = BufReader::new(file);
     let mut file_buffer = vec![];
     file_reader
         .read_to_end(&mut file_buffer)
-        .unwrap_or_else(|e| panic!("unable to read file {}\n{:?}", file_path, e));
+        .unwrap_or_else(|e| panic!("unable to read file {file_path}\n{e:?}"));
 
     let config_file: StacksDevnetConfig =
         match serde_json::from_slice::<StacksDevnetConfig>(&file_buffer) {
             Ok(s) => s,
             Err(e) => {
-                panic!("Config file malformatted {}", e);
+                panic!("Config file malformatted {e}");
             }
         };
     config_file
@@ -451,7 +451,7 @@ async fn mock_k8s_handler(handle: &mut Handle<Request<Body>, Response<Body>>) {
         }
         ("GET", "/api/v1/namespaces/undeployed") => (vec![], 404),
         ("GET", "/api/v1/namespaces/500_err") => (vec![], 500),
-        _ => panic!("Unexpected API request {:?}", request),
+        _ => panic!("Unexpected API request {request:?}"),
     };
 
     send.send_response(
