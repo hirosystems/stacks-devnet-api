@@ -28,7 +28,7 @@ pub async fn handle_get_status(
     let version_info = match serde_json::to_vec(&version_info) {
         Ok(v) => v,
         Err(e) => {
-            let msg = format!("failed to parse version info: {}", e);
+            let msg = format!("failed to parse version info: {e}");
             ctx.try_log(|logger| slog::error!(logger, "{}", msg));
             return responder.err_internal(msg);
         }
@@ -68,7 +68,7 @@ pub async fn handle_new_devnet(
             Err(e) => responder.respond(e.code, e.message),
         },
         Err(e) => {
-            responder.err_bad_request(format!("invalid configuration to create network: {}", e))
+            responder.err_bad_request(format!("invalid configuration to create network: {e}"))
         }
     }
 }
@@ -178,7 +178,7 @@ pub async fn handle_try_proxy_service(
                     Some(service) => {
                         let base_url = get_service_url(network, service.clone());
                         let port = get_user_facing_port(service).unwrap();
-                        let forward_url = format!("{}:{}", base_url, port);
+                        let forward_url = format!("{base_url}:{port}");
                         let proxy_request =
                             mutate_request_for_proxy(request, &forward_url, remaining_path);
                         proxy(proxy_request, responder, ctx).await
@@ -202,12 +202,12 @@ pub fn mutate_request_for_proxy(
     path_to_forward: &str,
 ) -> Request<Body> {
     let query = match request.uri().query() {
-        Some(query) => format!("?{}", query),
+        Some(query) => format!("?{query}"),
         None => String::new(),
     };
 
     *request.uri_mut() = {
-        let forward_uri = format!("http://{}/{}{}", forward_url, path_to_forward, query);
+        let forward_uri = format!("http://{forward_url}/{path_to_forward}{query}");
         Uri::from_str(forward_uri.as_str())
     }
     .unwrap();
@@ -225,7 +225,7 @@ async fn proxy(
     match client.request(request).await {
         Ok(response) => Ok(response),
         Err(e) => {
-            let msg = format!("error proxying request: {}", e);
+            let msg = format!("error proxying request: {e}");
             ctx.try_log(|logger| slog::error!(logger, "{}", msg));
             responder.err_internal(msg)
         }

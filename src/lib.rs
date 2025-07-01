@@ -140,9 +140,9 @@ impl StacksDevnetApiK8sManager {
                 };
                 let client_config = Config::from_kubeconfig(&kube_config)
                     .await
-                    .unwrap_or_else(|e| panic!("could not create kube client config: {}", e));
+                    .unwrap_or_else(|e| panic!("could not create kube client config: {e}"));
                 Client::try_from(client_config)
-                    .unwrap_or_else(|e| panic!("could not create kube client: {}", e))
+                    .unwrap_or_else(|e| panic!("could not create kube client: {e}"))
             }
             None => Client::try_default()
                 .await
@@ -188,10 +188,8 @@ impl StacksDevnetApiK8sManager {
             if cfg!(debug_assertions) {
                 self.deploy_namespace(namespace).await?;
             } else {
-                let message = format!(
-                    "cannot create devnet because namespace {} does not exist",
-                    namespace
-                );
+                let message =
+                    format!("cannot create devnet because namespace {namespace} does not exist");
                 self.ctx
                     .try_log(|logger| slog::warn!(logger, "{}", message));
                 return Err(DevNetError { message, code: 400 });
@@ -202,10 +200,7 @@ impl StacksDevnetApiK8sManager {
             .check_any_devnet_assets_exist(namespace, user_id)
             .await?;
         if any_assets_exist {
-            let message = format!(
-                "cannot create devnet because assets already exist {}",
-                context
-            );
+            let message = format!("cannot create devnet because assets already exist {context}");
             self.ctx
                 .try_log(|logger| slog::warn!(logger, "{}", message));
             return Err(DevNetError { message, code: 409 });
@@ -356,7 +351,7 @@ impl StacksDevnetApiK8sManager {
                 }
             }
             Err(e) => {
-                let message = format!("error getting namespace {}: {}", namespace_str, e);
+                let message = format!("error getting namespace {namespace_str}: {e}");
                 self.ctx
                     .try_log(|logger| slog::error!(logger, "{}", message));
                 Err(DevNetError { message, code: 500 })
@@ -492,7 +487,7 @@ impl StacksDevnetApiK8sManager {
         user_id: &str,
         pod: StacksDevnetPod,
     ) -> Result<PodStatusResponse, DevNetError> {
-        let context = format!("NAMESPACE: {}, POD: {}", namespace, pod);
+        let context = format!("NAMESPACE: {namespace}, POD: {pod}");
 
         self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
             slog::info!(logger, "getting pod status {}", context)
@@ -532,7 +527,7 @@ impl StacksDevnetApiK8sManager {
                     kube::Error::Api(api_error) => (api_error.message, api_error.code),
                     e => (e.to_string(), 500),
                 };
-                let msg = format!("failed to get pod status {}, ERROR: {}", context, msg);
+                let msg = format!("failed to get pod status {context}, ERROR: {msg}");
                 self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
                 Err(DevNetError { message: msg, code })
             }
@@ -548,9 +543,9 @@ impl StacksDevnetApiK8sManager {
         let url = get_service_url(namespace, StacksDevnetService::StacksBlockchain);
         let port =
             get_service_port(StacksDevnetService::StacksBlockchain, ServicePort::RPC).unwrap();
-        let url = format!("http://{}:{}/v2/info", url, port);
+        let url = format!("http://{url}:{port}/v2/info");
 
-        let context = format!("NAMESPACE: {}", namespace);
+        let context = format!("NAMESPACE: {namespace}");
 
         self.ctx.try_log(|logger: &hiro_system_kit::Logger| {
             slog::info!(logger, "Requesting URL: {}", url); // Log the full URL
@@ -582,7 +577,7 @@ impl StacksDevnetApiK8sManager {
                                     Ok(config)
                                 }
                                 Err(e) => {
-                                    let msg = format!("failed to parse JSON response: {}, ERROR: {}, Raw body: {}", context, e, body_str);
+                                    let msg = format!("failed to parse JSON response: {context}, ERROR: {e}, Raw body: {body_str}");
                                     self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
                                     Err(DevNetError {
                                         message: msg,
@@ -592,10 +587,8 @@ impl StacksDevnetApiK8sManager {
                             }
                         }
                         Err(e) => {
-                            let msg = format!(
-                                "failed to parse response bytes: {}, ERROR: {}",
-                                context, e
-                            );
+                            let msg =
+                                format!("failed to parse response bytes: {context}, ERROR: {e}");
                             self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
                             Err(DevNetError {
                                 message: msg,
@@ -604,14 +597,14 @@ impl StacksDevnetApiK8sManager {
                         }
                     },
                     Err(e) => {
-                        let msg = format!("failed to query stacks node: {}, ERROR: {}", context, e);
+                        let msg = format!("failed to query stacks node: {context}, ERROR: {e}");
                         self.ctx.try_log(|logger| slog::warn!(logger, "{}", msg));
                         Ok(StacksV2InfoResponse::default()) // Return default response on error
                     }
                 }
             }
             Err(e) => {
-                let msg = format!("failed to parse url: {} ERROR: {}", url, e);
+                let msg = format!("failed to parse url: {url} ERROR: {e}");
                 self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
                 Err(DevNetError {
                     message: msg,
@@ -626,11 +619,11 @@ impl StacksDevnetApiK8sManager {
         namespace: &str,
         user_id: &str,
     ) -> Result<StacksDevnetInfoResponse, DevNetError> {
-        let context = format!("NAMESPACE: {}", namespace);
+        let context = format!("NAMESPACE: {namespace}");
 
         match self.check_all_devnet_assets_exist(namespace).await? {
             false => {
-                let msg = format!("not all devnet assets exist {}", context);
+                let msg = format!("not all devnet assets exist {context}");
                 self.ctx
                     .try_log(|logger: &hiro_system_kit::Logger| slog::info!(logger, "{}", msg));
                 Err(DevNetError {
@@ -786,7 +779,7 @@ impl StacksDevnetApiK8sManager {
                     }
                     e => (e.to_string(), 500),
                 };
-                let message = format!("failed to fetch {}, ERROR: {}", resource_details, msg);
+                let message = format!("failed to fetch {resource_details}, ERROR: {msg}");
                 self.ctx
                     .try_log(|logger| slog::error!(logger, "{}", message));
                 Err(DevNetError { message, code })
@@ -834,7 +827,7 @@ impl StacksDevnetApiK8sManager {
                     kube::Error::Api(api_error) => (api_error.message, api_error.code),
                     e => (e.to_string(), 500),
                 };
-                let message = format!("failed to fetch {}, ERROR: {}", resource_details, msg);
+                let message = format!("failed to fetch {resource_details}, ERROR: {msg}");
                 self.ctx
                     .try_log(|logger| slog::error!(logger, "{}", message));
                 Err(DevNetError { message, code })
@@ -913,10 +906,8 @@ impl StacksDevnetApiK8sManager {
                 "no-name"
             }
         };
-        let resource_details = format!(
-            "RESOURCE: {}, NAME: {}, NAMESPACE: {}",
-            resource_type, name, namespace
-        );
+        let resource_details =
+            format!("RESOURCE: {resource_type}, NAME: {name}, NAMESPACE: {namespace}");
         self.ctx
             .try_log(|logger| slog::info!(logger, "creating {}", resource_details));
 
@@ -1286,10 +1277,9 @@ impl StacksDevnetApiK8sManager {
             stacks_conf.push_str(&format!(
                 r#"
                 [[ustx_balance]]
-                address = "{}"
-                amount = {}
-                "#,
-                miner_coinbase_recipient, balance
+                address = "{miner_coinbase_recipient}"
+                amount = {balance}
+                "#
             ));
 
             let bitcoind_chain_coordinator_host =
@@ -1299,10 +1289,9 @@ impl StacksDevnetApiK8sManager {
                 r#"
                 # Add orchestrator (docker-host) as an event observer
                 [[events_observer]]
-                endpoint = "{}:{}"
+                endpoint = "{bitcoind_chain_coordinator_host}:{chain_coordinator_ingestion_port}"
                 events_keys = ["*"]
-                "#,
-                bitcoind_chain_coordinator_host, chain_coordinator_ingestion_port
+                "#
             ));
 
             stacks_conf.push_str(&format!(
@@ -1333,12 +1322,11 @@ impl StacksDevnetApiK8sManager {
 
                 stacks_conf.push_str(&format!(
                     r#"
-                # Add stacks-signer-{} as an event observer
+                # Add stacks-signer-{signer_idx} as an event observer
                 [[events_observer]]
-                endpoint = "{}:{}"
+                endpoint = "{url}:{port}"
                 events_keys = ["stackerdb", "block_proposal", "burn_blocks"]
                 "#,
-                    signer_idx, url, port,
                 ));
             }
 
@@ -1694,7 +1682,7 @@ impl StacksDevnetApiK8sManager {
                     code: api_error.code,
                 }),
                 Err(e) => Err(DevNetError {
-                    message: format!("unable to delete namespace: {}", e),
+                    message: format!("unable to delete namespace: {e}"),
                     code: 500,
                 }),
             }
@@ -1715,7 +1703,7 @@ impl StacksDevnetApiK8sManager {
         match serde_yaml::from_str(template_str) {
             Ok(resource) => Ok(resource),
             Err(e) => {
-                let msg = format!("unable to parse template file: {}", e);
+                let msg = format!("unable to parse template file: {e}");
                 self.ctx.try_log(|logger| slog::error!(logger, "{}", msg));
                 Err(DevNetError {
                     message: msg,

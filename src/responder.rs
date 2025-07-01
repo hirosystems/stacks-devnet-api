@@ -113,7 +113,7 @@ impl Responder {
             .body(body)
         {
             Ok(r) => Ok(r),
-            Err(e) => self.err_internal(format!("failed to send response: {}", e)),
+            Err(e) => self.err_internal(format!("failed to send response: {e}")),
         }
     }
 

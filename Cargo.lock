@@ -518,8 +518,8 @@ dependencies = [
 
 [[package]]
 name = "clarinet-deployments"
-version = "3.0.1"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=a2570690549df7bf710645ab538af3deee309a01#a2570690549df7bf710645ab538af3deee309a01"
+version = "3.2.0"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=116137316023ae912848a1ee1845fed30b306fdc#116137316023ae912848a1ee1845fed30b306fdc"
 dependencies = [
  "base58",
  "base64 0.21.7",
@@ -544,8 +544,8 @@ dependencies = [
 
 [[package]]
 name = "clarinet-files"
-version = "3.0.1"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=a2570690549df7bf710645ab538af3deee309a01#a2570690549df7bf710645ab538af3deee309a01"
+version = "3.2.0"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=116137316023ae912848a1ee1845fed30b306fdc#116137316023ae912848a1ee1845fed30b306fdc"
 dependencies = [
  "bitcoin",
  "clarinet-utils",
@@ -568,7 +568,7 @@ dependencies = [
 [[package]]
 name = "clarinet-utils"
 version = "1.0.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=a2570690549df7bf710645ab538af3deee309a01#a2570690549df7bf710645ab538af3deee309a01"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=116137316023ae912848a1ee1845fed30b306fdc#116137316023ae912848a1ee1845fed30b306fdc"
 dependencies = [
  "bip32",
  "libsecp256k1",
@@ -600,8 +600,8 @@ dependencies = [
 
 [[package]]
 name = "clarity-repl"
-version = "3.0.1"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=a2570690549df7bf710645ab538af3deee309a01#a2570690549df7bf710645ab538af3deee309a01"
+version = "3.2.0"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=116137316023ae912848a1ee1845fed30b306fdc#116137316023ae912848a1ee1845fed30b306fdc"
 dependencies = [
  "chrono",
  "clar2wasm",
@@ -1553,7 +1553,7 @@ dependencies = [
 [[package]]
 name = "hiro-system-kit"
 version = "0.3.5"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=a2570690549df7bf710645ab538af3deee309a01#a2570690549df7bf710645ab538af3deee309a01"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=116137316023ae912848a1ee1845fed30b306fdc#116137316023ae912848a1ee1845fed30b306fdc"
 dependencies = [
  "colored",
  "time",
@@ -2051,7 +2051,7 @@ dependencies = [
  "thiserror 1.0.65",
  "tokio",
  "tokio-util",
- "tower",
+ "tower 0.4.13",
  "tower-http",
  "tracing",
 ]
@@ -3467,8 +3467,8 @@ dependencies = [
 
 [[package]]
 name = "stacks-codec"
-version = "3.0.1"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=a2570690549df7bf710645ab538af3deee309a01#a2570690549df7bf710645ab538af3deee309a01"
+version = "3.2.0"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=116137316023ae912848a1ee1845fed30b306fdc#116137316023ae912848a1ee1845fed30b306fdc"
 dependencies = [
  "clarity",
  "serde",
@@ -3528,14 +3528,14 @@ dependencies = [
  "test-case",
  "tokio",
  "toml",
- "tower",
+ "tower 0.5.2",
  "tower-test",
 ]
 
 [[package]]
 name = "stacks-rpc-client"
-version = "3.0.1"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=a2570690549df7bf710645ab538af3deee309a01#a2570690549df7bf710645ab538af3deee309a01"
+version = "3.2.0"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=116137316023ae912848a1ee1845fed30b306fdc#116137316023ae912848a1ee1845fed30b306fdc"
 dependencies = [
  "clarinet-utils",
  "clarity",
@@ -3763,9 +3763,9 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tokio"
-version = "1.41.0"
+version = "1.45.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "145f3413504347a2be84393cc8a7d2fb4d863b375909ea59f2158261aa258bbb"
+checksum = "75ef51a33ef1da925cea3e4eb122833cb377c61439ca401b770f54902b806779"
 dependencies = [
  "backtrace",
  "bytes",
@@ -3791,9 +3791,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-macros"
-version = "2.4.0"
+version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "693d596312e88961bc67d7f1f97af8a70227d9f90c31bba5806eec004978d752"
+checksum = "6e06d43f1345a3bcd39f6a56dbb7dcab2ba47e68e8ac134855e7e2bdbaf8cab8"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3885,6 +3885,16 @@ dependencies = [
  "tower-layer",
  "tower-service",
  "tracing",
+]
+
+[[package]]
+name = "tower"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d039ad9159c98b70ecfd540b2573b97f7f52c3e8d9f8ad57a24b916a536975f9"
+dependencies = [
+ "tower-layer",
+ "tower-service",
 ]
 
 [[package]]
