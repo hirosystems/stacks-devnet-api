@@ -98,7 +98,7 @@ When the service has been deployed to your Kubernetes cluster, it should be reac
  - `GET/POST localhost:8477/api/v1/network/<network-id>/bitcoin-node/*` - Forwards `*` to the underlying bitcoin node pod of the devnet. If not all devnet assets exist for the given namespace, a 404 error will be returned.
 - `GET/POST localhost:8477/api/v1/network/<network-id>/stacks-blockchain-api/*` - Forwards `*` to the underlying stacks api pod of the devnet. If not all devnet assets exist for the given namespace, a 404 error will be returned.
 
-## Bugs and feature requests
+## Bugs and Feature Requests
 
 If you encounter a bug or have a feature request, we encourage you to follow the steps below:
 

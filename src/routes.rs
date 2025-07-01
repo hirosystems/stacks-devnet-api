@@ -28,7 +28,7 @@ pub async fn handle_get_status(
     let version_info = match serde_json::to_vec(&version_info) {
         Ok(v) => v,
         Err(e) => {
-            let msg = format!("failed to parse version info: {}", e.to_string());
+            let msg = format!("failed to parse version info: {e}");
             ctx.try_log(|logger| slog::error!(logger, "{}", msg));
             return responder.err_internal(msg);
         }
@@ -58,11 +58,8 @@ pub async fn handle_new_devnet(
         Ok(config) => match config.to_validated_config(user_id, ctx) {
             Ok(config) => match k8s_manager.deploy_devnet(config).await {
                 Ok(_) => {
-                    match request_store.lock() {
-                        Ok(mut store) => {
-                            store.insert(user_id.to_string(), request_time);
-                        }
-                        Err(_) => {}
+                    if let Ok(mut store) = request_store.lock() {
+                        store.insert(user_id.to_string(), request_time);
                     }
                     responder.ok()
                 }
@@ -71,7 +68,7 @@ pub async fn handle_new_devnet(
             Err(e) => responder.respond(e.code, e.message),
         },
         Err(e) => {
-            responder.err_bad_request(format!("invalid configuration to create network: {}", e))
+            responder.err_bad_request(format!("invalid configuration to create network: {e}"))
         }
     }
 }
@@ -112,7 +109,7 @@ pub async fn handle_get_devnet(
     request_time: u64,
     ctx: Context,
 ) -> Result<Response<Body>, Infallible> {
-    match k8s_manager.get_devnet_info(&network, user_id).await {
+    match k8s_manager.get_devnet_info(network, user_id).await {
         Ok(devnet_info) => {
             let last_request_time = match request_store.lock() {
                 Ok(mut store) => match store.get(user_id) {
@@ -135,8 +132,7 @@ pub async fn handle_get_devnet(
                 Err(e) => {
                     let msg = format!(
                         "failed to form response body: NAMESPACE: {}, ERROR: {}",
-                        &network,
-                        e.to_string()
+                        &network, e
                     );
                     ctx.try_log(|logger: &hiro_system_kit::Logger| slog::error!(logger, "{}", msg));
                     responder.err_internal(msg)
@@ -174,18 +170,18 @@ pub async fn handle_try_proxy_service(
     responder: Responder,
     ctx: &Context,
 ) -> Result<Response<Body>, Infallible> {
-    match k8s_manager.check_all_devnet_assets_exist(&network).await {
+    match k8s_manager.check_all_devnet_assets_exist(network).await {
         Ok(exists) => match exists {
             true => {
                 let service = get_service_from_path_part(subroute);
                 match service {
                     Some(service) => {
-                        let base_url = get_service_url(&network, service.clone());
+                        let base_url = get_service_url(network, service.clone());
                         let port = get_user_facing_port(service).unwrap();
-                        let forward_url = format!("{}:{}", base_url, port);
+                        let forward_url = format!("{base_url}:{port}");
                         let proxy_request =
-                            mutate_request_for_proxy(request, &forward_url, &remaining_path);
-                        proxy(proxy_request, responder, &ctx).await
+                            mutate_request_for_proxy(request, &forward_url, remaining_path);
+                        proxy(proxy_request, responder, ctx).await
                     }
                     None => responder.err_bad_request("invalid request path".into()),
                 }
@@ -206,12 +202,12 @@ pub fn mutate_request_for_proxy(
     path_to_forward: &str,
 ) -> Request<Body> {
     let query = match request.uri().query() {
-        Some(query) => format!("?{}", query),
+        Some(query) => format!("?{query}"),
         None => String::new(),
     };
 
     *request.uri_mut() = {
-        let forward_uri = format!("http://{}/{}{}", forward_url, path_to_forward, query);
+        let forward_uri = format!("http://{forward_url}/{path_to_forward}{query}");
         Uri::from_str(forward_uri.as_str())
     }
     .unwrap();
@@ -229,7 +225,7 @@ async fn proxy(
     match client.request(request).await {
         Ok(response) => Ok(response),
         Err(e) => {
-            let msg = format!("error proxying request: {}", e.to_string());
+            let msg = format!("error proxying request: {e}");
             ctx.try_log(|logger| slog::error!(logger, "{}", msg));
             responder.err_internal(msg)
         }
