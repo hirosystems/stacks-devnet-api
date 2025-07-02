@@ -519,7 +519,7 @@ dependencies = [
 [[package]]
 name = "clarinet-deployments"
 version = "3.2.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=09d028d4b4c08dff355905d0b42b2ea17340293f#09d028d4b4c08dff355905d0b42b2ea17340293f"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=ca7c4e04f7ed40634773236be105147c2cccc660#ca7c4e04f7ed40634773236be105147c2cccc660"
 dependencies = [
  "base58",
  "base64 0.21.7",
@@ -546,7 +546,7 @@ dependencies = [
 [[package]]
 name = "clarinet-files"
 version = "3.2.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=09d028d4b4c08dff355905d0b42b2ea17340293f#09d028d4b4c08dff355905d0b42b2ea17340293f"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=ca7c4e04f7ed40634773236be105147c2cccc660#ca7c4e04f7ed40634773236be105147c2cccc660"
 dependencies = [
  "bitcoin",
  "clarinet-utils",
@@ -569,7 +569,7 @@ dependencies = [
 [[package]]
 name = "clarinet-utils"
 version = "1.0.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=09d028d4b4c08dff355905d0b42b2ea17340293f#09d028d4b4c08dff355905d0b42b2ea17340293f"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=ca7c4e04f7ed40634773236be105147c2cccc660#ca7c4e04f7ed40634773236be105147c2cccc660"
 dependencies = [
  "bip32",
  "libsecp256k1",
@@ -602,7 +602,7 @@ dependencies = [
 [[package]]
 name = "clarity-repl"
 version = "3.2.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=09d028d4b4c08dff355905d0b42b2ea17340293f#09d028d4b4c08dff355905d0b42b2ea17340293f"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=ca7c4e04f7ed40634773236be105147c2cccc660#ca7c4e04f7ed40634773236be105147c2cccc660"
 dependencies = [
  "chrono",
  "clar2wasm",
@@ -1554,7 +1554,7 @@ dependencies = [
 [[package]]
 name = "hiro-system-kit"
 version = "0.3.5"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=09d028d4b4c08dff355905d0b42b2ea17340293f#09d028d4b4c08dff355905d0b42b2ea17340293f"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=ca7c4e04f7ed40634773236be105147c2cccc660#ca7c4e04f7ed40634773236be105147c2cccc660"
 dependencies = [
  "colored",
  "time",
@@ -3469,7 +3469,7 @@ dependencies = [
 [[package]]
 name = "stacks-codec"
 version = "3.2.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=09d028d4b4c08dff355905d0b42b2ea17340293f#09d028d4b4c08dff355905d0b42b2ea17340293f"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=ca7c4e04f7ed40634773236be105147c2cccc660#ca7c4e04f7ed40634773236be105147c2cccc660"
 dependencies = [
  "clarity",
  "serde",
@@ -3535,7 +3535,7 @@ dependencies = [
 [[package]]
 name = "stacks-rpc-client"
 version = "3.2.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=09d028d4b4c08dff355905d0b42b2ea17340293f#09d028d4b4c08dff355905d0b42b2ea17340293f"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=ca7c4e04f7ed40634773236be105147c2cccc660#ca7c4e04f7ed40634773236be105147c2cccc660"
 dependencies = [
  "clarinet-utils",
  "clarity",
