@@ -1,3 +1,10 @@
+## [1.9.0](https://github.com/hirosystems/stacks-devnet-api/compare/v1.8.0...v1.9.0) (2025-07-01)
+
+
+### Features
+
+* update readme ([a996096](https://github.com/hirosystems/stacks-devnet-api/commit/a996096eadb582651894a34d450c7a926cd5c3d3))
+
 ## [1.8.0](https://github.com/hirosystems/stacks-devnet-api/compare/v1.7.0...v1.8.0) (2025-05-09)
 
 
