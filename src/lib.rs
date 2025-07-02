@@ -1,3 +1,7 @@
+use std::{collections::BTreeMap, str::FromStr, time::Duration};
+use std::{env, thread::sleep};
+
+use clarinet_deployments::types::BurnchainEpochConfig;
 use clarinet_files::{compute_addresses, StacksNetwork};
 use futures::future::try_join3;
 use hiro_system_kit::{slog, Logger};
@@ -25,8 +29,6 @@ use resources::{
     StacksDevnetResource,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{collections::BTreeMap, str::FromStr, time::Duration};
-use std::{env, thread::sleep};
 use strum::IntoEnumIterator;
 use tower::BoxError;
 
@@ -103,6 +105,7 @@ struct StacksV2InfoResponse {
     burn_block_height: u64,
     stacks_tip_height: u64,
 }
+
 #[derive(Clone)]
 pub struct StacksDevnetApiK8sManager {
     client: Client,
@@ -1358,53 +1361,20 @@ impl StacksDevnetApiK8sManager {
                 get_service_port(StacksDevnetService::BitcoindNode, ServicePort::P2P).unwrap()
             ));
 
-            stacks_conf.push_str(&format!(
+            stacks_conf.push_str(
                 r#"
                 [[burnchain.epochs]]
                 epoch_name = "1.0"
                 start_height = 0
-
-                [[burnchain.epochs]]
-                epoch_name = "2.0"
-                start_height = {}
-
-                [[burnchain.epochs]]
-                epoch_name = "2.05"
-                start_height = {}
-
-                [[burnchain.epochs]]
-                epoch_name = "2.1"
-                start_height = {}
-
-                [[burnchain.epochs]]
-                epoch_name = "2.2"
-                start_height = {}
-
-                [[burnchain.epochs]]
-                epoch_name = "2.3"
-                start_height = {}
-
-                [[burnchain.epochs]]
-                epoch_name = "2.4"
-                start_height = {}
-
-                [[burnchain.epochs]]
-                epoch_name = "2.5"
-                start_height = {}
-
-                [[burnchain.epochs]]
-                epoch_name = "3.0"
-                start_height = {}
                 "#,
-                devnet_config.epoch_2_0,
-                devnet_config.epoch_2_05,
-                devnet_config.epoch_2_1,
-                devnet_config.epoch_2_2,
-                devnet_config.epoch_2_3,
-                devnet_config.epoch_2_4,
-                devnet_config.epoch_2_5,
-                devnet_config.epoch_3_0,
-            ));
+            );
+            let epoch_conf = BurnchainEpochConfig::from(devnet_config);
+            let epoch_conf_str = toml::to_string(&epoch_conf).map_err(|e| DevNetError {
+                message: format!("failed to serialize epoch config: {e}"),
+                code: 500,
+            })?;
+            stacks_conf.push_str(&epoch_conf_str);
+
             stacks_conf
         };
 
