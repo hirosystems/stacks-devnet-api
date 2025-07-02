@@ -1,10 +1,14 @@
-use clarinet_files::{compute_addresses, StacksNetwork};
+use std::{collections::BTreeMap, str::FromStr, time::Duration};
+use std::{env, thread::sleep};
+
+use clarinet_files::{compute_addresses, DevnetConfig, StacksNetwork};
 use futures::future::try_join3;
 use hiro_system_kit::{slog, Logger};
 use hyper::{
     body::{Bytes, HttpBody},
     Body, Client as HttpClient, Request, Response, Uri,
 };
+use indoc::formatdoc;
 use k8s_openapi::{
     api::{
         apps::v1::{Deployment, StatefulSet},
@@ -25,9 +29,8 @@ use resources::{
     StacksDevnetResource,
 };
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{collections::BTreeMap, str::FromStr, time::Duration};
-use std::{env, thread::sleep};
 use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
 use tower::BoxError;
 
 pub mod config;
@@ -43,6 +46,28 @@ pub mod routes;
 use crate::resources::configmap::StacksDevnetConfigmap;
 use crate::resources::pod::StacksDevnetPod;
 use crate::resources::service::{get_service_url, StacksDevnetService};
+
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone, Copy, Eq, PartialOrd, Ord, EnumIter)]
+pub enum EpochSpec {
+    #[serde(rename = "2.0")]
+    Epoch2_0,
+    #[serde(rename = "2.05")]
+    Epoch2_05,
+    #[serde(rename = "2.1")]
+    Epoch2_1,
+    #[serde(rename = "2.2")]
+    Epoch2_2,
+    #[serde(rename = "2.3")]
+    Epoch2_3,
+    #[serde(rename = "2.4")]
+    Epoch2_4,
+    #[serde(rename = "2.5")]
+    Epoch2_5,
+    #[serde(rename = "3.0")]
+    Epoch3_0,
+    #[serde(rename = "3.1")]
+    Epoch3_1,
+}
 
 const COMPONENT_SELECTOR: &str = "app.kubernetes.io/component";
 const USER_SELECTOR: &str = "app.kubernetes.io/instance";
@@ -103,6 +128,7 @@ struct StacksV2InfoResponse {
     burn_block_height: u64,
     stacks_tip_height: u64,
 }
+
 #[derive(Clone)]
 pub struct StacksDevnetApiK8sManager {
     client: Client,
@@ -1358,6 +1384,9 @@ impl StacksDevnetApiK8sManager {
                 get_service_port(StacksDevnetService::BitcoindNode, ServicePort::P2P).unwrap()
             ));
 
+            let epoch_conf = build_stacks_epoch_config(devnet_config);
+            stacks_conf.push_str(&epoch_conf);
+
             stacks_conf.push_str(&format!(
                 r#"
                 [[burnchain.epochs]]
@@ -1395,6 +1424,10 @@ impl StacksDevnetApiK8sManager {
                 [[burnchain.epochs]]
                 epoch_name = "3.0"
                 start_height = {}
+
+                [[burnchain.epochs]]
+                epoch_name = "3.1"
+                start_height = {}
                 "#,
                 devnet_config.epoch_2_0,
                 devnet_config.epoch_2_05,
@@ -1404,6 +1437,7 @@ impl StacksDevnetApiK8sManager {
                 devnet_config.epoch_2_4,
                 devnet_config.epoch_2_5,
                 devnet_config.epoch_3_0,
+                devnet_config.epoch_3_1,
             ));
             stacks_conf
         };
@@ -1711,5 +1745,99 @@ impl StacksDevnetApiK8sManager {
                 })
             }
         }
+    }
+}
+
+fn build_stacks_epoch_config(config: &DevnetConfig) -> String {
+    EpochSpec::iter()
+        .map(|epoch| {
+            let start_height = match epoch {
+                EpochSpec::Epoch2_0 => config.epoch_2_0,
+                EpochSpec::Epoch2_05 => config.epoch_2_05,
+                EpochSpec::Epoch2_1 => config.epoch_2_1,
+                EpochSpec::Epoch2_2 => config.epoch_2_2,
+                EpochSpec::Epoch2_3 => config.epoch_2_3,
+                EpochSpec::Epoch2_4 => config.epoch_2_4,
+                EpochSpec::Epoch2_5 => config.epoch_2_5,
+                EpochSpec::Epoch3_0 => config.epoch_3_0,
+                EpochSpec::Epoch3_1 => config.epoch_3_1,
+            };
+            let epoch_toml = toml::to_string(&epoch).unwrap();
+            formatdoc!(
+                r#"
+            [[burnchain.epochs]]
+            epoch_name = {epoch_toml}
+            start_height = {start_height}
+            "#,
+            )
+        })
+        .collect::<Vec<String>>()
+        .join("\n")
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+    use pretty_assertions::assert_eq;
+
+    use super::*;
+
+    #[test]
+    fn test_epoch_conf() {
+        let devnet_config = DevnetConfig {
+            epoch_2_0: 0,
+            epoch_2_05: 1,
+            epoch_2_1: 2,
+            epoch_2_2: 3,
+            epoch_2_3: 4,
+            epoch_2_4: 5,
+            epoch_2_5: 6,
+            epoch_3_0: 7,
+            epoch_3_1: 8,
+            ..Default::default()
+        };
+
+        let epoch_config = build_stacks_epoch_config(&devnet_config);
+
+        assert_eq!(
+            epoch_config.trim_end(),
+            indoc! { r#"
+                [[burnchain.epochs]]
+                epoch_name = "2.0"
+                start_height = 0
+
+                [[burnchain.epochs]]
+                epoch_name = "2.05"
+                start_height = 1
+
+                [[burnchain.epochs]]
+                epoch_name = "2.1"
+                start_height = 2
+
+                [[burnchain.epochs]]
+                epoch_name = "2.2"
+                start_height = 3
+
+                [[burnchain.epochs]]
+                epoch_name = "2.3"
+                start_height = 4
+
+                [[burnchain.epochs]]
+                epoch_name = "2.4"
+                start_height = 5
+
+                [[burnchain.epochs]]
+                epoch_name = "2.5"
+                start_height = 6
+
+                [[burnchain.epochs]]
+                epoch_name = "3.0"
+                start_height = 7
+
+                [[burnchain.epochs]]
+                epoch_name = "3.1"
+                start_height = 8"#
+            }
+        );
     }
 }
