@@ -1,3 +1,10 @@
+## [1.10.0](https://github.com/hirosystems/stacks-devnet-api/compare/v1.9.0...v1.10.0) (2025-07-02)
+
+
+### Features
+
+* fix safer epoch config handling ([#132](https://github.com/hirosystems/stacks-devnet-api/issues/132)) ([75f6557](https://github.com/hirosystems/stacks-devnet-api/commit/75f6557eaa68ba22620128c613421ca9f01c637f))
+
 ## [1.9.0](https://github.com/hirosystems/stacks-devnet-api/compare/v1.8.0...v1.9.0) (2025-07-01)
 
 
