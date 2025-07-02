@@ -21,8 +21,7 @@ serde_json = "1.0.132"
 serde_yaml = "0.8.23"
 hyper = { version = "0.14", features = ["full"] }
 tower = "0.5.2"
-strum_macros = "0.24.3"
-strum = "0.24.1"
+strum = { version = "0.27.1", features = ["derive"] }
 toml = "0.5.9"
 
 hiro-system-kit = { version = "0.1.0", features = ["log"] }
@@ -40,6 +39,6 @@ serial_test = "2.0.0"
 k8s_tests = []
 
 [patch.crates-io]
-clarinet-files = { git = "https://github.com/hirosystems/clarinet.git", rev = "116137316023ae912848a1ee1845fed30b306fdc" }
-clarinet-deployments = { git = "https://github.com/hirosystems/clarinet.git", rev = "116137316023ae912848a1ee1845fed30b306fdc" }
-hiro-system-kit = { git = "https://github.com/hirosystems/clarinet.git", rev = "116137316023ae912848a1ee1845fed30b306fdc" }
+clarinet-files = { git = "https://github.com/hirosystems/clarinet.git", rev = "09d028d4b4c08dff355905d0b42b2ea17340293f" }
+clarinet-deployments = { git = "https://github.com/hirosystems/clarinet.git", rev = "09d028d4b4c08dff355905d0b42b2ea17340293f" }
+hiro-system-kit = { git = "https://github.com/hirosystems/clarinet.git", rev = "09d028d4b4c08dff355905d0b42b2ea17340293f" }

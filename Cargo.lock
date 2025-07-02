@@ -519,7 +519,7 @@ dependencies = [
 [[package]]
 name = "clarinet-deployments"
 version = "3.2.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=116137316023ae912848a1ee1845fed30b306fdc#116137316023ae912848a1ee1845fed30b306fdc"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=09d028d4b4c08dff355905d0b42b2ea17340293f#09d028d4b4c08dff355905d0b42b2ea17340293f"
 dependencies = [
  "base58",
  "base64 0.21.7",
@@ -540,12 +540,13 @@ dependencies = [
  "serde_yaml 0.8.26",
  "stacks-codec",
  "stacks-rpc-client",
+ "strum",
 ]
 
 [[package]]
 name = "clarinet-files"
 version = "3.2.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=116137316023ae912848a1ee1845fed30b306fdc#116137316023ae912848a1ee1845fed30b306fdc"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=09d028d4b4c08dff355905d0b42b2ea17340293f#09d028d4b4c08dff355905d0b42b2ea17340293f"
 dependencies = [
  "bitcoin",
  "clarinet-utils",
@@ -568,7 +569,7 @@ dependencies = [
 [[package]]
 name = "clarinet-utils"
 version = "1.0.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=116137316023ae912848a1ee1845fed30b306fdc#116137316023ae912848a1ee1845fed30b306fdc"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=09d028d4b4c08dff355905d0b42b2ea17340293f#09d028d4b4c08dff355905d0b42b2ea17340293f"
 dependencies = [
  "bip32",
  "libsecp256k1",
@@ -601,7 +602,7 @@ dependencies = [
 [[package]]
 name = "clarity-repl"
 version = "3.2.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=116137316023ae912848a1ee1845fed30b306fdc#116137316023ae912848a1ee1845fed30b306fdc"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=09d028d4b4c08dff355905d0b42b2ea17340293f#09d028d4b4c08dff355905d0b42b2ea17340293f"
 dependencies = [
  "chrono",
  "clar2wasm",
@@ -1553,7 +1554,7 @@ dependencies = [
 [[package]]
 name = "hiro-system-kit"
 version = "0.3.5"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=116137316023ae912848a1ee1845fed30b306fdc#116137316023ae912848a1ee1845fed30b306fdc"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=09d028d4b4c08dff355905d0b42b2ea17340293f#09d028d4b4c08dff355905d0b42b2ea17340293f"
 dependencies = [
  "colored",
  "time",
@@ -3468,7 +3469,7 @@ dependencies = [
 [[package]]
 name = "stacks-codec"
 version = "3.2.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=116137316023ae912848a1ee1845fed30b306fdc#116137316023ae912848a1ee1845fed30b306fdc"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=09d028d4b4c08dff355905d0b42b2ea17340293f#09d028d4b4c08dff355905d0b42b2ea17340293f"
 dependencies = [
  "clarity",
  "serde",
@@ -3524,7 +3525,6 @@ dependencies = [
  "serde_yaml 0.8.26",
  "serial_test",
  "strum",
- "strum_macros",
  "test-case",
  "tokio",
  "toml",
@@ -3535,7 +3535,7 @@ dependencies = [
 [[package]]
 name = "stacks-rpc-client"
 version = "3.2.0"
-source = "git+https://github.com/hirosystems/clarinet.git?rev=116137316023ae912848a1ee1845fed30b306fdc#116137316023ae912848a1ee1845fed30b306fdc"
+source = "git+https://github.com/hirosystems/clarinet.git?rev=09d028d4b4c08dff355905d0b42b2ea17340293f#09d028d4b4c08dff355905d0b42b2ea17340293f"
 dependencies = [
  "clarinet-utils",
  "clarity",
@@ -3555,21 +3555,24 @@ checksum = "7da8b5736845d9f2fcb837ea5d9e2628564b3b043a70948a3f0b778838c5fb4f"
 
 [[package]]
 name = "strum"
-version = "0.24.1"
+version = "0.27.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "063e6045c0e62079840579a7e47a355ae92f60eb74daaf156fb1e84ba164e63f"
+checksum = "f64def088c51c9510a8579e3c5d67c65349dcf755e5479ad3d010aa6454e2c32"
+dependencies = [
+ "strum_macros",
+]
 
 [[package]]
 name = "strum_macros"
-version = "0.24.3"
+version = "0.27.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e385be0d24f186b4ce2f9982191e7101bb737312ad61c1f2f984f34bcf85d59"
+checksum = "c77a8c5abcaf0f9ce05d62342b7d298c346515365c36b673df4ebe3ced01fde8"
 dependencies = [
- "heck 0.4.1",
+ "heck 0.5.0",
  "proc-macro2",
  "quote",
  "rustversion",
- "syn 1.0.109",
+ "syn 2.0.98",
 ]
 
 [[package]]

@@ -1,5 +1,5 @@
 use std::fmt;
-use strum_macros::EnumIter;
+use strum::EnumIter;
 
 #[derive(EnumIter, Debug, Clone)]
 pub enum StacksDevnetStatefulSet {
