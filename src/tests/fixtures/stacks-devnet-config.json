@@ -88,12 +88,12 @@
               "path": "contracts/px.clar"
             },
             "source": "Cjs7IHRpdGxlOiBweAo7OyB2ZXJzaW9uOgo7OyBzdW1tYXJ5Ogo7OyBkZXNjcmlwdGlvbjogQWxsb3dzIHVzZXJzIHRvIHBheSB0byB1cGRhdGUgZGF0YSBpbiBhIG1hdHJpeC4gCjs7ICBFYWNoIG1hdHJpeCB2YWx1ZSBtdXN0IGJlIGEgaGV4YWRlY2ltYWwgdmFsdWUgZnJvbSAweDAwMDAwMCB0byAweGZmZmZmZiwgcmVwcmVzZW50aW5nIGEgY29sb3IgdG8gYmUgZGlzcGxheWVkIG9uIGEgZ3JpZCBpbiBhIHdlYiBwYWdlLiAKOzsgIEVhY2ggbWF0cml4IGtleSBjb3JyZXNwb25kcyB0byB0aGUgbG9jYXRpb24gb2YgdGhlIGdyaWQsIHdoaWNoIGlzIDEwMHgxMDAgY2VsbHMuCgo7OyB0cmFpdHMKOzsKCjs7IHRva2VuIGRlZmluaXRpb25zCjs7IAoKOzsgY29uc3RhbnRzCjs7CihkZWZpbmUtY29uc3RhbnQgTUFYX0xPQyB1MTAwKQooZGVmaW5lLWNvbnN0YW50IE1BWF9WQUwgMHhmZmZmZmYpCihkZWZpbmUtY29uc3RhbnQgTUlOX1ZBTCAweDAwMDAwMCkKKGRlZmluZS1jb25zdGFudCBBTExfTE9DUyAobGlzdCB1MCB1MSB1MiB1MyB1NCB1NSB1NiB1NyB1OCB1OSB1MTAgdTExIHUxMiB1MTMgdTE0IHUxNSB1MTYgdTE3IHUxOCB1MTkgdTIwIHUyMSB1MjIgdTIzIHUyNCB1MjUgdTI2IHUyNyB1MjggdTI5IHUzMCB1MzEgdTMyIHUzMyB1MzQgdTM1IHUzNiB1MzcgdTM4IHUzOSB1NDAgdTQxIHU0MiB1NDMgdTQ0IHU0NSB1NDYgdTQ3IHU0OCB1NDkgdTUwIHU1MSB1NTIgdTUzIHU1NCB1NTUgdTU2IHU1NyB1NTggdTU5IHU2MCB1NjEgdTYyIHU2MyB1NjQgdTY1IHU2NiB1NjcgdTY4IHU2OSB1NzAgdTcxIHU3MiB1NzMgdTc0IHU3NSB1NzYgdTc3IHU3OCB1NzkgdTgwIHU4MSB1ODIgdTgzIHU4NCB1ODUgdTg2IHU4NyB1ODggdTg5IHU5MCB1OTEgdTkyIHU5MyB1OTQgdTk1IHU5NiB1OTcgdTk4IHU5OSkpCjs7IGRhdGEgdmFycwo7OwoKOzsgZGF0YSBtYXBzCjs7CihkZWZpbmUtbWFwIHBpeGVscyB1aW50IChidWZmIDMpKQoKOzsgcHVibGljIGZ1bmN0aW9ucwo7OwooZGVmaW5lLXB1YmxpYyAoc2V0LXZhbHVlLWF0IChsb2MgdWludCkgKHZhbHVlIChidWZmIDMpKSkgCiAgICAoYmVnaW4gCiAgICAgICAgKGlmICg+PSBsb2MgTUFYX0xPQykKICAgICAgICAgICAgKGVyciAiTG9jYXRpb24gb3V0IG9mIGJvdW5kcy4iKQogICAgICAgICAgICAoaWYgKD4gdmFsdWUgTUFYX1ZBTCkKICAgICAgICAgICAgICAgIChlcnIgIlZhbHVlIG11c3QgYmUgbGVzcyB0aGFuIDB4ZmZmZmZmLiIpCiAgICAgICAgICAgICAgICAoaWYgKDwgdmFsdWUgTUlOX1ZBTCkKICAgICAgICAgICAgICAgICAgICAoZXJyICJWYWx1ZSBtdXN0IGJlIGdyZWF0ZXIgdGhhbiAweDAwMDAwMC4iKQogICAgICAgICAgICAgICAgICAgIChvayAobWFwLXNldCBwaXhlbHMgbG9jIHZhbHVlKSkKICAgICAgICAgICAgICAgICkKICAgICAgICAgICAgKQogICAgICAgICkKICAgICkKKQo7OyByZWFkIG9ubHkgZnVuY3Rpb25zCjs7CgooZGVmaW5lLXJlYWQtb25seSAoZ2V0LXZhbHVlLWF0IChsb2MgdWludCkpCiAgICAoaWYgKD49IGxvYyBNQVhfTE9DKQogICAgICAgIChlcnIgIk91dCBvZiBib3VuZHMuIikKICAgICAgICAob2sgKGRlZmF1bHQtdG8gMHhmZmZmZmYgKG1hcC1nZXQ/IHBpeGVscyBsb2MpKSkKICAgICkKKQoKKGRlZmluZS1yZWFkLW9ubHkgKGdldC1hbGwpIAogICAgKG1hcCBnZXQtdmFsdWUtYXQgQUxMX0xPQ1MpCikKCihkZWZpbmUtcmVhZC1vbmx5IChnZW5lc2lzLXRpbWUgKGhlaWdodCB1aW50KSkKICAgIChnZXQtYmxvY2staW5mbz8gdGltZSBoZWlnaHQpCikKOzsgcHJpdmF0ZSBmdW5jdGlvbnMKOzsK",
-            "clarity_version": 2,
+            "clarity_version": 3,
             "cost": 18060,
             "anchor_block_only": true
           }
         ],
-        "epoch": "2.1"
+        "epoch": "3.1"
       },
       {
         "id": 3,
@@ -117,7 +117,7 @@
             "anchor_block_only": true
           }
         ],
-        "epoch": "2.1"
+        "epoch": "3.1"
       }
     ],
     "contracts": [
@@ -376,8 +376,8 @@
     "contracts": {
       "px": {
         "path": "contracts/px.clar",
-        "clarity_version": 2,
-        "epoch": 2.1
+        "clarity_version": 3,
+        "epoch": 3.1
       }
     },
     "repl": {
