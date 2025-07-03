@@ -11,7 +11,6 @@ use test_case::test_case;
 #[test_case(StacksDevnetConfigmap::StacksBlockchainApi => is equal_to "stacks-blockchain-api"; "for StacksBlockchainApi")]
 #[test_case(StacksDevnetConfigmap::StacksBlockchainApiPg => is equal_to "stacks-blockchain-api-pg"; "for StacksBlockchainApiPg")]
 #[test_case(StacksDevnetConfigmap::StacksSigner0 => is equal_to "stacks-signer-0"; "for StacksSigner0")]
-#[test_case(StacksDevnetConfigmap::StacksSigner1 => is equal_to "stacks-signer-1"; "for StacksSigner1")]
 #[test_case(StacksDevnetConfigmap::DeploymentPlan => is equal_to "deployment-plan"; "for DeploymentPlan")]
 #[test_case(StacksDevnetConfigmap::Devnet => is equal_to "devnet"; "for Devnet")]
 #[test_case(StacksDevnetConfigmap::ProjectDir => is equal_to "project-dir"; "for ProjectDir")]
@@ -35,7 +34,6 @@ fn it_prints_correct_name_for_deployment(deployment: StacksDevnetDeployment) -> 
 
 #[test_case(StacksDevnetStatefulSet::StacksBlockchainApi => is equal_to  "stacks-blockchain-api"; "for StacksBlockchainApi")]
 #[test_case(StacksDevnetStatefulSet::StacksSigner0 => is equal_to  "stacks-signer-0"; "for StacksSigner0")]
-#[test_case(StacksDevnetStatefulSet::StacksSigner1 => is equal_to  "stacks-signer-1"; "for StacksSigner1")]
 fn it_prints_correct_name_for_stateful_set(pod: StacksDevnetStatefulSet) -> String {
     pod.to_string()
 }
@@ -44,7 +42,6 @@ fn it_prints_correct_name_for_stateful_set(pod: StacksDevnetStatefulSet) -> Stri
 #[test_case(StacksDevnetService::StacksBlockchain => is equal_to  "stacks-blockchain"; "for StacksBlockchain")]
 #[test_case(StacksDevnetService::StacksBlockchainApi => is equal_to  "stacks-blockchain-api"; "for StacksBlockchainApi")]
 #[test_case(StacksDevnetService::StacksSigner0 => is equal_to  "stacks-signer-0"; "for StacksSigner0")]
-#[test_case(StacksDevnetService::StacksSigner1 => is equal_to  "stacks-signer-1"; "for StacksSigner1")]
 fn it_prints_correct_name_for_service(service: StacksDevnetService) -> String {
     service.to_string()
 }
@@ -59,7 +56,6 @@ fn it_prints_correct_name_for_service(service: StacksDevnetService) -> String {
 #[test_case(StacksDevnetService::StacksBlockchainApi, ServicePort::Event => is equal_to  Some("3700".to_string()); "for StacksBlockchainApi Event port")]
 #[test_case(StacksDevnetService::StacksBlockchainApi, ServicePort::DB => is equal_to  Some("5432".to_string()); "for StacksBlockchainApi DB port")]
 #[test_case(StacksDevnetService::StacksSigner0, ServicePort::Event => is equal_to  Some("30001".to_string()); "for StacksSigner0 Event port")]
-#[test_case(StacksDevnetService::StacksSigner1, ServicePort::Event => is equal_to  Some("30001".to_string()); "for StacksSigner1 Event port")]
 #[test_case(StacksDevnetService::StacksBlockchainApi, ServicePort::RPC => is equal_to  None; "invalid service port combination")]
 fn it_gets_correct_port_for_service(
     service: StacksDevnetService,
@@ -72,7 +68,6 @@ fn it_gets_correct_port_for_service(
 #[test_case("stacks-blockchain" => is equal_to Some(StacksDevnetService::StacksBlockchain); "for stacks-blockchain")]
 #[test_case("stacks-blockchain-api" => is equal_to Some(StacksDevnetService::StacksBlockchainApi); "for stacks-blockchain-api")]
 #[test_case("stacks-signer-0" => is equal_to Some(StacksDevnetService::StacksSigner0); "for stacks-signer-0")]
-#[test_case("stacks-signer-1" => is equal_to Some(StacksDevnetService::StacksSigner1); "for stacks-signer-1")]
 #[test_case("invalid" => is equal_to None; "returning None for invalid paths")]
 fn it_prints_service_from_path_part(path_part: &str) -> Option<StacksDevnetService> {
     get_service_from_path_part(path_part)
@@ -82,7 +77,6 @@ fn it_prints_service_from_path_part(path_part: &str) -> Option<StacksDevnetServi
 #[test_case(StacksDevnetService::StacksBlockchain => is equal_to Some("20443".to_string()); "for StacksBlockchain")]
 #[test_case(StacksDevnetService::StacksBlockchainApi => is equal_to Some("3999".to_string()); "for StacksBlockchainApi")]
 #[test_case(StacksDevnetService::StacksSigner0 => is equal_to None; "for StacksSigner0")]
-#[test_case(StacksDevnetService::StacksSigner1 => is equal_to None; "for StacksSigner1")]
 fn it_gets_user_facing_port_for_service(service: StacksDevnetService) -> Option<String> {
     get_user_facing_port(service)
 }

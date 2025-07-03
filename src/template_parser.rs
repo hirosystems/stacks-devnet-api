@@ -58,14 +58,5 @@ pub fn get_yaml_from_resource(resource: StacksDevnetResource) -> &'static str {
         StacksDevnetResource::Configmap(StacksDevnetConfigmap::StacksSigner0) => {
             include_str!("../templates/configmaps/stacks-signer-0.template.yaml")
         }
-        StacksDevnetResource::StatefulSet(StacksDevnetStatefulSet::StacksSigner1) => {
-            include_str!("../templates/stateful-sets/stacks-signer-1.template.yaml")
-        }
-        StacksDevnetResource::Service(StacksDevnetService::StacksSigner1) => {
-            include_str!("../templates/services/stacks-signer-1.template.yaml")
-        }
-        StacksDevnetResource::Configmap(StacksDevnetConfigmap::StacksSigner1) => {
-            include_str!("../templates/configmaps/stacks-signer-1.template.yaml")
-        }
     }
 }
