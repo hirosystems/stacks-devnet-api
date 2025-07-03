@@ -189,6 +189,7 @@ devnet_settings:
   epoch_2_4: 105
   epoch_2_5: 105
   epoch_3_0: 121
+  epoch_3_1: 122
   use_docker_gateway_routing: false
   docker_platform: linux/amd64
 "

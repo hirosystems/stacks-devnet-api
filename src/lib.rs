@@ -221,13 +221,6 @@ impl StacksDevnetApiK8sManager {
         )
         .await?;
 
-        self.deploy_stacks_signer(
-            &config,
-            SignerIdx::Signer1,
-            "530d9f61984c888536871c6573073bdfc0058896dc1adfe9a6a10dfacadc209101",
-        )
-        .await?;
-
         if !config.disable_stacks_api {
             self.deploy_stacks_blockchain_api(&config).await?;
         }
@@ -1316,11 +1309,6 @@ impl StacksDevnetApiK8sManager {
                         get_service_port(StacksDevnetService::StacksSigner0, ServicePort::Event)
                             .unwrap(),
                     ),
-                    SignerIdx::Signer1 => (
-                        get_service_url(namespace, StacksDevnetService::StacksSigner1),
-                        get_service_port(StacksDevnetService::StacksSigner1, ServicePort::Event)
-                            .unwrap(),
-                    ),
                 };
 
                 stacks_conf.push_str(&format!(
@@ -1478,24 +1466,18 @@ impl StacksDevnetApiK8sManager {
             SignerIdx::Signer0 => {
                 get_service_port(StacksDevnetService::StacksSigner0, ServicePort::Event).unwrap()
             }
-            SignerIdx::Signer1 => {
-                get_service_port(StacksDevnetService::StacksSigner1, ServicePort::Event).unwrap()
-            }
         };
 
         let configmap = match signer_idx {
             SignerIdx::Signer0 => StacksDevnetConfigmap::StacksSigner0,
-            SignerIdx::Signer1 => StacksDevnetConfigmap::StacksSigner1,
         };
 
         let sts = match signer_idx {
             SignerIdx::Signer0 => StacksDevnetStatefulSet::StacksSigner0,
-            SignerIdx::Signer1 => StacksDevnetStatefulSet::StacksSigner1,
         };
 
         let service = match signer_idx {
             SignerIdx::Signer0 => StacksDevnetService::StacksSigner0,
-            SignerIdx::Signer1 => StacksDevnetService::StacksSigner1,
         };
 
         // configmap env vars for api conatainer
