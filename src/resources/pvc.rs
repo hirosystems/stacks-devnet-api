@@ -5,7 +5,6 @@ use strum::EnumIter;
 pub enum StacksDevnetPvc {
     StacksBlockchainApiPg,
     StacksSigner0,
-    StacksSigner1,
 }
 
 impl fmt::Display for StacksDevnetPvc {
@@ -13,7 +12,6 @@ impl fmt::Display for StacksDevnetPvc {
         match self {
             StacksDevnetPvc::StacksBlockchainApiPg => write!(f, "stacks-blockchain-api"),
             StacksDevnetPvc::StacksSigner0 => write!(f, "stacks-signer-0"),
-            StacksDevnetPvc::StacksSigner1 => write!(f, "stacks-signer-1"),
         }
     }
 }
