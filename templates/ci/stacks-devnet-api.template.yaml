@@ -34,8 +34,7 @@ roleRef:
   name: stacks-devnet-api
   apiGroup: rbac.authorization.k8s.io
 
----  
-
+---
 apiVersion: v1
 kind: Pod
 metadata:
@@ -78,4 +77,3 @@ spec:
   selector:
     name: stacks-devnet-api
   type: NodePort
-

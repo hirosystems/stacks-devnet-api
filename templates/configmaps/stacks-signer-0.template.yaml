@@ -9,4 +9,5 @@ metadata:
     app.kubernetes.io/managed-by: stacks-devnet-api
     app.kubernetes.io/name: stacks-signer-0
     app.kubernetes.io/component: stacks-signer-0
-    argocd.argoproj.io/instance: platform-user-resources.platform
+  annotations:
+    argocd.argoproj.io/tracking-id: platform-user-resources.platform:apps/Deployment:{user_id}/argo-cd
