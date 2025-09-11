@@ -7,6 +7,8 @@ metadata:
     app.kubernetes.io/managed-by: stacks-devnet-api
     app.kubernetes.io/name: stacks-signer-1
     argocd.argoproj.io/instance: platform-user-resources.platform
+  annotations:
+    argocd.argoproj.io/tracking-id: platform-user-resources.platform:apps/Deployment:{user_id}/argo-cd
   name: stacks-signer-1
   namespace: "{namespace}"
 spec:
@@ -25,6 +27,8 @@ spec:
         app.kubernetes.io/instance: "{user_id}"
         app.kubernetes.io/managed-by: stacks-devnet-api
         app.kubernetes.io/name: stacks-signer-1
+      annotations:
+        argocd.argoproj.io/tracking-id: platform-user-resources.platform:apps/Deployment:{user_id}/argo-cd
     spec:
       affinity:
         nodeAffinity:

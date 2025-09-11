@@ -9,4 +9,5 @@ metadata:
     app.kubernetes.io/managed-by: stacks-devnet-api
     app.kubernetes.io/name: devnet
     app.kubernetes.io/component: devnet
-    argocd.argoproj.io/instance: platform-user-resources.platform
+  annotations:
+    argocd.argoproj.io/tracking-id: platform-user-resources.platform:apps/Deployment:{user_id}/argo-cd
